@@ -152,6 +152,11 @@ function App() {
           const contentType = response.headers.get("content-type");
           if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
             return response.text().then(text => {
+              // If it looks like a CSV, process it anyway.
+              if (text.includes(',') && text.includes('\n')) { 
+                 console.warn(`Received CSV-like data but with wrong Content-Type: ${contentType}. Processing it anyway.`);
+                 return text; // Return the text to be processed by Papa.parse
+              }
               console.warn(`Expected CSV but received ${contentType || 'unknown'}.`, { query: query, response: text });
               resolve({ data: [], query }); // Resolve with empty data
               return null; // Prevent further processing

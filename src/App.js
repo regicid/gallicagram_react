@@ -281,6 +281,37 @@ function App() {
       });
   };
 
+  const handleDownloadCSV = () => {
+    if (plotData.length === 0) {
+      alert("No data to download.");
+      return;
+    }
+
+    const headers = ['date', ...plotData.map(trace => trace.name)];
+    const rows = plotData[0].x.map((date, i) => {
+      const row = { date: date.toISOString().split('T')[0] };
+      plotData.forEach(trace => {
+        row[trace.name] = trace.y[i];
+      });
+      return row;
+    });
+
+    const csv = Papa.unparse({
+      fields: headers,
+      data: rows
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'gallicagram_data.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const activeQuery = queries.find(q => q.id === activeQueryId);
 
   return (
@@ -312,6 +343,9 @@ function App() {
           )}
           <button onClick={handlePlot} disabled={isLoading}>
             {isLoading ? 'Loading...' : 'Plot'}
+          </button>
+          <button onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
+            Download CSV
           </button>
           <div className="form-group">
             <label>Visualization:</label>

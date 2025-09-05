@@ -112,3 +112,19 @@ button:hover {
 .form-row .form-group {
   flex: 1;
 }
+
+.checkbox-group {
+  display: flex;
+  gap: 10px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="radio"] {
+  margin-right: 5px;
+}
+

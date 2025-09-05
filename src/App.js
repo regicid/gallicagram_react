@@ -149,14 +149,19 @@ function App() {
           if (!response.ok) {
             throw new Error(`Network response was not ok for "${word}"`);
           }
+          const contentType = response.headers.get("content-type");
+          if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
+            return response.text().then(text => {
+              console.warn(`Expected CSV but received ${contentType || 'unknown'}.`, { query: query, response: text });
+              resolve({ data: [], query }); // Resolve with empty data
+              return null; // Prevent further processing
+            });
+          }
           return response.text();
         })
         .then(csvText => {
-          if (!csvText.includes(',')) {
-            console.warn(`Received non-CSV data for "${word}":`, csvText);
-            resolve({ data: [], query });
-            return;
-          }
+          if (csvText === null) return; // Stop if not CSV
+
           Papa.parse(csvText, {
             header: true,
             dynamicTyping: true,
@@ -164,7 +169,9 @@ function App() {
             complete: (results) => {
               if (results.errors.length) {
                 console.error(`CSV Parsing errors for "${word}":`, results.errors);
-                reject(new Error(`Error parsing CSV for "${word}"`));
+                // Even with parsing errors, we resolve with what we have, but log it.
+                // This is more robust than rejecting the whole promise.
+                resolve({ data: results.data, query });
               } else {
                 resolve({ data: results.data, query });
               }
@@ -203,7 +210,7 @@ function App() {
     }
 
     data.forEach(row => {
-      const year = row.annee || row.year || row.année;
+      const year = row.date || row.annee || row.year || row.année;
       if (year && row.n !== undefined && row.total !== undefined) {
         let dateKey;
         if (resolution === 'annee') {
@@ -238,7 +245,10 @@ function App() {
       x: processedData.map(d => d.x),
       y: yValues,
       type: plotType === 'line' ? 'scatter' : 'bar',
-      mode: plotType === 'line' ? 'lines+markers' : undefined,
+      mode: plotType === 'line'
+        ? (processedData.length > 20 ? 'lines' : 'lines+markers')
+        : undefined,
+      line: plotType === 'line' ? { shape: 'spline' } : undefined,
       name: allSameCorpus
         ? (query.word || `Query ${query.id}`)
         : `${query.word || `Query ${query.id}`} (${query.corpus})`,

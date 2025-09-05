@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/guni/:path*",
+      "destination": "https://shiny.ens-paris-saclay.fr/guni/:path*"
+    }
+  ]
+}

@@ -40,13 +40,15 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
         <label>Word:</label>
         <input type="text" name="word" value={word} onChange={handleChange} required />
       </div>
-      <div className="form-group">
-        <label>Start Date:</label>
-        <input type="number" name="startDate" value={startDate} onChange={handleChange} />
-      </div>
-      <div className="form-group">
-        <label>End Date:</label>
-        <input type="number" name="endDate" value={endDate} onChange={handleChange} />
+      <div className="form-row">
+        <div className="form-group">
+          <label>Start Date:</label>
+          <input type="number" name="startDate" value={startDate} onChange={handleChange} />
+        </div>
+        <div className="form-group">
+          <label>End Date:</label>
+          <input type="number" name="endDate" value={endDate} onChange={handleChange} />
+        </div>
       </div>
       <div className="form-group">
         <label>Corpus:</label>

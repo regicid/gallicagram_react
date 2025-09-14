@@ -3,6 +3,10 @@
     {
       "source": "/guni/:path*",
       "destination": "https://shiny.ens-paris-saclay.fr/guni/:path*"
+    },
+    {
+      "source": "/ngrams/:path*",
+      "destination": "https://books.google.com/ngrams/:path*"
     }
   ]
 }

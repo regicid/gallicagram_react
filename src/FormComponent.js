@@ -25,6 +25,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
     { value: 'subtitles_en', label: 'Opensubtitles (anglais)' },
     { value: 'rap', label: 'Rap (Genius)' },
     { value: 'persee', label: 'Persée' },
+    { value: 'google', label: 'Ngram Viewer' },
   ];
 
   const handleChange = (e) => {

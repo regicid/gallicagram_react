@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import FormComponent from './FormComponent';
 import PlotComponent from './PlotComponent';
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
+import ContextDisplay from './ContextDisplay';
 
 let nextId = 2;
 const initialQuery = {
@@ -50,6 +51,13 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [smoothing, setSmoothing] = useState(0);
   const [plotType, setPlotType] = useState('line');
+  const [occurrences, setOccurrences] = useState([]);
+  const [totalOccurrences, setTotalOccurrences] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [contextSearchParams, setContextSearchParams] = useState({ limit: 10, cursor: 0 });
+  const [isContextLoading, setIsContextLoading] = useState(false);
+
+  const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
 
   useEffect(() => {
     // Initial data load from local CSV
@@ -86,108 +94,40 @@ function App() {
       });
   }, []); // Empty dependency array ensures this runs only once
 
-  useEffect(() => {
-    if (apiResponses.length === 0) return;
+  const processNgramData = useCallback((apiResponse, allSameCorpus, plotType) => {
+    const { data, query } = apiResponse;
+    const { startDate, endDate } = query;
+    const start = parseInt(startDate);
+    const end = parseInt(endDate);
 
-    const firstCorpus = queries[0]?.corpus;
-    const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
-    const traces = apiResponses.map(res => processData(res, allSameCorpus, plotType));
-    setRawPlotData(traces);
-  }, [apiResponses, plotType, queries]);
-
-  useEffect(() => {
-    if (plotType !== 'line') {
-      setPlotData(rawPlotData);
-      return;
+    const years = [];
+    for (let year = start; year <= end; year++) {
+      years.push(new Date(year, 0));
     }
-    const smoothedTraces = rawPlotData.map(trace => {
-      const smoothedY = movingAverage(trace.y, smoothing);
-      return { ...trace, y: smoothedY };
+
+    const traces = data.map(ngramData => {
+      return {
+        x: years,
+        y: ngramData.timeseries,
+        type: plotType === 'line' ? 'scatter' : 'bar',
+        mode: plotType === 'line'
+          ? (years.length > 20 ? 'lines' : 'lines+markers')
+          : undefined,
+        line: plotType === 'line' ? { shape: 'spline' } : undefined,
+        name: allSameCorpus
+          ? (ngramData.ngram || `Query ${query.id}`)
+          : `${ngramData.ngram || `Query ${query.id}`} (${query.corpus})`,
+        connectgaps: false,
+      };
     });
-    setPlotData(smoothedTraces);
-  }, [smoothing, rawPlotData, plotType]);
 
-  const handleFormChange = (updatedQuery) => {
-    const newQueries = queries.map(q => q.id === updatedQuery.id ? updatedQuery : q);
-    setQueries(newQueries);
-  };
+    return traces;
+  }, []);
 
-  const addQuery = () => {
-    const activeQuery = queries.find(q => q.id === activeQueryId);
-    const newQuery = {
-      id: nextId++,
-      word: '', // Reset the word
-      startDate: activeQuery.startDate,
-      endDate: activeQuery.endDate,
-      corpus: activeQuery.corpus,
-      resolution: activeQuery.resolution,
-    };
-    setQueries([...queries, newQuery]);
-    setActiveQueryId(newQuery.id);
-  };
-
-  const removeQuery = (id) => {
-    if (queries.length <= 1) return;
-    const newQueries = queries.filter(q => q.id !== id);
-    setQueries(newQueries);
-    if (activeQueryId === id) {
-      setActiveQueryId(newQueries[0].id);
+  const processData = useCallback((apiResponse, allSameCorpus, plotType) => {
+    if (apiResponse.query.corpus === 'google') {
+      return processNgramData(apiResponse, allSameCorpus, plotType);
     }
-  };
-
-  const fetchDataForQuery = (query) => {
-    return new Promise((resolve, reject) => {
-      const { word, corpus, startDate, endDate, resolution } = query;
-      if (!word) {
-        resolve({ data: [], query });
-        return;
-      }
-      const url = `/guni/query?mot=${word}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
-
-      fetch(url)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Network response was not ok for "${word}"`);
-          }
-          const contentType = response.headers.get("content-type");
-          if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
-            return response.text().then(text => {
-              // If it looks like a CSV, process it anyway.
-              if (text.includes(',') && text.includes('\n')) { 
-                 console.warn(`Received CSV-like data but with wrong Content-Type: ${contentType}. Processing it anyway.`);
-                 return text; // Return the text to be processed by Papa.parse
-              }
-              console.warn(`Expected CSV but received ${contentType || 'unknown'}.`, { query: query, response: text });
-              resolve({ data: [], query }); // Resolve with empty data
-              return null; // Prevent further processing
-            });
-          }
-          return response.text();
-        })
-        .then(csvText => {
-          if (csvText === null) return; // Stop if not CSV
-
-          Papa.parse(csvText, {
-            header: true,
-            dynamicTyping: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-              if (results.errors.length) {
-                console.error(`CSV Parsing errors for "${word}":`, results.errors);
-                // Even with parsing errors, we resolve with what we have, but log it.
-                // This is more robust than rejecting the whole promise.
-                resolve({ data: results.data, query });
-              } else {
-                resolve({ data: results.data, query });
-              }
-            }
-          });
-        })
-        .catch(error => reject(error));
-    });
-  };
-
-  const processData = (apiResponse, allSameCorpus, plotType) => {
     const { data, query } = apiResponse;
     const { startDate, endDate, resolution } = query;
     const dataMap = new Map();
@@ -259,11 +199,214 @@ function App() {
         : `${query.word || `Query ${query.id}`} (${query.corpus})`,
       connectgaps: false,
     };
+  }, [processNgramData]);
+
+  useEffect(() => {
+    if (apiResponses.length === 0) return;
+
+    const firstCorpus = queries[0]?.corpus;
+    const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
+    const traces = apiResponses.flatMap(res => processData(res, allSameCorpus, plotType));
+    setRawPlotData(traces);
+  }, [apiResponses, plotType, queries, processData]);
+
+  useEffect(() => {
+    if (plotType !== 'line') {
+      setPlotData(rawPlotData);
+      return;
+    }
+    const smoothedTraces = rawPlotData.map(trace => {
+      const smoothedY = movingAverage(trace.y, smoothing);
+      return { ...trace, y: smoothedY };
+    });
+    setPlotData(smoothedTraces);
+  }, [smoothing, rawPlotData, plotType]);
+
+  const handleFormChange = (updatedQuery) => {
+    const newQueries = queries.map(q => q.id === updatedQuery.id ? updatedQuery : q);
+    setQueries(newQueries);
+  };
+
+  const addQuery = () => {
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    const newQuery = {
+      id: nextId++,
+      word: '', // Reset the word
+      startDate: activeQuery.startDate,
+      endDate: activeQuery.endDate,
+      corpus: activeQuery.corpus,
+      resolution: activeQuery.resolution,
+    };
+    setQueries([...queries, newQuery]);
+    setActiveQueryId(newQuery.id);
+  };
+
+  const removeQuery = (id) => {
+    if (queries.length <= 1) return;
+    const newQueries = queries.filter(q => q.id !== id);
+    setQueries(newQueries);
+    if (activeQueryId === id) {
+      setActiveQueryId(newQueries[0].id);
+    }
+  };
+
+  const fetchOccurrences = async (date, searchParams) => {
+    setIsContextLoading(true);
+    setError(null);
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    if (!activeQuery || !activeQuery.word) {
+      setIsContextLoading(false);
+      return;
+    }
+    
+    const params = new URLSearchParams({
+      terms: activeQuery.word,
+      year: date.getFullYear(),
+      limit: searchParams.limit,
+      cursor: searchParams.cursor,
+      source: activeQuery.corpus === 'livres' ? 'book' : (activeQuery.corpus === 'presse' ? 'periodical' : 'all'),
+      sort: 'relevance'
+    });
+
+    try {
+      const response = await fetch(`${GALLICA_PROXY_API_URL}/api/occurrences_no_context?${params}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch occurrences');
+      }
+      const data = await response.json();
+      setOccurrences(data.records);
+      setTotalOccurrences(data.total_records);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsContextLoading(false);
+    }
+  };
+
+  const handlePointClick = (data) => {
+    if (data.points.length > 0) {
+      const point = data.points[0];
+      const date = new Date(point.x);
+      setSelectedDate(date);
+      const newSearchParams = { limit: 10, cursor: 0 };
+      setContextSearchParams(newSearchParams);
+      fetchOccurrences(date, newSearchParams);
+    }
+  };
+
+  const handleContextPageChange = (pageIndex) => {
+      const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };
+      setContextSearchParams(newSearchParams);
+      fetchOccurrences(selectedDate, newSearchParams);
+  }
+
+  const fetchDataForQuery = (query) => {
+    if (query.corpus === 'google') {
+      return fetchDataForNgramViewer(query);
+    }
+    return new Promise((resolve, reject) => {
+      const { word, corpus, startDate, endDate, resolution } = query;
+      if (!word) {
+        resolve({ data: [], query });
+        return;
+      }
+  
+      const words = word.split('+');
+  
+      const fetchPromises = words.map(w => {
+        const url = `/guni/query?mot=${w.trim()}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+        console.log("Querying URL:", url);
+        return fetch(url)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Network response was not ok for "${w}"`);
+            }
+            const contentType = response.headers.get("content-type");
+            if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
+              return response.text().then(text => {
+                if (text.includes(',') && text.includes('\n')) {
+                  console.warn(`Received CSV-like data but with wrong Content-Type: ${contentType}. Processing it anyway.`);
+                  return text;
+                }
+                console.warn(`Expected CSV but received ${contentType || 'unknown'}.`, { query: { ...query, word: w }, response: text });
+                return ''; // Return empty string to avoid breaking Papa.parse
+              });
+            }
+            return response.text();
+          })
+          .then(csvText => {
+            return new Promise((papaResolve) => {
+              if (!csvText) {
+                papaResolve([]);
+                return;
+              }
+              Papa.parse(csvText, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                  if (results.errors.length) {
+                    console.error(`CSV Parsing errors for "${w}":`, results.errors);
+                  }
+                  papaResolve(results.data);
+                }
+              });
+            });
+          });
+      });
+  
+      Promise.all(fetchPromises)
+        .then(results => {
+          const combinedData = {};
+          results.forEach(data => {
+            data.forEach(row => {
+              const dateKey = row.date || row.annee || row.year || row.année;
+              if (dateKey) {
+                if (!combinedData[dateKey]) {
+                  combinedData[dateKey] = { ...row, n: 0, total: 0 };
+                }
+                combinedData[dateKey].n += row.n || 0;
+                if (combinedData[dateKey].total === 0) {
+                  combinedData[dateKey].total = row.total || 0;
+                }
+              }
+            });
+          });
+          resolve({ data: Object.values(combinedData), query });
+        })
+        .catch(error => reject(error));
+    });
+  };
+
+  const fetchDataForNgramViewer = (query) => {
+    return new Promise((resolve, reject) => {
+      const { word, startDate, endDate } = query;
+      if (!word) {
+        resolve({ data: [], query });
+        return;
+      }
+      const url = `/ngrams/json?content=${word}&year_start=${startDate}&year_end=${endDate}&corpus=fr&smoothing=0`;
+      console.log("Querying URL:", url);
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Network response was not ok for "${word}"`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          resolve({ data: data, query });
+        })
+        .catch(error => reject(error));
+    });
   };
 
   const handlePlot = () => {
     setError(null);
     setApiResponses([]);
+    setOccurrences([]);
+    setTotalOccurrences(0);
+    setSelectedDate(null);
     setIsLoading(true);
 
     const promises = queries.map(q => fetchDataForQuery(q));
@@ -368,7 +511,16 @@ function App() {
         </div>
         <div className="plot-container">
           {error && <div className="error">{error}</div>}
-          <PlotComponent data={plotData} />
+          <PlotComponent data={plotData} onPointClick={handlePointClick} />
+          {(selectedDate || occurrences.length > 0) && 
+            <ContextDisplay 
+                records={occurrences} 
+                totalRecords={totalOccurrences}
+                onPageChange={handleContextPageChange}
+                searchParams={contextSearchParams}
+                isLoading={isContextLoading}
+            />
+          }
         </div>
       </div>
     </div>

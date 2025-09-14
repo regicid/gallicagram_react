@@ -128,3 +128,42 @@ button:hover {
   margin-right: 5px;
 }
 
+.context-display {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ccc;
+  text-align: left;
+}
+
+.records-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.occurrence-card {
+  border: 1px solid #eee;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.occurrence-card h4 {
+  margin-top: 0;
+}
+
+.context-view {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #eee;
+}
+
+.context-view .pivot {
+  background-color: #ff0;
+  font-weight: bold;
+}
+
+.pagination {
+    margin-top: 10px;
+}

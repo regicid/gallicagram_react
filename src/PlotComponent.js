@@ -1,7 +1,7 @@
 import React from 'react';
 import Plot from 'react-plotly.js';
 
-const PlotComponent = ({ data }) => {
+const PlotComponent = ({ data, onPointClick }) => {
   return (
     <Plot
       data={data}
@@ -19,6 +19,7 @@ const PlotComponent = ({ data }) => {
           title: 'Frequency in the corpus'
         }
       }}
+      onClick={onPointClick}
     />
   );
 };

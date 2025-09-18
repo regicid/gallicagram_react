@@ -1,9 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Slider from '@mui/material/Slider';
 import Box from '@mui/material/Box';
+import TextField from '@mui/material/TextField';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import Typography from '@mui/material/Typography';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
 
 const FormComponent = ({ formData, onFormChange, onPlot }) => {
   const { word, startDate, endDate, corpus, resolution } = formData;
+  const [advancedOptions, setAdvancedOptions] = useState({
+    option1: false,
+    option2: false,
+    option3: false,
+  });
+
 
   const corpora = [
     { value: 'lemonde', label: 'Le Monde' },
@@ -36,6 +50,19 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
     onFormChange({ ...formData, startDate: newValue[0], endDate: newValue[1] });
   };
 
+  const handleDateInputChange = (e) => {
+    const { name, value } = e.target;
+    const intValue = value === '' ? '' : parseInt(value, 10);
+    onFormChange({ ...formData, [name]: intValue });
+  };
+
+  const handleAdvancedOptionsChange = (event) => {
+    setAdvancedOptions({
+      ...advancedOptions,
+      [event.target.name]: event.target.checked,
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onPlot();
@@ -43,25 +70,42 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="form-group">
-        <label>Word:</label>
+      <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
+        <label style={{ marginRight: '1rem' }}>Word:</label>
         <input type="text" name="word" value={word} onChange={handleChange} required />
       </div>
       <div className="form-group">
-        <label>Date Range:</label>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 300 }}>
+          <TextField
+            name="startDate"
+            label="Start Date"
+            type="number"
+            value={startDate}
+            onChange={handleDateInputChange}
+            inputProps={{ min: 1600, max: 2025 }}
+          />
+          <TextField
+            name="endDate"
+            label="End Date"
+            type="number"
+            value={endDate}
+            onChange={handleDateInputChange}
+            inputProps={{ min: 1600, max: 2025 }}
+          />
+        </Box>
         <Box sx={{ width: 300 }}>
           <Slider
             getAriaLabel={() => 'Date range'}
             value={[startDate, endDate]}
             onChange={handleSliderChange}
-            valueLabelDisplay="on"
+            valueLabelDisplay="off"
             min={1600}
             max={2025}
           />
         </Box>
       </div>
-      <div className="form-group">
-        <label>Corpus:</label>
+      <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+        <label style={{ marginRight: '1rem' }}>Corpus:</label>
         <select name="corpus" value={corpus} onChange={handleChange}>
           {corpora.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
@@ -102,6 +146,47 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
         </div>
       </div>
       <button type="submit" style={{ display: 'none' }} />
+      <Accordion>
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          aria-controls="panel1a-content"
+          id="panel1a-header"
+        >
+          <Typography>Advanced Options</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={advancedOptions.option1}
+                onChange={handleAdvancedOptionsChange}
+                name="option1"
+              />
+            }
+            label="Option 1"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={advancedOptions.option2}
+                onChange={handleAdvancedOptionsChange}
+                name="option2"
+              />
+            }
+            label="Option 2"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={advancedOptions.option3}
+                onChange={handleAdvancedOptionsChange}
+                name="option3"
+              />
+            }
+            label="Option 3"
+          />
+        </AccordionDetails>
+      </Accordion>
     </form>
   );
 };

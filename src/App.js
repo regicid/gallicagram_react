@@ -60,9 +60,10 @@ function App() {
   const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
 
   useEffect(() => {
-    // Initial data load from local CSV
+    // Initial data load
     setIsLoading(true);
-    fetch('/liberte_data.csv')
+
+    const csvPromise = fetch('/liberte_data.csv')
       .then(response => {
         if (!response.ok) {
           throw new Error("Could not load initial data file.");
@@ -70,21 +71,38 @@ function App() {
         return response.text();
       })
       .then(csvText => {
-        Papa.parse(csvText, {
-          header: true,
-          dynamicTyping: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            if (results.errors.length) {
-              setError("Error parsing initial data file.");
-              console.error("Error parsing initial CSV:", results.errors);
-            } else {
-              const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery } };
-              setApiResponses([initialApiResponse]);
+        return new Promise((resolve, reject) => {
+          Papa.parse(csvText, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              if (results.errors.length) {
+                console.error("Error parsing initial CSV:", results.errors);
+                reject(new Error("Error parsing initial data file."));
+              } else {
+                const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery } };
+                setApiResponses([initialApiResponse]);
+                resolve();
+              }
             }
-          }
+          });
         });
+      });
+
+    const occurrencesPromise = fetch('/occurrences_exemple.json')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("Could not load example occurrences file.");
+        }
+        return response.json();
       })
+      .then(data => {
+        setOccurrences(data.records);
+        setTotalOccurrences(data.total_records || data.records.length);
+      });
+
+    Promise.all([csvPromise, occurrencesPromise])
       .catch(err => {
         setError(err.message);
         console.error(err);
@@ -314,7 +332,7 @@ function App() {
       const words = word.split('+');
   
       const fetchPromises = words.map(w => {
-        const url = `/guni/query?mot=${w.trim()}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+        const url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${w.trim()}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
         console.log("Querying URL:", url);
         return fetch(url)
           .then(response => {
@@ -487,30 +505,35 @@ function App() {
           <button onClick={handlePlot} disabled={isLoading}>
             {isLoading ? 'Loading...' : 'Plot'}
           </button>
-          <button onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
-            Download CSV
-          </button>
-          <div className="form-group">
-            <label>Visualization:</label>
-            <select value={plotType} onChange={(e) => setPlotType(e.target.value)}>
-              <option value="line">Line Plot (Frequency)</option>
-              <option value="bar">Bar Plot (Raw Count)</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Smoothing (Moving Average): {smoothing}</label>
-            <input
-              type="range"
-              min="0"
-              max="11"
-              value={smoothing}
-              onChange={(e) => setSmoothing(parseInt(e.target.value, 10))}
-              disabled={plotType !== 'line'}
-            />
-          </div>
         </div>
         <div className="plot-container">
           {error && <div className="error">{error}</div>}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', marginBottom: '-15px' }}>
+            <div className="form-group">
+              <label>Visualization:</label>
+              <select value={plotType} onChange={(e) => setPlotType(e.target.value)}>
+                <option value="line">Line Plot (Frequency)</option>
+                <option value="bar">Bar Plot (Raw Count)</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Smoothing (Moving Average): {smoothing}</label>
+              <input
+                type="range"
+                min="0"
+                max="11"
+                value={smoothing}
+                onChange={(e) => setSmoothing(parseInt(e.target.value, 10))}
+                disabled={plotType !== 'line'}
+              />
+            </div>
+            <button disabled={isLoading || plotData.length === 0}>
+              Download Plot
+            </button>
+            <button onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
+              Download CSV
+            </button>
+          </div>
           <PlotComponent data={plotData} onPointClick={handlePointClick} />
           {(selectedDate || occurrences.length > 0) && 
             <ContextDisplay 

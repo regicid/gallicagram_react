@@ -154,37 +154,36 @@ function App() {
 
     if (resolution === 'annee') {
       for (let year = start; year <= end; year++) {
-        dataMap.set(new Date(year, 0).getTime(), null);
+        dataMap.set(Date.UTC(year, 0), null);
       }
     } else if (resolution === 'mois') {
-      let currentDate = new Date(start, 0);
-      const finalDate = new Date(end, 11);
-      while (currentDate <= finalDate) {
-        dataMap.set(new Date(currentDate).getTime(), null);
-        currentDate.setMonth(currentDate.getMonth() + 1);
+      for (let y = start; y <= end; y++) {
+        for (let m = 0; m < 12; m++) {
+          dataMap.set(Date.UTC(y, m), null);
+        }
       }
     } else if (resolution === 'jour') {
-      let currentDate = new Date(start, 0, 1);
-      const finalDate = new Date(end, 11, 31);
+      let currentDate = new Date(Date.UTC(start, 0, 1));
+      const finalDate = new Date(Date.UTC(end, 11, 31));
       while (currentDate <= finalDate) {
-        dataMap.set(new Date(currentDate).getTime(), null);
-        currentDate.setDate(currentDate.getDate() + 1);
+        dataMap.set(currentDate.getTime(), null);
+        currentDate.setUTCDate(currentDate.getUTCDate() + 1);
       }
     }
 
     data.forEach(row => {
-      const year = row.date || row.annee || row.year || row.année;
+      const year = row.date || row.annee || row.year;
       if (year && row.n !== undefined && row.total !== undefined) {
         let dateKey;
         if (resolution === 'annee') {
-          dateKey = new Date(year, 0).getTime();
+          dateKey = Date.UTC(year, 0);
         } else if (resolution === 'mois') {
           const month = row.mois ? row.mois - 1 : 0;
-          dateKey = new Date(year, month).getTime();
+          dateKey = Date.UTC(year, month);
         } else { // jour
           const month = row.mois ? row.mois - 1 : 0;
           const day = row.jour || 1;
-          dateKey = new Date(year, month, day).getTime();
+          dateKey = Date.UTC(year, month, day);
         }
         if (dataMap.has(dateKey)) {
           dataMap.set(dateKey, { n: row.n, total: row.total });
@@ -378,15 +377,24 @@ function App() {
           const combinedData = {};
           results.forEach(data => {
             data.forEach(row => {
-              const dateKey = row.date || row.annee || row.year || row.année;
-              if (dateKey) {
-                if (!combinedData[dateKey]) {
-                  combinedData[dateKey] = { ...row, n: 0, total: 0 };
-                }
-                combinedData[dateKey].n += row.n || 0;
-                if (combinedData[dateKey].total === 0) {
-                  combinedData[dateKey].total = row.total || 0;
-                }
+              const year = row.date || row.annee || row.year;
+              if (!year) return;
+
+              let dateKey;
+              if (resolution === 'annee') {
+                dateKey = `${year}`;
+              } else if (resolution === 'mois') {
+                dateKey = `${year}-${row.mois || 1}`;
+              } else { // jour
+                dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
+              }
+
+              if (!combinedData[dateKey]) {
+                combinedData[dateKey] = { ...row, n: 0, total: 0 };
+              }
+              combinedData[dateKey].n += row.n || 0;
+              if (combinedData[dateKey].total === 0) {
+                combinedData[dateKey].total = row.total || 0;
               }
             });
           });

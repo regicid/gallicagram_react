@@ -13,6 +13,9 @@ const initialQuery = {
   endDate: 1950,
   corpus: 'presse',
   resolution: 'annee',
+  advancedOptions: {
+    rescale: false,
+  }
 };
 
 function movingAverage(data, windowSize) {
@@ -54,6 +57,7 @@ function App() {
   const [occurrences, setOccurrences] = useState([]);
   const [totalOccurrences, setTotalOccurrences] = useState(0);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedQuery, setSelectedQuery] = useState(null);
   const [contextSearchParams, setContextSearchParams] = useState({ limit: 10, cursor: 0 });
   const [isContextLoading, setIsContextLoading] = useState(false);
 
@@ -253,6 +257,7 @@ function App() {
       endDate: activeQuery.endDate,
       corpus: activeQuery.corpus,
       resolution: activeQuery.resolution,
+      advancedOptions: activeQuery.advancedOptions,
     };
     setQueries([...queries, newQuery]);
     setActiveQueryId(newQuery.id);
@@ -267,21 +272,20 @@ function App() {
     }
   };
 
-  const fetchOccurrences = async (date, searchParams) => {
+  const fetchOccurrences = async (date, searchParams, query) => {
     setIsContextLoading(true);
     setError(null);
-    const activeQuery = queries.find(q => q.id === activeQueryId);
-    if (!activeQuery || !activeQuery.word) {
+    if (!query || !query.word) {
       setIsContextLoading(false);
       return;
     }
     
     const params = new URLSearchParams({
-      terms: activeQuery.word,
+      terms: query.word,
       year: date.getFullYear(),
       limit: searchParams.limit,
       cursor: searchParams.cursor,
-      source: activeQuery.corpus === 'livres' ? 'book' : (activeQuery.corpus === 'presse' ? 'periodical' : 'all'),
+      source: query.corpus === 'livres' ? 'book' : (query.corpus === 'presse' ? 'periodical' : 'all'),
       sort: 'relevance'
     });
 
@@ -303,18 +307,21 @@ function App() {
   const handlePointClick = (data) => {
     if (data.points.length > 0) {
       const point = data.points[0];
+      const curveNumber = point.curveNumber;
+      const query = apiResponses[curveNumber].query;
+      setSelectedQuery(query);
       const date = new Date(point.x);
       setSelectedDate(date);
       const newSearchParams = { limit: 10, cursor: 0 };
       setContextSearchParams(newSearchParams);
-      fetchOccurrences(date, newSearchParams);
+      fetchOccurrences(date, newSearchParams, query);
     }
   };
 
   const handleContextPageChange = (pageIndex) => {
       const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };
       setContextSearchParams(newSearchParams);
-      fetchOccurrences(selectedDate, newSearchParams);
+      fetchOccurrences(selectedDate, newSearchParams, selectedQuery);
   }
 
   const fetchDataForQuery = (query) => {
@@ -542,7 +549,7 @@ function App() {
               Download CSV
             </button>
           </div>
-          <PlotComponent data={plotData} onPointClick={handlePointClick} />
+          <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
           {(selectedDate || occurrences.length > 0) && 
             <ContextDisplay 
                 records={occurrences} 

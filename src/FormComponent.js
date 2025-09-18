@@ -13,7 +13,7 @@ import Checkbox from '@mui/material/Checkbox';
 const FormComponent = ({ formData, onFormChange, onPlot }) => {
   const { word, startDate, endDate, corpus, resolution } = formData;
   const [advancedOptions, setAdvancedOptions] = useState({
-    option1: false,
+    rescale: false,
     option2: false,
     option3: false,
   });
@@ -57,10 +57,12 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
   };
 
   const handleAdvancedOptionsChange = (event) => {
-    setAdvancedOptions({
+    const newAdvancedOptions = {
       ...advancedOptions,
       [event.target.name]: event.target.checked,
-    });
+    };
+    setAdvancedOptions(newAdvancedOptions);
+    onFormChange({ ...formData, advancedOptions: newAdvancedOptions });
   };
 
   const handleSubmit = (e) => {
@@ -158,12 +160,12 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
           <FormControlLabel
             control={
               <Checkbox
-                checked={advancedOptions.option1}
+                checked={advancedOptions.rescale}
                 onChange={handleAdvancedOptionsChange}
-                name="option1"
+                name="rescale"
               />
             }
-            label="Option 1"
+            label="Rescale all curves"
           />
           <FormControlLabel
             control={

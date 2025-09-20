@@ -324,111 +324,142 @@ function App() {
       fetchOccurrences(selectedDate, newSearchParams, selectedQuery);
   }
 
+  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution) => {
+    const url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim()}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+    console.log("Querying Gallicagram URL:", url);
+    return fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Network response was not ok for "${word}"`);
+        }
+        const contentType = response.headers.get("content-type");
+        if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
+          return response.text().then(text => {
+            if (text.includes(',') && text.includes('\n')) {
+              console.warn(`Received CSV-like data but with wrong Content-Type: ${contentType}. Processing it anyway.`);
+              return text;
+            }
+            console.warn(`Expected CSV but received ${contentType || 'unknown'}.`, { query: { word, corpus }, response: text });
+            return ''; // Return empty string to avoid breaking Papa.parse
+          });
+        }
+        return response.text();
+      })
+      .then(csvText => {
+        return new Promise((papaResolve) => {
+          if (!csvText) {
+            papaResolve([]);
+            return;
+          }
+          Papa.parse(csvText, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              if (results.errors.length) {
+                console.error(`CSV Parsing errors for "${word}":`, results.errors);
+              }
+              papaResolve(results.data);
+            }
+          });
+        });
+      });
+  };
+
+  const fetchSingleWordNgramViewer = (word, startDate, endDate) => {
+    const url = `/ngrams/json?content=${word.trim()}&year_start=${startDate}&year_end=${endDate}&corpus=fr&smoothing=0`;
+    console.log("Querying Ngram URL:", url);
+    return fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Network response was not ok for "${word}"`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (!data || data.length === 0) {
+          console.warn(`No data returned for "${word}"`);
+          return { ngram: word, timeseries: [] };
+        }
+        return data[0];
+      });
+  };
+
   const fetchDataForQuery = (query) => {
-    if (query.corpus === 'google') {
-      return fetchDataForNgramViewer(query);
-    }
     return new Promise((resolve, reject) => {
       const { word, corpus, startDate, endDate, resolution } = query;
       if (!word) {
         resolve({ data: [], query });
         return;
       }
-  
-      const words = word.split('+');
-  
-      const fetchPromises = words.map(w => {
-        const url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${w.trim()}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
-        console.log("Querying URL:", url);
-        return fetch(url)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`Network response was not ok for "${w}"`);
-            }
-            const contentType = response.headers.get("content-type");
-            if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
-              return response.text().then(text => {
-                if (text.includes(',') && text.includes('\n')) {
-                  console.warn(`Received CSV-like data but with wrong Content-Type: ${contentType}. Processing it anyway.`);
-                  return text;
-                }
-                console.warn(`Expected CSV but received ${contentType || 'unknown'}.`, { query: { ...query, word: w }, response: text });
-                return ''; // Return empty string to avoid breaking Papa.parse
-              });
-            }
-            return response.text();
-          })
-          .then(csvText => {
-            return new Promise((papaResolve) => {
-              if (!csvText) {
-                papaResolve([]);
-                return;
-              }
-              Papa.parse(csvText, {
-                header: true,
-                dynamicTyping: true,
-                skipEmptyLines: true,
-                complete: (results) => {
-                  if (results.errors.length) {
-                    console.error(`CSV Parsing errors for "${w}":`, results.errors);
-                  }
-                  papaResolve(results.data);
-                }
-              });
-            });
-          });
-      });
-  
+
+      const words = word.split('+').map(w => w.trim());
+
+      let fetchPromises;
+      if (corpus === 'google') {
+        fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, startDate, endDate));
+      } else {
+        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, startDate, endDate, resolution));
+      }
+
       Promise.all(fetchPromises)
         .then(results => {
-          const combinedData = {};
-          results.forEach(data => {
-            data.forEach(row => {
-              const year = row.date || row.annee || row.year;
-              if (!year) return;
-
-              let dateKey;
-              if (resolution === 'annee') {
-                dateKey = `${year}`;
-              } else if (resolution === 'mois') {
-                dateKey = `${year}-${row.mois || 1}`;
-              } else { // jour
-                dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
-              }
-
-              if (!combinedData[dateKey]) {
-                combinedData[dateKey] = { ...row, n: 0, total: 0 };
-              }
-              combinedData[dateKey].n += row.n || 0;
-              if (combinedData[dateKey].total === 0) {
-                combinedData[dateKey].total = row.total || 0;
+          if (corpus === 'google') {
+            if (results.length === 1) {
+              resolve({ data: results, query });
+              return;
+            }
+            const combinedNgram = results.map(r => r.ngram).join(' + ');
+            let combinedTimeseries = [];
+            const lengths = results.map(r => r.timeseries.length);
+            const maxLength = Math.max(...lengths);
+            results.forEach(r => {
+              if (r.timeseries.length < maxLength) {
+                const diff = maxLength - r.timeseries.length;
+                r.timeseries = r.timeseries.concat(Array(diff).fill(0));
               }
             });
-          });
-          resolve({ data: Object.values(combinedData), query });
-        })
-        .catch(error => reject(error));
-    });
-  };
+            for (let i = 0; i < maxLength; i++) {
+              let sum = 0;
+              for (let j = 0; j < results.length; j++) {
+                sum += results[j].timeseries[i] || 0;
+              }
+              combinedTimeseries.push(sum);
+            }
+            const combinedData = [{
+              ngram: combinedNgram,
+              parent: "",
+              timeseries: combinedTimeseries,
+              type: "ABS"
+            }];
+            resolve({ data: combinedData, query });
+          } else {
+            const combinedData = {};
+            results.forEach(data => {
+              data.forEach(row => {
+                const year = row.date || row.annee || row.year;
+                if (!year) return;
 
-  const fetchDataForNgramViewer = (query) => {
-    return new Promise((resolve, reject) => {
-      const { word, startDate, endDate } = query;
-      if (!word) {
-        resolve({ data: [], query });
-        return;
-      }
-      const url = `/ngrams/json?content=${word}&year_start=${startDate}&year_end=${endDate}&corpus=fr&smoothing=0`;
-      console.log("Querying URL:", url);
-      fetch(url)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Network response was not ok for "${word}"`);
+                let dateKey;
+                if (resolution === 'annee') {
+                  dateKey = `${year}`;
+                } else if (resolution === 'mois') {
+                  dateKey = `${year}-${row.mois || 1}`;
+                } else { // jour
+                  dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
+                }
+
+                if (!combinedData[dateKey]) {
+                  combinedData[dateKey] = { ...row, n: 0, total: 0 };
+                }
+                combinedData[dateKey].n += row.n || 0;
+                if (combinedData[dateKey].total === 0) {
+                  combinedData[dateKey].total = row.total || 0;
+                }
+              });
+            });
+            resolve({ data: Object.values(combinedData), query });
           }
-          return response.json();
-        })
-        .then(data => {
-          resolve({ data: data, query });
         })
         .catch(error => reject(error));
     });

@@ -5,6 +5,7 @@ import PlotComponent from './PlotComponent';
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
+import { useTranslation } from 'react-i18next';
 
 let nextId = 2;
 const initialQuery = {
@@ -45,6 +46,7 @@ function movingAverage(data, windowSize) {
 }
 
 function App() {
+  const { t, i18n } = useTranslation();
   const [queries, setQueries] = useState([{ id: 1, ...initialQuery }]);
   const [activeQueryId, setActiveQueryId] = useState(1);
   const [apiResponses, setApiResponses] = useState([]);
@@ -137,14 +139,14 @@ function App() {
           : undefined,
         line: plotType === 'line' ? { shape: 'spline' } : undefined,
         name: allSameCorpus
-          ? (ngramData.ngram || `Query ${query.id}`)
-          : `${ngramData.ngram || `Query ${query.id}`} (${query.corpus})`,
+          ? (ngramData.ngram || `${t('Query')} ${query.id}`)
+          : `${ngramData.ngram || `${t('Query')} ${query.id}`} (${query.corpus})`,
         connectgaps: false,
       };
     });
 
     return traces;
-  }, []);
+  }, [t]);
 
   const processData = useCallback((apiResponse, allSameCorpus, plotType) => {
     if (apiResponse.query.corpus === 'google') {
@@ -216,11 +218,11 @@ function App() {
         : undefined,
       line: plotType === 'line' ? { shape: 'spline' } : undefined,
       name: allSameCorpus
-        ? (query.word || `Query ${query.id}`)
-        : `${query.word || `Query ${query.id}`} (${query.corpus})`,
+        ? (query.word || `${t('Query')} ${query.id}`)
+        : `${query.word || `${t('Query')} ${query.id}`} (${query.corpus})`,
       connectgaps: false,
     };
-  }, [processNgramData]);
+  }, [processNgramData, t]);
 
   useEffect(() => {
     if (apiResponses.length === 0) return;
@@ -519,6 +521,10 @@ function App() {
     document.body.removeChild(link);
   };
 
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+  };
+
   const activeQuery = queries.find(q => q.id === activeQueryId);
 
   return (
@@ -526,9 +532,11 @@ function App() {
       <header className="App-header">
         <img src="/logo.png" className="App-logo" alt="logo" />
         <div className="header-links">
-          <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">X</a>
-          <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">Paper</a>
-          <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">API</a>
+          <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
+          <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
+          <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">{t('API')}</a>
+          <button style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem'}} onClick={() => changeLanguage('en')}>🇬🇧</button>
+          <button style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem'}} onClick={() => changeLanguage('fr')}>🇫🇷</button>
         </div>
       </header>
       <div className="App-body">
@@ -549,38 +557,41 @@ function App() {
             />
           )}
           <button onClick={handlePlot} disabled={isLoading}>
-            {isLoading ? 'Loading...' : 'Plot'}
+            {isLoading ? t('Loading...') : t('Plot')}
           </button>
         </div>
         <div className="plot-container">
           {error && <div className="error">{error}</div>}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', marginBottom: '-15px' }}>
-            <div className="form-group">
-              <label>Visualization:</label>
-              <select value={plotType} onChange={(e) => setPlotType(e.target.value)}>
-                <option value="line">Line Plot (Frequency)</option>
-                <option value="bar">Bar Plot (Raw Count)</option>
-              </select>
+          <div className="plot-area">
+            <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
+            <div className="plot-controls">
+              <h3>{t('Plot controls')}</h3>
+              <div className="form-group">
+                <label>{t('Visualization:')}</label>
+                <select value={plotType} onChange={(e) => setPlotType(e.target.value)}>
+                  <option value="line">{t('Line Plot (Frequency)')}</option>
+                  <option value="bar">{t('Bar Plot (Raw Count)')}</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>{t('Smoothing (Moving Average):')} {smoothing}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="11"
+                  value={smoothing}
+                  onChange={(e) => setSmoothing(parseInt(e.target.value, 10))}
+                  disabled={plotType !== 'line'}
+                />
+              </div>
+              <button disabled={isLoading || plotData.length === 0}>
+                {t('Download Plot')}
+              </button>
+              <button onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
+                {t('Download CSV')}
+              </button>
             </div>
-            <div className="form-group">
-              <label>Smoothing (Moving Average): {smoothing}</label>
-              <input
-                type="range"
-                min="0"
-                max="11"
-                value={smoothing}
-                onChange={(e) => setSmoothing(parseInt(e.target.value, 10))}
-                disabled={plotType !== 'line'}
-              />
-            </div>
-            <button disabled={isLoading || plotData.length === 0}>
-              Download Plot
-            </button>
-            <button onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
-              Download CSV
-            </button>
           </div>
-          <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
           {(selectedDate || occurrences.length > 0) && 
             <ContextDisplay 
                 records={occurrences} 

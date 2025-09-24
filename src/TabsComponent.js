@@ -1,7 +1,9 @@
-
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 const TabsComponent = ({ queries, activeQueryId, onTabClick, onAddTab, onRemoveTab, isOnlyQuery }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="tabs">
       {queries.map(query => (
@@ -10,7 +12,7 @@ const TabsComponent = ({ queries, activeQueryId, onTabClick, onAddTab, onRemoveT
           className={`tab ${query.id === activeQueryId ? 'active' : ''}`}
           onClick={() => onTabClick(query.id)}
         >
-          {query.word || `Query ${query.id}`}
+          {query.word || `${t('Query')} ${query.id}`}
           {!isOnlyQuery && (
             <button className="remove-tab-btn" onClick={(e) => { e.stopPropagation(); onRemoveTab(query.id); }}>x</button>
           )}

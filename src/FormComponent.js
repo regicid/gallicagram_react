@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Slider from '@mui/material/Slider';
 import Box from '@mui/material/Box';
@@ -9,8 +10,10 @@ import Typography from '@mui/material/Typography';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
+import { useTranslation } from 'react-i18next';
 
 const FormComponent = ({ formData, onFormChange, onPlot }) => {
+  const { t } = useTranslation();
   const { word, startDate, endDate, corpus, resolution } = formData;
   const [advancedOptions, setAdvancedOptions] = useState({
     rescale: false,
@@ -20,26 +23,26 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
 
 
   const corpora = [
-    { value: 'lemonde', label: 'Le Monde' },
-    { value: 'presse', label: 'Presse de Gallica' },
-    { value: 'livres', label: 'Livres de Gallica' },
-    { value: 'ddb', label: 'Deutsches Zeitungsportal (DDB)' },
-    { value: 'american_stories', label: 'American Stories' },
-    { value: 'paris', label: 'Journal de Paris' },
-    { value: 'moniteur', label: 'Moniteur Universel' },
-    { value: 'journal_des_debats', label: 'Journal des Débats' },
-    { value: 'la_presse', label: 'La Presse' },
-    { value: 'constitutionnel', label: 'Le Constitutionnel' },
-    { value: 'figaro', label: 'Le Figaro' },
-    { value: 'temps', label: 'Le Temps' },
-    { value: 'petit_journal', label: 'Le Petit Journal' },
-    { value: 'petit_parisien', label: 'Le Petit Parisien' },
-    { value: 'huma', label: 'L’Humanité' },
-    { value: 'subtitles', label: 'Opensubtitles (français)' },
-    { value: 'subtitles_en', label: 'Opensubtitles (anglais)' },
-    { value: 'rap', label: 'Rap (Genius)' },
-    { value: 'persee', label: 'Persée' },
-    { value: 'google', label: 'Ngram Viewer' },
+    { value: 'lemonde', label: t('Le Monde') },
+    { value: 'presse', label: t('Presse de Gallica') },
+    { value: 'livres', label: t('Livres de Gallica') },
+    { value: 'ddb', label: t('Deutsches Zeitungsportal (DDB)') },
+    { value: 'american_stories', label: t('American Stories') },
+    { value: 'paris', label: t('Journal de Paris') },
+    { value: 'moniteur', label: t('Moniteur Universel') },
+    { value: 'journal_des_debats', label: t('Journal des Débats') },
+    { value: 'la_presse', label: t('La Presse') },
+    { value: 'constitutionnel', label: t('Le Constitutionnel') },
+    { value: 'figaro', label: t('Le Figaro') },
+    { value: 'temps', label: t('Le Temps') },
+    { value: 'petit_journal', label: t('Le Petit Journal') },
+    { value: 'petit_parisien', label: t('Le Petit Parisien') },
+    { value: 'huma', label: t('L’Humanité') },
+    { value: 'subtitles', label: t('Opensubtitles (français)') },
+    { value: 'subtitles_en', label: t('Opensubtitles (anglais)') },
+    { value: 'rap', label: t('Rap (Genius)') },
+    { value: 'persee', label: t('Persée') },
+    { value: 'google', label: t('Ngram Viewer') },
   ];
 
   const handleChange = (e) => {
@@ -73,14 +76,14 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
-        <label style={{ marginRight: '1rem' }}>Word:</label>
+        <label style={{ marginRight: '1rem' }}>{t('Word:')}</label>
         <input type="text" name="word" value={word} onChange={handleChange} required />
       </div>
       <div className="form-group">
         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 300 }}>
           <TextField
             name="startDate"
-            label="Start Date"
+            label={t('Start Date')}
             type="number"
             value={startDate}
             onChange={handleDateInputChange}
@@ -88,7 +91,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
           />
           <TextField
             name="endDate"
-            label="End Date"
+            label={t('End Date')}
             type="number"
             value={endDate}
             onChange={handleDateInputChange}
@@ -97,7 +100,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
         </Box>
         <Box sx={{ width: 300 }}>
           <Slider
-            getAriaLabel={() => 'Date range'}
+            getAriaLabel={() => t('Date range')}
             value={[startDate, endDate]}
             onChange={handleSliderChange}
             valueLabelDisplay="off"
@@ -107,13 +110,13 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
         </Box>
       </div>
       <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-        <label style={{ marginRight: '1rem' }}>Corpus:</label>
+        <label style={{ marginRight: '1rem' }}>{t('Corpus:')}</label>
         <select name="corpus" value={corpus} onChange={handleChange}>
           {corpora.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
       </div>
       <div className="form-group">
-        <label>Resolution:</label>
+        <label>{t('Resolution:')}</label>
         <div className="checkbox-group">
           <label className="checkbox-label">
             <input
@@ -123,7 +126,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
               checked={resolution === 'annee'}
               onChange={handleChange}
             />
-            Année
+            {t('Année')}
           </label>
           <label className="checkbox-label">
             <input
@@ -133,7 +136,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
               checked={resolution === 'mois'}
               onChange={handleChange}
             />
-            Mois
+            {t('Mois')}
           </label>
           <label className="checkbox-label">
             <input
@@ -143,7 +146,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
               checked={resolution === 'jour'}
               onChange={handleChange}
             />
-            Jour
+            {t('Jour')}
           </label>
         </div>
       </div>
@@ -154,7 +157,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
           aria-controls="panel1a-content"
           id="panel1a-header"
         >
-          <Typography>Advanced Options</Typography>
+          <Typography>{t('Advanced Options')}</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <FormControlLabel
@@ -165,7 +168,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
                 name="rescale"
               />
             }
-            label="Rescale all curves"
+            label={t('Rescale all curves')}
           />
           <FormControlLabel
             control={
@@ -175,7 +178,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
                 name="option2"
               />
             }
-            label="Option 2"
+            label={t('Option 2')}
           />
           <FormControlLabel
             control={
@@ -185,7 +188,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
                 name="option3"
               />
             }
-            label="Option 3"
+            label={t('Option 3')}
           />
         </AccordionDetails>
       </Accordion>

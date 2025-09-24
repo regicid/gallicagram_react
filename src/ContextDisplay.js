@@ -1,13 +1,16 @@
 import React from 'react';
 import Occurrence from './Occurrence';
+import { useTranslation } from 'react-i18next';
 
 const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isLoading }) => {
+  const { t } = useTranslation();
+
   if (isLoading) {
-      return <div>Loading occurrences...</div>;
+      return <div>{t('Loading occurrences...')}</div>;
   }
   
   if (!records || records.length === 0) {
-    return <div>No occurrences found for this selection.</div>;
+    return <div>{t('No occurrences found for this selection.')}</div>;
   }
 
   const numPages = Math.ceil(totalRecords / (searchParams?.limit ?? 10));
@@ -15,7 +18,7 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
 
   return (
     <div className="context-display">
-      <h3>{totalRecords.toLocaleString()} occurrences found</h3>
+      <h3>{totalRecords.toLocaleString()} {t('occurrences found')}</h3>
       <div className="records-list">
         {records.map(record => (
           <Occurrence key={record.ark + record.url} record={record} />
@@ -23,9 +26,9 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
       </div>
       {totalRecords > (searchParams?.limit ?? 10) && (
         <div className="pagination">
-            <button onClick={() => onPageChange(currentPage - 2)} disabled={currentPage <= 1}>&lt; Previous</button>
-            <span> Page {currentPage} of {numPages.toLocaleString()} </span>
-            <button onClick={() => onPageChange(currentPage)} disabled={currentPage >= numPages}>Next &gt;</button>
+            <button onClick={() => onPageChange(currentPage - 2)} disabled={currentPage <= 1}>&lt; {t('Previous')}</button>
+            <span> {t('Page')} {currentPage} {t('of')} {numPages.toLocaleString()} </span>
+            <button onClick={() => onPageChange(currentPage)} disabled={currentPage >= numPages}>{t('Next')} &gt;</button>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import Plot from 'react-plotly.js';
+import { useTranslation } from 'react-i18next';
 
 const zscore = (data) => {
   const mean = data.reduce((a, b) => a + b, 0) / data.length;
@@ -8,11 +9,13 @@ const zscore = (data) => {
 };
 
 const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
+  const { t } = useTranslation();
+
   const plotData = advancedOptions?.rescale && data.length > 0 && plotType === 'line'
     ? data.map(trace => ({ ...trace, y: zscore(trace.y) }))
     : data;
 
-  const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? 'Z-score' : 'Frequency in the corpus';
+  const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? t('Z-score') : t('Frequency in the corpus');
 
   return (
     <Plot
@@ -20,12 +23,12 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
       layout={{
         width: 800,
         height: 600,
-        title: 'Frequency over time',
+        title: t('Frequency over time'),
         font: {
           family: 'Lato, sans-serif'
         },
         xaxis: {
-          title: 'Date'
+          title: t('Date')
         },
         yaxis: {
           title: yAxisTitle

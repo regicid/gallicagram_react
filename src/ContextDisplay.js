@@ -1,6 +1,7 @@
 import React from 'react';
 import Occurrence from './Occurrence';
 import { useTranslation } from 'react-i18next';
+import Button from '@mui/material/Button';
 
 const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isLoading }) => {
   const { t } = useTranslation();
@@ -26,9 +27,9 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
       </div>
       {totalRecords > (searchParams?.limit ?? 10) && (
         <div className="pagination">
-            <button onClick={() => onPageChange(currentPage - 2)} disabled={currentPage <= 1}>&lt; {t('Previous')}</button>
+            <Button variant="contained" color="success" onClick={() => onPageChange(currentPage - 2)} disabled={currentPage <= 1}>&lt; {t('Previous')}</Button>
             <span> {t('Page')} {currentPage} {t('of')} {numPages.toLocaleString()} </span>
-            <button onClick={() => onPageChange(currentPage)} disabled={currentPage >= numPages}>{t('Next')} &gt;</button>
+            <Button variant="contained" color="success" onClick={() => onPageChange(currentPage)} disabled={currentPage >= numPages}>{t('Next')} &gt;</Button>
         </div>
       )}
     </div>

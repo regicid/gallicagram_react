@@ -57,5 +57,6 @@
   "Frequency in the corpus": "Fréquence dans le corpus",
   "Frequency over time": "Fréquence au fil du temps",
   "Date": "Date",
-  "Plot controls": "Paramètres graphiques"
+  "Plot controls": "Paramètres graphiques",
+  "Total Occurrences:": "Nombre d'occurrences total :"
 }

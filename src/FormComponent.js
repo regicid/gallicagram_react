@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Slider from '@mui/material/Slider';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -11,6 +11,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import { useTranslation } from 'react-i18next';
+import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 
 const FormComponent = ({ formData, onFormChange, onPlot }) => {
   const { t } = useTranslation();
@@ -20,30 +21,20 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
     option2: false,
     option3: false,
   });
+  const [corpora, setCorpora] = useState([]);
 
-
-  const corpora = [
-    { value: 'lemonde', label: t('Le Monde') },
-    { value: 'presse', label: t('Presse de Gallica') },
-    { value: 'livres', label: t('Livres de Gallica') },
-    { value: 'ddb', label: t('Deutsches Zeitungsportal (DDB)') },
-    { value: 'american_stories', label: t('American Stories') },
-    { value: 'paris', label: t('Journal de Paris') },
-    { value: 'moniteur', label: t('Moniteur Universel') },
-    { value: 'journal_des_debats', label: t('Journal des Débats') },
-    { value: 'la_presse', label: t('La Presse') },
-    { value: 'constitutionnel', label: t('Le Constitutionnel') },
-    { value: 'figaro', label: t('Le Figaro') },
-    { value: 'temps', label: t('Le Temps') },
-    { value: 'petit_journal', label: t('Le Petit Journal') },
-    { value: 'petit_parisien', label: t('Le Petit Parisien') },
-    { value: 'huma', label: t('L’Humanité') },
-    { value: 'subtitles', label: t('Opensubtitles (français)') },
-    { value: 'subtitles_en', label: t('Opensubtitles (anglais)') },
-    { value: 'rap', label: t('Rap (Genius)') },
-    { value: 'persee', label: t('Persée') },
-    { value: 'google', label: t('Ngram Viewer') },
-  ];
+  useEffect(() => {
+    fetch('/corpus.tsv')
+      .then(response => response.text())
+      .then(data => {
+        const lines = data.split('\n');
+        const corporaData = lines.slice(1).map(line => {
+          const columns = line.split('\t');
+          return { label: `${columns[0]} (${columns[1]})`, value: columns[3], resolution: columns[5], maxLength: parseInt(columns[4], 10) };
+        }).filter(c => c.value);
+        setCorpora([...corporaData, { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle' }]);
+      });
+  }, [t]);
 
   const handleChange = (e) => {
     onFormChange({ ...formData, [e.target.name]: e.target.value });
@@ -70,8 +61,21 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    const selectedCorpus = corpora.find(c => c.value === corpus);
+    if (selectedCorpus && selectedCorpus.maxLength) {
+      const wordCount = word.split(/[ -]/).filter(w => w).length;
+      if (wordCount > selectedCorpus.maxLength) {
+        alert(`Your query is too long for the selected corpus. Maximum length is ${selectedCorpus.maxLength} words.`);
+        return;
+      }
+    }
+
     onPlot();
   };
+
+  const selectedCorpus = corpora.find(c => c.value === corpus);
+  const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
 
   return (
     <form onSubmit={handleSubmit}>
@@ -109,15 +113,27 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
           />
         </Box>
       </div>
-      <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-        <label style={{ marginRight: '1rem' }}>{t('Corpus:')}</label>
-        <select name="corpus" value={corpus} onChange={handleChange}>
-          {corpora.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-        </select>
+      <div className="form-group" style={{ marginBottom: '1rem' }}>
+        <FormControl sx={{ width: 300 }}>
+          <InputLabel id="corpus-select-label">{t('Corpus:')}</InputLabel>
+          <Select
+            labelId="corpus-select-label"
+            id="corpus-select"
+            value={corpus}
+            label={t('Corpus:')}
+            name="corpus"
+            onChange={handleChange}
+            sx={{ fontFamily: 'serif' }}
+          >
+            {corpora.map(c => (
+              <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </div>
       <div className="form-group">
         <label>{t('Resolution:')}</label>
-        <div className="checkbox-group">
+        <div className="checkbox-group" style={{ display: 'flex', justifyContent: 'center' }}>
           <label className="checkbox-label">
             <input
               type="radio"
@@ -128,26 +144,28 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
             />
             {t('Année')}
           </label>
-          <label className="checkbox-label">
-            <input
-              type="radio"
-              name="resolution"
-              value="mois"
-              checked={resolution === 'mois'}
-              onChange={handleChange}
-            />
-            {t('Mois')}
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="radio"
-              name="resolution"
-              value="jour"
-              checked={resolution === 'jour'}
-              onChange={handleChange}
-            />
-            {t('Jour')}
-          </label>
+          {(maxResolution === 'Mensuelle' || maxResolution === 'Journalière') &&
+            <label className="checkbox-label">
+              <input
+                type="radio"
+                name="resolution"
+                value="mois"
+                checked={resolution === 'mois'}
+                onChange={handleChange}
+              />
+              {t('Mois')}
+            </label>}
+          {maxResolution === 'Journalière' &&
+            <label className="checkbox-label">
+              <input
+                type="radio"
+                name="resolution"
+                value="jour"
+                checked={resolution === 'jour'}
+                onChange={handleChange}
+              />
+              {t('Jour')}
+            </label>}
         </div>
       </div>
       <button type="submit" style={{ display: 'none' }} />

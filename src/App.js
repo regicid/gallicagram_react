@@ -6,6 +6,19 @@ import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
 import { useTranslation } from 'react-i18next';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+
+const theme = createTheme({
+  typography: {
+    fontFamily: [
+      'Georgia',
+      'serif',
+    ].join(','),
+  },
+});
 
 let nextId = 2;
 const initialQuery = {
@@ -45,8 +58,25 @@ function movingAverage(data, windowSize) {
   return smoothed;
 }
 
+const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
+
 function App() {
   const { t, i18n } = useTranslation();
+
+  useEffect(() => {
+    fetch('https://ipapi.co/json/')
+      .then(response => response.json())
+      .then(data => {
+        console.log('IP Geolocation data:', data);
+        console.log('Is country FR:', data.country_code === 'FR');
+        if (data.country_code === 'FR') {
+          i18n.changeLanguage('fr');
+        } else {
+          i18n.changeLanguage('en');
+        }
+      })
+      .catch(error => console.error('Error fetching IP geolocation:', error));
+  }, [i18n]);
   const [queries, setQueries] = useState([{ id: 1, ...initialQuery }]);
   const [activeQueryId, setActiveQueryId] = useState(1);
   const [apiResponses, setApiResponses] = useState([]);
@@ -58,12 +88,14 @@ function App() {
   const [plotType, setPlotType] = useState('line');
   const [occurrences, setOccurrences] = useState([]);
   const [totalOccurrences, setTotalOccurrences] = useState(0);
+  const [totalPlotOccurrences, setTotalPlotOccurrences] = useState(0);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedQuery, setSelectedQuery] = useState(null);
   const [contextSearchParams, setContextSearchParams] = useState({ limit: 10, cursor: 0 });
   const [isContextLoading, setIsContextLoading] = useState(false);
+  const [fetchContextAfterPlot, setFetchContextAfterPlot] = useState(false);
 
-  const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
+
 
   useEffect(() => {
     // Initial data load
@@ -245,36 +277,7 @@ function App() {
     setPlotData(smoothedTraces);
   }, [smoothing, rawPlotData, plotType]);
 
-  const handleFormChange = (updatedQuery) => {
-    const newQueries = queries.map(q => q.id === updatedQuery.id ? updatedQuery : q);
-    setQueries(newQueries);
-  };
-
-  const addQuery = () => {
-    const activeQuery = queries.find(q => q.id === activeQueryId);
-    const newQuery = {
-      id: nextId++,
-      word: '', // Reset the word
-      startDate: activeQuery.startDate,
-      endDate: activeQuery.endDate,
-      corpus: activeQuery.corpus,
-      resolution: activeQuery.resolution,
-      advancedOptions: activeQuery.advancedOptions,
-    };
-    setQueries([...queries, newQuery]);
-    setActiveQueryId(newQuery.id);
-  };
-
-  const removeQuery = (id) => {
-    if (queries.length <= 1) return;
-    const newQueries = queries.filter(q => q.id !== id);
-    setQueries(newQueries);
-    if (activeQueryId === id) {
-      setActiveQueryId(newQueries[0].id);
-    }
-  };
-
-  const fetchOccurrences = async (date, searchParams, query) => {
+  const fetchOccurrences = useCallback(async (date, searchParams, query) => {
     setIsContextLoading(true);
     setError(null);
     if (!query || !query.word) {
@@ -304,6 +307,66 @@ function App() {
     } finally {
       setIsContextLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (fetchContextAfterPlot && plotData.length > 0) {
+      const activeQueryIndex = queries.findIndex(q => q.id === activeQueryId);
+      if (activeQueryIndex === -1) {
+        setFetchContextAfterPlot(false);
+        return;
+      }
+
+      const activeTrace = plotData[activeQueryIndex];
+      const activeQuery = queries[activeQueryIndex];
+
+      if (activeTrace && activeTrace.x && activeTrace.x.length > 0) {
+        let lastDateWithData = null;
+        for (let i = activeTrace.x.length - 1; i >= 0; i--) {
+          if (activeTrace.y[i] !== null && activeTrace.y[i] !== undefined) {
+            lastDateWithData = new Date(activeTrace.x[i]);
+            break;
+          }
+        }
+
+        if (lastDateWithData) {
+          setSelectedDate(lastDateWithData);
+          const newSearchParams = { limit: 10, cursor: 0 };
+          setContextSearchParams(newSearchParams);
+          fetchOccurrences(lastDateWithData, newSearchParams, activeQuery);
+        }
+      }
+      setFetchContextAfterPlot(false);
+    }
+  }, [plotData, fetchContextAfterPlot, queries, activeQueryId, fetchOccurrences]);
+
+  const handleFormChange = (updatedQuery) => {
+    const newQueries = queries.map(q => q.id === updatedQuery.id ? updatedQuery : q);
+    setQueries(newQueries);
+  };
+
+  const addQuery = () => {
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    const newQuery = {
+      id: nextId++,
+      word: '', // Reset the word
+      startDate: activeQuery.startDate,
+      endDate: activeQuery.endDate,
+      corpus: activeQuery.corpus,
+      resolution: activeQuery.resolution,
+      advancedOptions: activeQuery.advancedOptions,
+    };
+    setQueries([...queries, newQuery]);
+    setActiveQueryId(newQuery.id);
+  };
+
+  const removeQuery = (id) => {
+    if (queries.length <= 1) return;
+    const newQueries = queries.filter(q => q.id !== id);
+    setQueries(newQueries);
+    if (activeQueryId === id) {
+      setActiveQueryId(newQueries[0].id);
+    }
   };
 
   const handlePointClick = (data) => {
@@ -332,7 +395,7 @@ function App() {
     return fetch(url)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Network response was not ok for "${word}"`);
+          throw new Error(`Network response was not ok for \"${word}\"`);
         }
         const contentType = response.headers.get("content-type");
         if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
@@ -359,7 +422,7 @@ function App() {
             skipEmptyLines: true,
             complete: (results) => {
               if (results.errors.length) {
-                console.error(`CSV Parsing errors for "${word}":`, results.errors);
+                console.error(`CSV Parsing errors for \"${word}\":`, results.errors);
               }
               papaResolve(results.data);
             }
@@ -374,13 +437,13 @@ function App() {
     return fetch(url)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Network response was not ok for "${word}"`);
+          throw new Error(`Network response was not ok for \"${word}\"`);
         }
         return response.json();
       })
       .then(data => {
         if (!data || data.length === 0) {
-          console.warn(`No data returned for "${word}"`);
+          console.warn(`No data returned for \"${word}\"`);
           return { ngram: word, timeseries: [] };
         }
         return data[0];
@@ -460,7 +523,9 @@ function App() {
                 }
               });
             });
-            resolve({ data: Object.values(combinedData), query });
+            const dataValues = Object.values(combinedData);
+            const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
+            resolve({ data: dataValues, query, total });
           }
         })
         .catch(error => reject(error));
@@ -472,14 +537,18 @@ function App() {
     setApiResponses([]);
     setOccurrences([]);
     setTotalOccurrences(0);
+    setTotalPlotOccurrences(0);
     setSelectedDate(null);
     setIsLoading(true);
+    setFetchContextAfterPlot(true);
 
     const promises = queries.map(q => fetchDataForQuery(q));
 
     Promise.all(promises)
       .then(responses => {
         setApiResponses(responses);
+        const total = responses.reduce((acc, res) => acc + (res.total || 0), 0);
+        setTotalPlotOccurrences(total);
       })
       .catch(err => {
         console.error("An error occurred during plotting:", err);
@@ -528,6 +597,7 @@ function App() {
   const activeQuery = queries.find(q => q.id === activeQueryId);
 
   return (
+    <ThemeProvider theme={theme}>
     <div className="App">
       <header className="App-header">
         <img src="/logo.png" className="App-logo" alt="logo" />
@@ -556,9 +626,14 @@ function App() {
               onPlot={handlePlot}
             />
           )}
-          <button onClick={handlePlot} disabled={isLoading}>
+          <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
             {isLoading ? t('Loading...') : t('Plot')}
-          </button>
+          </Button>
+          {totalPlotOccurrences > 0 && (
+            <Typography variant="body1" style={{ marginTop: '1rem' }}>
+              {t('Total Occurrences:')} {totalPlotOccurrences.toLocaleString()}
+            </Typography>
+          )}
         </div>
         <div className="plot-container">
           {error && <div className="error">{error}</div>}
@@ -567,11 +642,20 @@ function App() {
             <div className="plot-controls">
               <h3>{t('Plot controls')}</h3>
               <div className="form-group">
-                <label>{t('Visualization:')}</label>
-                <select value={plotType} onChange={(e) => setPlotType(e.target.value)}>
-                  <option value="line">{t('Line Plot (Frequency)')}</option>
-                  <option value="bar">{t('Bar Plot (Raw Count)')}</option>
-                </select>
+                <FormControl sx={{ minWidth: 240 }}>
+                  <InputLabel id="plot-type-select-label">{t('Visualization:')}</InputLabel>
+                  <Select
+                    labelId="plot-type-select-label"
+                    id="plot-type-select"
+                    value={plotType}
+                    label={t('Visualization:')}
+                    onChange={(e) => setPlotType(e.target.value)}
+                    sx={{ fontFamily: 'serif' }}
+                  >
+                    <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>
+                    <MenuItem value={"bar"}>{t('Bar Plot (Raw Count)')}</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
               <div className="form-group">
                 <label>{t('Smoothing (Moving Average):')} {smoothing}</label>
@@ -584,12 +668,12 @@ function App() {
                   disabled={plotType !== 'line'}
                 />
               </div>
-              <button disabled={isLoading || plotData.length === 0}>
+              <Button variant="contained" color="success" disabled={isLoading || plotData.length === 0}>
                 {t('Download Plot')}
-              </button>
-              <button onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
+              </Button>
+              <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
                 {t('Download CSV')}
-              </button>
+              </Button>
             </div>
           </div>
           {(selectedDate || occurrences.length > 0) && 
@@ -604,6 +688,7 @@ function App() {
         </div>
       </div>
     </div>
+    </ThemeProvider>
   );
 }
 

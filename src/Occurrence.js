@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Button from '@mui/material/Button';
 
 const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
 
@@ -21,7 +22,7 @@ const Occurrence = ({ record }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const terms = ensureMultiWordIsWrapped(record.terms);
+      const terms = ensureMultiWordIsWrapped(record.terms).map(term => term.split('+')[0]);
       const params = new URLSearchParams({
         ark: record.ark,
         url: record.url,
@@ -47,9 +48,9 @@ const Occurrence = ({ record }) => {
       <h4>{record.paper_title}</h4>
       <p>{record.date}</p>
       <a href={record.url} target="_blank" rel="noopener noreferrer">View on Gallica</a>
-      <button onClick={fetchContext} disabled={isLoading}>
+      <Button variant="contained" color="success" onClick={fetchContext} disabled={isLoading}>
         {isLoading ? 'Loading...' : (context ? 'Hide context' : 'Show context')}
-      </button>
+      </Button>
       {error && <div className="error" style={{color: 'red'}}>{error}</div>}
       {context && (
         <div className="context-view">

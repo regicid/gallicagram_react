@@ -1,5 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
+import AddIcon from '@mui/icons-material/Add';
 
 const TabsComponent = ({ queries, activeQueryId, onTabClick, onAddTab, onRemoveTab, isOnlyQuery }) => {
   const { t } = useTranslation();
@@ -14,11 +17,11 @@ const TabsComponent = ({ queries, activeQueryId, onTabClick, onAddTab, onRemoveT
         >
           {query.word || `${t('Query')} ${query.id}`}
           {!isOnlyQuery && (
-            <button className="remove-tab-btn" onClick={(e) => { e.stopPropagation(); onRemoveTab(query.id); }}>x</button>
+            <IconButton size="small" className="remove-tab-btn" onClick={(e) => { e.stopPropagation(); onRemoveTab(query.id); }}><CloseIcon fontSize="small" /></IconButton>
           )}
         </div>
       ))}
-      <button className="add-tab-btn" onClick={onAddTab}>+</button>
+      <IconButton className="add-tab-btn" onClick={onAddTab}><AddIcon /></IconButton>
     </div>
   );
 };

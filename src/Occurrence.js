@@ -45,9 +45,12 @@ const Occurrence = ({ record }) => {
 
   return (
     <div className="occurrence-card">
-      <h4>{record.paper_title}</h4>
+      <h4>
+        <a href={record.url} target="_blank" rel="noopener noreferrer" style={{textDecoration: 'none', color: 'inherit'}}>
+          {record.paper_title}
+        </a>
+      </h4>
       <p>{record.date}</p>
-      <a href={record.url} target="_blank" rel="noopener noreferrer">View on Gallica</a>
       <Button variant="contained" color="success" onClick={fetchContext} disabled={isLoading}>
         {isLoading ? 'Loading...' : (context ? 'Hide context' : 'Show context')}
       </Button>

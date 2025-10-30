@@ -58,5 +58,8 @@
   "Frequency over time": "Fréquence au fil du temps",
   "Date": "Date",
   "Plot controls": "Paramètres graphiques",
-  "Total Occurrences:": "Nombre d'occurrences total :"
+  "Total Occurrences:": "Nombre d'occurrences total :",
+  "No more results": "Plus de résultats",
+  "Search by title...": "Rechercher par titre...",
+  "No results match your search": "Aucun résultat ne correspond à votre recherche"
 }

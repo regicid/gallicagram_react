@@ -277,14 +277,14 @@ function App() {
     setPlotData(smoothedTraces);
   }, [smoothing, rawPlotData, plotType]);
 
-  const fetchOccurrences = useCallback(async (date, searchParams, query) => {
+  const fetchOccurrences = useCallback(async (date, searchParams, query, shouldAppend = false) => {
     setIsContextLoading(true);
     setError(null);
     if (!query || !query.word) {
       setIsContextLoading(false);
       return;
     }
-    
+
     const params = new URLSearchParams({
       terms: query.word,
       year: date.getFullYear(),
@@ -300,7 +300,11 @@ function App() {
         throw new Error('Failed to fetch occurrences');
       }
       const data = await response.json();
-      setOccurrences(data.records);
+      if (shouldAppend) {
+        setOccurrences(prev => [...prev, ...data.records]);
+      } else {
+        setOccurrences(data.records);
+      }
       setTotalOccurrences(data.total_records);
     } catch (err) {
       setError(err.message);
@@ -333,7 +337,7 @@ function App() {
           setSelectedDate(lastDateWithData);
           const newSearchParams = { limit: 10, cursor: 0 };
           setContextSearchParams(newSearchParams);
-          fetchOccurrences(lastDateWithData, newSearchParams, activeQuery);
+          fetchOccurrences(lastDateWithData, newSearchParams, activeQuery, false);
         }
       }
       setFetchContextAfterPlot(false);
@@ -379,14 +383,14 @@ function App() {
       setSelectedDate(date);
       const newSearchParams = { limit: 10, cursor: 0 };
       setContextSearchParams(newSearchParams);
-      fetchOccurrences(date, newSearchParams, query);
+      fetchOccurrences(date, newSearchParams, query, false);
     }
   };
 
   const handleContextPageChange = (pageIndex) => {
       const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };
       setContextSearchParams(newSearchParams);
-      fetchOccurrences(selectedDate, newSearchParams, selectedQuery);
+      fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
   }
 
   const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution) => {

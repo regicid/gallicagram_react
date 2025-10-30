@@ -64,7 +64,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
 
     const selectedCorpus = corpora.find(c => c.value === corpus);
     if (selectedCorpus && selectedCorpus.maxLength) {
-      const wordCount = word.split(/[ -]/).filter(w => w).length;
+      const wordCount = Math.max(...word.split('+').map(segment => segment.split(/[ -]/).filter(w => w).length));
       if (wordCount > selectedCorpus.maxLength) {
         alert(`Your query is too long for the selected corpus. Maximum length is ${selectedCorpus.maxLength} words.`);
         return;

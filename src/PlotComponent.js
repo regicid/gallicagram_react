@@ -31,7 +31,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
           title: t('Date')
         },
         yaxis: {
-          title: yAxisTitle
+          title: yAxisTitle,
+          rangemode: plotType === 'area' ? 'tozero' : 'normal'
         }
       }}
       onClick={onPointClick}

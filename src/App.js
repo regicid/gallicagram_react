@@ -9,7 +9,9 @@ import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Slider, Tooltip } from '@mui/material';
+import SumsComponent from './SumsComponent';
+import WordCloudComponent from './WordCloudComponent';
 
 const theme = createTheme({
   typography: {
@@ -82,6 +84,7 @@ function App() {
   const [apiResponses, setApiResponses] = useState([]);
   const [rawPlotData, setRawPlotData] = useState([]);
   const [plotData, setPlotData] = useState([]);
+  const [sumsData, setSumsData] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [smoothing, setSmoothing] = useState(0);
@@ -119,7 +122,8 @@ function App() {
                 console.error("Error parsing initial CSV:", results.errors);
                 reject(new Error("Error parsing initial data file."));
               } else {
-                const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery } };
+                const total = results.data.reduce((acc, row) => acc + (row.n || 0), 0);
+                const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery }, total };
                 setApiResponses([initialApiResponse]);
                 resolve();
               }
@@ -165,11 +169,12 @@ function App() {
       return {
         x: years,
         y: ngramData.timeseries,
-        type: plotType === 'line' ? 'scatter' : 'bar',
-        mode: plotType === 'line'
+        type: plotType === 'line' || plotType === 'area' ? 'scatter' : 'bar',
+        mode: plotType === 'line' || plotType === 'area'
           ? (years.length > 20 ? 'lines' : 'lines+markers')
           : undefined,
-        line: plotType === 'line' ? { shape: 'spline' } : undefined,
+        fill: plotType === 'area' ? 'tozeroy' : undefined,
+        line: plotType === 'line' || plotType === 'area' ? { shape: 'spline' } : undefined,
         name: allSameCorpus
           ? (ngramData.ngram || `${t('Query')} ${query.id}`)
           : `${ngramData.ngram || `${t('Query')} ${query.id}`} (${query.corpus})`,
@@ -234,7 +239,7 @@ function App() {
 
     const yValues = processedData.map(d => {
       if (!d.data) return null;
-      if (plotType === 'line') {
+      if (plotType === 'line' || plotType === 'area') {
         return (d.data.n !== undefined && d.data.total) ? d.data.n / d.data.total : null;
       } else { // bar
         return d.data.n !== undefined ? d.data.n : null;
@@ -244,11 +249,12 @@ function App() {
     return {
       x: processedData.map(d => d.x),
       y: yValues,
-      type: plotType === 'line' ? 'scatter' : 'bar',
-      mode: plotType === 'line'
+      type: plotType === 'line' || plotType === 'area' ? 'scatter' : 'bar',
+      mode: plotType === 'line' || plotType === 'area'
         ? (processedData.length > 20 ? 'lines' : 'lines+markers')
         : undefined,
-      line: plotType === 'line' ? { shape: 'spline' } : undefined,
+      fill: plotType === 'area' ? 'tozeroy' : undefined,
+      line: plotType === 'line' || plotType === 'area' ? { shape: 'spline' } : undefined,
       name: allSameCorpus
         ? (query.word || `${t('Query')} ${query.id}`)
         : `${query.word || `${t('Query')} ${query.id}`} (${query.corpus})`,
@@ -259,14 +265,31 @@ function App() {
   useEffect(() => {
     if (apiResponses.length === 0) return;
 
-    const firstCorpus = queries[0]?.corpus;
-    const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
-    const traces = apiResponses.flatMap(res => processData(res, allSameCorpus, plotType));
-    setRawPlotData(traces);
-  }, [apiResponses, plotType, queries, processData]);
+    if (plotType === 'sums' || plotType === 'wordcloud') {
+      const data = apiResponses.map(res => {
+        let total;
+        if (res.query.corpus === 'google') {
+          total = 0; 
+        } else {
+          total = res.total || 0;
+        }
+        return {
+          word: res.query.word || `${t('Query')} ${res.query.id}`,
+          total: total
+        };
+      });
+      data.sort((a, b) => b.total - a.total);
+      setSumsData(data);
+    } else {
+      const firstCorpus = queries[0]?.corpus;
+      const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
+      const traces = apiResponses.flatMap(res => processData(res, allSameCorpus, plotType));
+      setRawPlotData(traces);
+    }
+  }, [apiResponses, plotType, queries, processData, t]);
 
   useEffect(() => {
-    if (plotType !== 'line') {
+    if (plotType !== 'line' && plotType !== 'area') {
       setPlotData(rawPlotData);
       return;
     }
@@ -642,7 +665,13 @@ function App() {
         <div className="plot-container">
           {error && <div className="error">{error}</div>}
           <div className="plot-area">
-            <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
+            {plotType === 'sums' ? (
+              <SumsComponent data={sumsData} />
+            ) : plotType === 'wordcloud' ? (
+              <WordCloudComponent data={sumsData} />
+            ) : (
+              <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
+            )}
             <div className="plot-controls">
               <h3>{t('Plot controls')}</h3>
               <div className="form-group">
@@ -657,19 +686,28 @@ function App() {
                     sx={{ fontFamily: 'serif' }}
                   >
                     <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>
+                    <MenuItem value={"area"}>{t('Area Chart (Frequency)')}</MenuItem>
                     <MenuItem value={"bar"}>{t('Bar Plot (Raw Count)')}</MenuItem>
+                    <MenuItem value={"sums"}>{t('Sums')}</MenuItem>
+                    <MenuItem value={"wordcloud"}>{t('Word Cloud')}</MenuItem>
                   </Select>
                 </FormControl>
               </div>
               <div className="form-group">
-                <label>{t('Smoothing (Moving Average):')} {smoothing}</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="11"
+                <Typography id="smoothing-slider" gutterBottom>
+                  {t('Smoothing (Moving Average):')}
+                </Typography>
+                <Slider
                   value={smoothing}
-                  onChange={(e) => setSmoothing(parseInt(e.target.value, 10))}
-                  disabled={plotType !== 'line'}
+                  onChange={(e, newValue) => setSmoothing(newValue)}
+                  aria-labelledby="smoothing-slider"
+                  valueLabelDisplay="on"
+                  step={1}
+                  marks
+                  min={0}
+                  max={10}
+                  disabled={plotType !== 'line' && plotType !== 'area'}
+                  sx={{ width: 200, ml: 2 }}
                 />
               </div>
               <Button variant="contained" color="success" disabled={isLoading || plotData.length === 0}>

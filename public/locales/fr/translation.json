@@ -9,6 +9,7 @@
   "Visualization:": "Visualisation :",
   "Line Plot (Frequency)": "Graphique linéaire (fréquence)",
   "Bar Plot (Raw Count)": "Graphique à barres (nombre brut)",
+  "Area Chart (Frequency)": "Graphique en aires (fréquence)",
   "Smoothing (Moving Average):": "Lissage (moyenne mobile) :",
   "Download Plot": "Télécharger le graphique",
   "Download CSV": "Télécharger le CSV",
@@ -61,5 +62,10 @@
   "Total Occurrences:": "Nombre d'occurrences total :",
   "No more results": "Plus de résultats",
   "Search by title...": "Rechercher par titre...",
-  "No results match your search": "Aucun résultat ne correspond à votre recherche"
+  "No results match your search": "Aucun résultat ne correspond à votre recherche",
+  "Sums": "Sommes",
+  "No data to display": "Aucune donnée à afficher",
+  "Total Occurrences per Query": "Total d'occurrences par requête",
+  "Total Occurrences": "Total d'occurrences",
+  "Word Cloud": "Nuage de mots"
 }

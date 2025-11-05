@@ -9,6 +9,7 @@
   "Visualization:": "Visualization:",
   "Line Plot (Frequency)": "Line Plot (Frequency)",
   "Bar Plot (Raw Count)": "Bar Plot (Raw Count)",
+  "Area Chart (Frequency)": "Area Chart (Frequency)",
   "Smoothing (Moving Average):": "Smoothing (Moving Average):",
   "Download Plot": "Download Plot",
   "Download CSV": "Download CSV",
@@ -61,5 +62,10 @@
   "Total Occurrences:": "Total Occurrences:",
   "No more results": "No more results",
   "Search by title...": "Search by title...",
-  "No results match your search": "No results match your search"
+  "No results match your search": "No results match your search",
+  "Sums": "Sums",
+  "No data to display": "No data to display",
+  "Total Occurrences per Query": "Total Occurrences per Query",
+  "Total Occurrences": "Total Occurrences",
+  "Word Cloud": "Word Cloud"
 }

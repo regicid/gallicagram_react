@@ -18,7 +18,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
   const { word, startDate, endDate, corpus, resolution } = formData;
   const [advancedOptions, setAdvancedOptions] = useState({
     rescale: false,
-    option2: false,
+    ratio: false,
     option3: false,
   });
   const [corpora, setCorpora] = useState([]);
@@ -191,12 +191,12 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
           <FormControlLabel
             control={
               <Checkbox
-                checked={advancedOptions.option2}
+                checked={advancedOptions.ratio}
                 onChange={handleAdvancedOptionsChange}
-                name="option2"
+                name="ratio"
               />
             }
-            label={t('Option 2')}
+            label={t('Ratio')}
           />
           <FormControlLabel
             control={

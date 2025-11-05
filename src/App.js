@@ -185,7 +185,7 @@ function App() {
     return traces;
   }, [t]);
 
-  const processData = useCallback((apiResponse, allSameCorpus, plotType) => {
+  const processData = useCallback((apiResponse, allSameCorpus, plotType, advancedOptions) => {
     if (apiResponse.query.corpus === 'google') {
       return processNgramData(apiResponse, allSameCorpus, plotType);
     }
@@ -269,7 +269,7 @@ function App() {
       const data = apiResponses.map(res => {
         let total;
         if (res.query.corpus === 'google') {
-          total = 0; 
+          total = 0;
         } else {
           total = res.total || 0;
         }
@@ -283,10 +283,35 @@ function App() {
     } else {
       const firstCorpus = queries[0]?.corpus;
       const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
-      const traces = apiResponses.flatMap(res => processData(res, allSameCorpus, plotType));
+      const activeQuery = queries.find(q => q.id === activeQueryId);
+      const advancedOptions = activeQuery?.advancedOptions || {};
+
+      let traces = apiResponses.flatMap(res => processData(res, allSameCorpus, plotType, advancedOptions));
+
+      // Handle ratio calculation for lineplot mode
+      if (plotType === 'line' && advancedOptions.ratio && traces.length >= 2) {
+        const trace1 = traces[0];
+        const trace2 = traces[1];
+        const ratioTrace = {
+          x: trace1.x,
+          y: trace1.y.map((v, i) => {
+            if (v !== null && trace2.y[i] !== null && trace2.y[i] !== 0) {
+              return v / trace2.y[i];
+            }
+            return null;
+          }),
+          type: 'scatter',
+          mode: trace1.mode,
+          line: trace1.line,
+          name: `${trace1.name}/${trace2.name}`,
+          connectgaps: false,
+        };
+        traces = [ratioTrace];
+      }
+
       setRawPlotData(traces);
     }
-  }, [apiResponses, plotType, queries, processData, t]);
+  }, [apiResponses, plotType, queries, activeQueryId, processData, t]);
 
   useEffect(() => {
     if (plotType !== 'line' && plotType !== 'area') {

@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FormControl, InputLabel, Select, MenuItem, Slider, Tooltip, TextField, Box } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box } from '@mui/material';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
 
@@ -55,6 +55,89 @@ function movingAverage(data, windowSize) {
       smoothed.push(null);
     }
   }
+  return smoothed;
+}
+
+function loessSmoothing(data, span) {
+  // span should be between 0 and 1, representing the fraction of data points to use
+  // We'll convert the slider value (0-10) to a span value (0.05-1.0)
+  // When span is 0, return the original data without smoothing
+  if (span === 0) {
+    return data;
+  }
+
+  const alpha = 0.05 + (span / 10) * 0.95;
+
+  const smoothed = [];
+  const n = data.length;
+  const bandwidth = Math.max(2, Math.floor(alpha * n));
+
+  // Tricube weight function
+  const tricube = (x) => {
+    const absX = Math.abs(x);
+    if (absX >= 1) return 0;
+    const tmp = 1 - absX * absX * absX;
+    return tmp * tmp * tmp;
+  };
+
+  for (let i = 0; i < n; i++) {
+    // Find the k nearest neighbors
+    const distances = [];
+    for (let j = 0; j < n; j++) {
+      if (data[j] !== null) {
+        distances.push({ index: j, distance: Math.abs(i - j) });
+      }
+    }
+
+    if (distances.length === 0) {
+      smoothed.push(null);
+      continue;
+    }
+
+    distances.sort((a, b) => a.distance - b.distance);
+    const neighbors = distances.slice(0, Math.min(bandwidth, distances.length));
+
+    if (neighbors.length === 0) {
+      smoothed.push(data[i]);
+      continue;
+    }
+
+    const maxDist = neighbors[neighbors.length - 1].distance;
+
+    if (maxDist === 0) {
+      smoothed.push(data[i]);
+      continue;
+    }
+
+    // Weighted linear regression
+    let sumW = 0;
+    let sumWX = 0;
+    let sumWY = 0;
+    let sumWXX = 0;
+    let sumWXY = 0;
+
+    for (const neighbor of neighbors) {
+      const j = neighbor.index;
+      const w = tricube(neighbor.distance / maxDist);
+      sumW += w;
+      sumWX += w * j;
+      sumWY += w * data[j];
+      sumWXX += w * j * j;
+      sumWXY += w * j * data[j];
+    }
+
+    // Solve for slope and intercept
+    const denominator = sumW * sumWXX - sumWX * sumWX;
+    if (Math.abs(denominator) < 1e-10) {
+      // Fallback to weighted average if regression fails
+      smoothed.push(sumWY / sumW);
+    } else {
+      const slope = (sumW * sumWXY - sumWX * sumWY) / denominator;
+      const intercept = (sumWY - slope * sumWX) / sumW;
+      smoothed.push(intercept + slope * i);
+    }
+  }
+
   return smoothed;
 }
 
@@ -318,12 +401,17 @@ function App() {
       setPlotData(rawPlotData);
       return;
     }
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    const useLoess = activeQuery?.advancedOptions?.loessSmoothing || false;
+
     const smoothedTraces = rawPlotData.map(trace => {
-      const smoothedY = movingAverage(trace.y, smoothing);
+      const smoothedY = useLoess
+        ? loessSmoothing(trace.y, smoothing)
+        : movingAverage(trace.y, smoothing);
       return { ...trace, y: smoothedY };
     });
     setPlotData(smoothedTraces);
-  }, [smoothing, rawPlotData, plotType]);
+  }, [smoothing, rawPlotData, plotType, queries, activeQueryId]);
 
   const fetchOccurrences = useCallback(async (date, searchParams, query, shouldAppend = false) => {
     setIsContextLoading(true);
@@ -470,7 +558,7 @@ function App() {
     return fetch(url)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Network response was not ok for \"${word}\"`);
+          throw new Error(`Network response was not ok for "${word}"`);
         }
         const contentType = response.headers.get("content-type");
         if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
@@ -497,7 +585,7 @@ function App() {
             skipEmptyLines: true,
             complete: (results) => {
               if (results.errors.length) {
-                console.error(`CSV Parsing errors for \"${word}\":`, results.errors);
+                console.error(`CSV Parsing errors for "${word}":`, results.errors);
               }
               papaResolve(results.data);
             }
@@ -512,13 +600,13 @@ function App() {
     return fetch(url)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Network response was not ok for \"${word}\"`);
+          throw new Error(`Network response was not ok for "${word}"`);
         }
         return response.json();
       })
       .then(data => {
         if (!data || data.length === 0) {
-          console.warn(`No data returned for \"${word}\"`);
+          console.warn(`No data returned for "${word}"`);
           return { ngram: word, timeseries: [] };
         }
         return data[0];
@@ -792,7 +880,9 @@ function App() {
               </div>
               <div className="form-group">
                 <Typography id="smoothing-slider" gutterBottom>
-                  {t('Smoothing (Moving Average):')}
+                  {activeQuery?.advancedOptions?.loessSmoothing
+                    ? t('Smoothing (Loess Span):')
+                    : t('Smoothing (Moving Average):')}
                 </Typography>
                 <Slider
                   value={smoothing}

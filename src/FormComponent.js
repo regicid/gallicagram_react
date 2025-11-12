@@ -184,6 +184,16 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
           }
           label={t('Option 3')}
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.loessSmoothing}
+              onChange={onAdvancedOptionsChange}
+              name="loessSmoothing"
+            />
+          }
+          label={t('Loess Smoothing')}
+        />
       </AccordionDetails>
     </Accordion>
   );

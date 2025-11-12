@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
-import FormComponent from './FormComponent';
+import FormComponent, { AdvancedOptionsComponent } from './FormComponent';
 import PlotComponent from './PlotComponent';
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FormControl, InputLabel, Select, MenuItem, Slider, Tooltip } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Slider, Tooltip, TextField, Box } from '@mui/material';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
 
@@ -25,8 +25,6 @@ const theme = createTheme({
 let nextId = 2;
 const initialQuery = {
   word: 'liberté',
-  startDate: 1789,
-  endDate: 1950,
   corpus: 'presse',
   resolution: 'annee',
   advancedOptions: {
@@ -81,6 +79,8 @@ function App() {
   }, [i18n]);
   const [queries, setQueries] = useState([{ id: 1, ...initialQuery }]);
   const [activeQueryId, setActiveQueryId] = useState(1);
+  const [startDate, setStartDate] = useState(1789);
+  const [endDate, setEndDate] = useState(1950);
   const [apiResponses, setApiResponses] = useState([]);
   const [rawPlotData, setRawPlotData] = useState([]);
   const [plotData, setPlotData] = useState([]);
@@ -123,7 +123,7 @@ function App() {
                 reject(new Error("Error parsing initial data file."));
               } else {
                 const total = results.data.reduce((acc, row) => acc + (row.n || 0), 0);
-                const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery }, total };
+                const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery, startDate: 1789, endDate: 1950 }, total };
                 setApiResponses([initialApiResponse]);
                 resolve();
               }
@@ -397,13 +397,36 @@ function App() {
     setQueries(newQueries);
   };
 
+  const handleSliderChange = (event, newValue) => {
+    setStartDate(newValue[0]);
+    setEndDate(newValue[1]);
+  };
+
+  const handleDateInputChange = (e) => {
+    const { name, value } = e.target;
+    const intValue = value === '' ? '' : parseInt(value, 10);
+    if (name === 'startDate') {
+      setStartDate(intValue);
+    } else if (name === 'endDate') {
+      setEndDate(intValue);
+    }
+  };
+
+  const handleAdvancedOptionsChange = (event) => {
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    const newAdvancedOptions = {
+      ...activeQuery.advancedOptions,
+      [event.target.name]: event.target.checked,
+    };
+    const updatedQuery = { ...activeQuery, advancedOptions: newAdvancedOptions };
+    handleFormChange(updatedQuery);
+  };
+
   const addQuery = () => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
     const newQuery = {
       id: nextId++,
       word: '', // Reset the word
-      startDate: activeQuery.startDate,
-      endDate: activeQuery.endDate,
       corpus: activeQuery.corpus,
       resolution: activeQuery.resolution,
       advancedOptions: activeQuery.advancedOptions,
@@ -442,7 +465,7 @@ function App() {
   }
 
   const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution) => {
-    const url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim()}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+    const url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
       .then(response => {
@@ -502,11 +525,11 @@ function App() {
       });
   };
 
-  const fetchDataForQuery = (query) => {
+  const fetchDataForQuery = (query, globalStartDate, globalEndDate) => {
     return new Promise((resolve, reject) => {
-      const { word, corpus, startDate, endDate, resolution } = query;
+      const { word, corpus, resolution } = query;
       if (!word) {
-        resolve({ data: [], query });
+        resolve({ data: [], query: { ...query, startDate: globalStartDate, endDate: globalEndDate } });
         return;
       }
 
@@ -514,16 +537,17 @@ function App() {
 
       let fetchPromises;
       if (corpus === 'google') {
-        fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, startDate, endDate));
+        fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, globalStartDate, globalEndDate));
       } else {
-        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, startDate, endDate, resolution));
+        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution));
       }
 
       Promise.all(fetchPromises)
         .then(results => {
+          const queryWithDates = { ...query, startDate: globalStartDate, endDate: globalEndDate };
           if (corpus === 'google') {
             if (results.length === 1) {
-              resolve({ data: results, query });
+              resolve({ data: results, query: queryWithDates });
               return;
             }
             const combinedNgram = results.map(r => r.ngram).join(' + ');
@@ -549,7 +573,7 @@ function App() {
               timeseries: combinedTimeseries,
               type: "ABS"
             }];
-            resolve({ data: combinedData, query });
+            resolve({ data: combinedData, query: queryWithDates });
           } else {
             const combinedData = {};
             results.forEach(data => {
@@ -577,7 +601,7 @@ function App() {
             });
             const dataValues = Object.values(combinedData);
             const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
-            resolve({ data: dataValues, query, total });
+            resolve({ data: dataValues, query: queryWithDates, total });
           }
         })
         .catch(error => reject(error));
@@ -594,7 +618,19 @@ function App() {
     setIsLoading(true);
     setFetchContextAfterPlot(true);
 
-    const promises = queries.map(q => fetchDataForQuery(q));
+    // Expand queries with '&' separator into multiple queries
+    const expandedQueries = queries.flatMap(q => {
+      if (q.word && q.word.includes('&')) {
+        // Split by '&' and create separate queries for each word
+        return q.word.split('&').map(w => ({
+          ...q,
+          word: w.trim()
+        }));
+      }
+      return [q];
+    });
+
+    const promises = expandedQueries.map(q => fetchDataForQuery(q, startDate, endDate));
 
     Promise.all(promises)
       .then(responses => {
@@ -672,11 +708,47 @@ function App() {
             isOnlyQuery={queries.length === 1}
           />
           {activeQuery && (
-            <FormComponent
-              formData={activeQuery}
-              onFormChange={handleFormChange}
-              onPlot={handlePlot}
-            />
+            <>
+              <FormComponent
+                formData={activeQuery}
+                onFormChange={handleFormChange}
+                onPlot={handlePlot}
+              />
+              <div className="form-group">
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 300 }}>
+                  <TextField
+                    name="startDate"
+                    label={t('Start Date')}
+                    type="number"
+                    value={startDate}
+                    onChange={handleDateInputChange}
+                    inputProps={{ min: 1600, max: 2025 }}
+                  />
+                  <TextField
+                    name="endDate"
+                    label={t('End Date')}
+                    type="number"
+                    value={endDate}
+                    onChange={handleDateInputChange}
+                    inputProps={{ min: 1600, max: 2025 }}
+                  />
+                </Box>
+                <Box sx={{ width: 300 }}>
+                  <Slider
+                    getAriaLabel={() => t('Date range')}
+                    value={[startDate, endDate]}
+                    onChange={handleSliderChange}
+                    valueLabelDisplay="off"
+                    min={1600}
+                    max={2025}
+                  />
+                </Box>
+              </div>
+              <AdvancedOptionsComponent
+                advancedOptions={activeQuery.advancedOptions}
+                onAdvancedOptionsChange={handleAdvancedOptionsChange}
+              />
+            </>
           )}
           <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
             {isLoading ? t('Loading...') : t('Plot')}

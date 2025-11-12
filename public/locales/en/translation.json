@@ -67,5 +67,11 @@
   "No data to display": "No data to display",
   "Total Occurrences per Query": "Total Occurrences per Query",
   "Total Occurrences": "Total Occurrences",
-  "Word Cloud": "Word Cloud"
+  "Word Cloud": "Word Cloud",
+  "Query Syntax:": "Query Syntax:",
+  "Use & to plot multiple words as separate lines": "Use & to plot multiple words as separate lines",
+  "Example:": "Example:",
+  "Use + to combine multiple words into one line": "Use + to combine multiple words into one line",
+  "button:": "button:",
+  "Add a new tab to compare different corpora or resolutions": "Add a new tab to compare different corpora or resolutions"
 }

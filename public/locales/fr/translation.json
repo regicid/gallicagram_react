@@ -67,5 +67,11 @@
   "No data to display": "Aucune donnée à afficher",
   "Total Occurrences per Query": "Total d'occurrences par requête",
   "Total Occurrences": "Total d'occurrences",
-  "Word Cloud": "Nuage de mots"
+  "Word Cloud": "Nuage de mots",
+  "Query Syntax:": "Syntaxe de requête :",
+  "Use & to plot multiple words as separate lines": "Utilisez & pour tracer plusieurs mots en lignes séparées",
+  "Example:": "Exemple :",
+  "Use + to combine multiple words into one line": "Utilisez + pour combiner plusieurs mots en une seule ligne",
+  "button:": "bouton :",
+  "Add a new tab to compare different corpora or resolutions": "Ajoutez un nouvel onglet pour comparer différents corpus ou résolutions"
 }

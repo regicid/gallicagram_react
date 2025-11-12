@@ -1,8 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import Slider from '@mui/material/Slider';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
 import Accordion from '@mui/material/Accordion';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -11,16 +8,12 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import { useTranslation } from 'react-i18next';
-import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 const FormComponent = ({ formData, onFormChange, onPlot }) => {
   const { t } = useTranslation();
-  const { word, startDate, endDate, corpus, resolution } = formData;
-  const [advancedOptions, setAdvancedOptions] = useState({
-    rescale: false,
-    ratio: false,
-    option3: false,
-  });
+  const { word, corpus, resolution } = formData;
   const [corpora, setCorpora] = useState([]);
 
   useEffect(() => {
@@ -38,25 +31,6 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
 
   const handleChange = (e) => {
     onFormChange({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSliderChange = (event, newValue) => {
-    onFormChange({ ...formData, startDate: newValue[0], endDate: newValue[1] });
-  };
-
-  const handleDateInputChange = (e) => {
-    const { name, value } = e.target;
-    const intValue = value === '' ? '' : parseInt(value, 10);
-    onFormChange({ ...formData, [name]: intValue });
-  };
-
-  const handleAdvancedOptionsChange = (event) => {
-    const newAdvancedOptions = {
-      ...advancedOptions,
-      [event.target.name]: event.target.checked,
-    };
-    setAdvancedOptions(newAdvancedOptions);
-    onFormChange({ ...formData, advancedOptions: newAdvancedOptions });
   };
 
   const handleSubmit = (e) => {
@@ -77,41 +51,35 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
   const selectedCorpus = corpora.find(c => c.value === corpus);
   const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
 
+  const helpTooltipContent = (
+    <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+      <strong>{t('Query Syntax:')}</strong>
+      <br />
+      <br />
+      <strong>&:</strong> {t('Use & to plot multiple words as separate lines')}
+      <br />
+      <em>{t('Example:')} liberté&égalité</em>
+      <br />
+      <br />
+      <strong>+:</strong> {t('Use + to combine multiple words into one line')}
+      <br />
+      <em>{t('Example:')} liberté+égalité</em>
+      <br />
+      <br />
+      <strong>+ {t('button:')}</strong> {t('Add a new tab to compare different corpora or resolutions')}
+    </div>
+  );
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
         <label style={{ marginRight: '1rem' }}>{t('Word:')}</label>
         <input type="text" name="word" value={word} onChange={handleChange} required />
-      </div>
-      <div className="form-group">
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 300 }}>
-          <TextField
-            name="startDate"
-            label={t('Start Date')}
-            type="number"
-            value={startDate}
-            onChange={handleDateInputChange}
-            inputProps={{ min: 1600, max: 2025 }}
-          />
-          <TextField
-            name="endDate"
-            label={t('End Date')}
-            type="number"
-            value={endDate}
-            onChange={handleDateInputChange}
-            inputProps={{ min: 1600, max: 2025 }}
-          />
-        </Box>
-        <Box sx={{ width: 300 }}>
-          <Slider
-            getAriaLabel={() => t('Date range')}
-            value={[startDate, endDate]}
-            onChange={handleSliderChange}
-            valueLabelDisplay="off"
-            min={1600}
-            max={2025}
-          />
-        </Box>
+        <Tooltip title={helpTooltipContent} arrow placement="right">
+          <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
+            <HelpOutlineIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </div>
       <div className="form-group" style={{ marginBottom: '1rem' }}>
         <FormControl sx={{ width: 300 }}>
@@ -169,48 +137,55 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
         </div>
       </div>
       <button type="submit" style={{ display: 'none' }} />
-      <Accordion>
-        <AccordionSummary
-          expandIcon={<ExpandMoreIcon />}
-          aria-controls="panel1a-content"
-          id="panel1a-header"
-        >
-          <Typography>{t('Advanced Options')}</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={advancedOptions.rescale}
-                onChange={handleAdvancedOptionsChange}
-                name="rescale"
-              />
-            }
-            label={t('Rescale all curves')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={advancedOptions.ratio}
-                onChange={handleAdvancedOptionsChange}
-                name="ratio"
-              />
-            }
-            label={t('Ratio')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={advancedOptions.option3}
-                onChange={handleAdvancedOptionsChange}
-                name="option3"
-              />
-            }
-            label={t('Option 3')}
-          />
-        </AccordionDetails>
-      </Accordion>
     </form>
+  );
+};
+
+export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsChange }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Accordion>
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon />}
+        aria-controls="panel1a-content"
+        id="panel1a-header"
+      >
+        <Typography>{t('Advanced Options')}</Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.rescale}
+              onChange={onAdvancedOptionsChange}
+              name="rescale"
+            />
+          }
+          label={t('Rescale all curves')}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.ratio}
+              onChange={onAdvancedOptionsChange}
+              name="ratio"
+            />
+          }
+          label={t('Ratio')}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.option3}
+              onChange={onAdvancedOptionsChange}
+              name="option3"
+            />
+          }
+          label={t('Option 3')}
+        />
+      </AccordionDetails>
+    </Accordion>
   );
 };
 

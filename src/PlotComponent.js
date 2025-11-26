@@ -11,9 +11,45 @@ const zscore = (data) => {
 const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
   const { t } = useTranslation();
 
-  const plotData = advancedOptions?.rescale && data.length > 0 && plotType === 'line'
+  // Set1 palette
+  const defaultPalette = [
+    '#377EB8FF', // blue
+    '#E41A1CFF', // red
+    '#4DAF4AFF', // green
+    '#984EA3FF', // purple
+    '#FF7F00FF', // orange
+    '#FFFF33FF', // yellow
+    '#A65628FF', // brown
+    '#F781BFFF', // pink
+    '#999999FF', // grey
+  ];
+
+  // Paul Tol's colorblind-safe palette (bright scheme)
+  // Reference: https://personal.sron.nl/~pault/
+  const colorblindPalette = [
+    '#4477AA', // blue
+    '#EE6677', // red
+    '#228833', // green
+    '#CCBB44', // yellow
+    '#66CCEE', // cyan
+    '#AA3377', // purple
+    '#BBBBBB', // grey
+    '#EE9944', // orange
+  ];
+
+  let plotData = advancedOptions?.rescale && data.length > 0 && plotType === 'line'
     ? data.map(trace => ({ ...trace, y: zscore(trace.y) }))
     : data;
+
+  // Apply color palette (colorblind or default)
+  if (plotData.length > 0) {
+    const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
+    plotData = plotData.map((trace, index) => ({
+      ...trace,
+      line: trace.line ? { ...trace.line, color: palette[index % palette.length] } : { color: palette[index % palette.length] },
+      marker: trace.marker ? { ...trace.marker, color: palette[index % palette.length] } : { color: palette[index % palette.length] }
+    }));
+  }
 
   const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? t('Z-score') : t('Frequency in the corpus');
 

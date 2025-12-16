@@ -77,5 +77,10 @@
   "Example:": "Example:",
   "Use + to combine multiple words into one line": "Use + to combine multiple words into one line",
   "button:": "button:",
-  "Add a new tab to compare different corpora or resolutions": "Add a new tab to compare different corpora or resolutions"
+  "Add a new tab to compare different corpora or resolutions": "Add a new tab to compare different corpora or resolutions",
+  "Start date warning": "Start date ({{startDate}}) is before the recommended period start ({{periodStart}}) for {{corpusName}}",
+  "End date warning": "End date ({{endDate}}) is after the recommended period end ({{periodEnd}}) for {{corpusName}}",
+  "Smoothing Help": "Smoothing Help",
+  "Moving Average Help": "Moving Average calculates the average value over a sliding window of data points. For each point, it looks at neighboring points within the window size and computes their mean. This reduces noise and reveals trends in the data.",
+  "Loess Smoothing Help": "Loess (Locally Estimated Scatterplot Smoothing) fits multiple local regression models to subsets of the data. It creates a smooth curve that follows the data patterns more closely than a moving average, especially for non-linear trends."
 }

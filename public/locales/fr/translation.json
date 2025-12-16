@@ -77,5 +77,10 @@
   "Example:": "Exemple :",
   "Use + to combine multiple words into one line": "Utilisez + pour combiner plusieurs mots en une seule ligne",
   "button:": "bouton :",
-  "Add a new tab to compare different corpora or resolutions": "Ajoutez un nouvel onglet pour comparer différents corpus ou résolutions"
+  "Add a new tab to compare different corpora or resolutions": "Ajoutez un nouvel onglet pour comparer différents corpus ou résolutions",
+  "Start date warning": "La date de début ({{startDate}}) est antérieure au début de la période conseillée ({{periodStart}}) pour {{corpusName}}",
+  "End date warning": "La date de fin ({{endDate}}) est postérieure à la fin de la période conseillée ({{periodEnd}}) pour {{corpusName}}",
+  "Smoothing Help": "Aide sur le lissage",
+  "Moving Average Help": "La moyenne mobile calcule la valeur moyenne sur une fenêtre glissante de points de données. Pour chaque point, elle examine les points voisins dans la fenêtre et calcule leur moyenne. Cela réduit le bruit et révèle les tendances dans les données.",
+  "Loess Smoothing Help": "Le lissage Loess (Locally Estimated Scatterplot Smoothing) ajuste plusieurs modèles de régression locale à des sous-ensembles des données. Il crée une courbe lisse qui suit les motifs des données plus étroitement qu'une moyenne mobile, en particulier pour les tendances non linéaires."
 }

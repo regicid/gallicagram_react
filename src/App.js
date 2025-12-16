@@ -9,7 +9,8 @@ import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
 
@@ -180,8 +181,34 @@ function App() {
   const [contextSearchParams, setContextSearchParams] = useState({ limit: 10, cursor: 0 });
   const [isContextLoading, setIsContextLoading] = useState(false);
   const [fetchContextAfterPlot, setFetchContextAfterPlot] = useState(false);
+  const [corpusPeriods, setCorpusPeriods] = useState({});
+  const [dateWarnings, setDateWarnings] = useState([]);
 
-
+  useEffect(() => {
+    // Load corpus periods from TSV
+    fetch('/corpus.tsv')
+      .then(response => response.text())
+      .then(data => {
+        const lines = data.split('\n');
+        const periods = {};
+        lines.slice(1).forEach(line => {
+          const columns = line.split('\t');
+          if (columns[0] && columns[1] && columns[3]) {
+            const periodRange = columns[1].trim();
+            const periodMatch = periodRange.match(/^(\d{4})-(\d{4})$/);
+            if (periodMatch) {
+              periods[columns[3].trim()] = {
+                start: parseInt(periodMatch[1]),
+                end: parseInt(periodMatch[2]),
+                name: columns[0].trim()
+              };
+            }
+          }
+        });
+        setCorpusPeriods(periods);
+      })
+      .catch(error => console.error('Error loading corpus periods:', error));
+  }, []);
 
   useEffect(() => {
     // Initial data load
@@ -499,6 +526,37 @@ function App() {
       setEndDate(intValue);
     }
   };
+
+  const validateDatesAgainstCorpus = useCallback(() => {
+    const currentActiveQuery = queries.find(q => q.id === activeQueryId);
+    if (!currentActiveQuery || !corpusPeriods[currentActiveQuery.corpus]) {
+      setDateWarnings([]);
+      return;
+    }
+
+    const period = corpusPeriods[currentActiveQuery.corpus];
+    const warnings = [];
+
+    if (startDate < period.start) {
+      warnings.push({
+        type: 'start',
+        message: t('Start date warning', { startDate, periodStart: period.start, corpusName: period.name })
+      });
+    }
+
+    if (endDate > period.end) {
+      warnings.push({
+        type: 'end',
+        message: t('End date warning', { endDate, periodEnd: period.end, corpusName: period.name })
+      });
+    }
+
+    setDateWarnings(warnings);
+  }, [queries, activeQueryId, corpusPeriods, startDate, endDate, t]);
+
+  useEffect(() => {
+    validateDatesAgainstCorpus();
+  }, [validateDatesAgainstCorpus]);
 
   const handleAdvancedOptionsChange = (event) => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
@@ -841,6 +899,15 @@ function App() {
           <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
             {isLoading ? t('Loading...') : t('Plot')}
           </Button>
+          {dateWarnings.length > 0 && (
+            <Box sx={{ marginTop: '1rem', width: '100%' }}>
+              {dateWarnings.map((warning, index) => (
+                <Alert key={index} severity="warning" sx={{ marginBottom: '0.5rem' }}>
+                  {warning.message}
+                </Alert>
+              ))}
+            </Box>
+          )}
           {totalPlotOccurrences > 0 && (
             <Typography variant="body1" style={{ marginTop: '1rem' }}>
               {t('Total Occurrences:')} {totalPlotOccurrences.toLocaleString()}
@@ -878,24 +945,44 @@ function App() {
                   </Select>
                 </FormControl>
               </div>
-              <div className="form-group">
-                <Typography id="smoothing-slider" gutterBottom>
-                  {activeQuery?.advancedOptions?.loessSmoothing
-                    ? t('Smoothing (Loess Span):')
-                    : t('Smoothing (Moving Average):')}
-                </Typography>
-                <Slider
-                  value={smoothing}
-                  onChange={(e, newValue) => setSmoothing(newValue)}
-                  aria-labelledby="smoothing-slider"
-                  valueLabelDisplay="on"
-                  step={1}
-                  marks
-                  min={0}
-                  max={10}
-                  disabled={plotType !== 'line' && plotType !== 'area'}
-                  sx={{ width: 200, ml: 2 }}
-                />
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ flexGrow: 1 }}>
+                  <Typography id="smoothing-slider" gutterBottom>
+                    {activeQuery?.advancedOptions?.loessSmoothing
+                      ? t('Smoothing (Loess Span):')
+                      : t('Smoothing (Moving Average):')}
+                  </Typography>
+                  <Slider
+                    value={smoothing}
+                    onChange={(e, newValue) => setSmoothing(newValue)}
+                    aria-labelledby="smoothing-slider"
+                    valueLabelDisplay="on"
+                    step={1}
+                    marks
+                    min={0}
+                    max={10}
+                    disabled={plotType !== 'line' && plotType !== 'area'}
+                    sx={{ width: 200, ml: 2 }}
+                  />
+                </div>
+                <Tooltip
+                  title={
+                    <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+                      <strong>{t('Smoothing Help')}</strong>
+                      <br />
+                      <br />
+                      {activeQuery?.advancedOptions?.loessSmoothing
+                        ? t('Loess Smoothing Help')
+                        : t('Moving Average Help')}
+                    </div>
+                  }
+                  arrow
+                  placement="right"
+                >
+                  <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
+                    <HelpOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </div>
               <Button variant="contained" color="success" disabled={isLoading || plotData.length === 0}>
                 {t('Download Plot')}

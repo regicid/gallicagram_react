@@ -82,7 +82,7 @@ const FormComponent = ({ formData, onFormChange, onPlot }) => {
         </Tooltip>
       </div>
       <div className="form-group" style={{ marginBottom: '1rem' }}>
-        <FormControl sx={{ width: 300 }}>
+        <FormControl fullWidth>
           <InputLabel id="corpus-select-label">{t('Corpus:')}</InputLabel>
           <Select
             labelId="corpus-select-label"

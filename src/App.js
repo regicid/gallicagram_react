@@ -855,7 +855,6 @@ function App() {
         } else if (plotType === 'sums') {
             // Horizontal Bar Chart
             const maxVal = Math.max(...sumsData.map(d => d.total));
-            const minVal = 0;
             
             // Calculate room needed for value labels at the end of bars
             ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
@@ -1246,7 +1245,7 @@ function App() {
                 onPlot={handlePlot}
               />
               <div className="form-group">
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 300 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                   <TextField
                     name="startDate"
                     label={t('Start Date')}
@@ -1264,7 +1263,7 @@ function App() {
                     inputProps={{ min: 1600, max: 2025 }}
                   />
                 </Box>
-                <Box sx={{ width: 300 }}>
+                <Box sx={{ width: '100%' }}>
                   <Slider
                     getAriaLabel={() => t('Date range')}
                     value={[startDate, endDate]}
@@ -1302,17 +1301,19 @@ function App() {
         <div className="plot-container">
           {error && <div className="error">{error}</div>}
           <div className="plot-area">
-            {plotType === 'sums' ? (
-              <SumsComponent data={sumsData} />
-            ) : plotType === 'wordcloud' ? (
-              <WordCloudComponent data={sumsData} />
-            ) : (
-              <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
-            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {plotType === 'sums' ? (
+                <SumsComponent data={sumsData} />
+              ) : plotType === 'wordcloud' ? (
+                <WordCloudComponent data={sumsData} />
+              ) : (
+                <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
+              )}
+            </div>
             <div className="plot-controls">
               <h3>{t('Plot controls')}</h3>
               <div className="form-group">
-                <FormControl sx={{ minWidth: 240 }}>
+                <FormControl fullWidth>
                   <InputLabel id="plot-type-select-label">{t('Visualization:')}</InputLabel>
                   <Select
                     labelId="plot-type-select-label"
@@ -1347,7 +1348,7 @@ function App() {
                     min={0}
                     max={10}
                     disabled={plotType !== 'line' && plotType !== 'area'}
-                    sx={{ width: 200, ml: 2 }}
+                    sx={{ width: '90%' }}
                   />
                 </div>
                 <Tooltip

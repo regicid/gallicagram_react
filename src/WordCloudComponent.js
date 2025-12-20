@@ -35,8 +35,7 @@ const WordCloudComponent = ({ data }) => {
     <Plot
       data={plotData}
       layout={{
-        width: 800,
-        height: 600,
+        autosize: true,
         title: t('Word Cloud'),
         font: {
           family: 'EB Garamond, Georgia, serif'
@@ -44,6 +43,8 @@ const WordCloudComponent = ({ data }) => {
         xaxis: { showgrid: false, zeroline: false, showticklabels: false },
         yaxis: { showgrid: false, zeroline: false, showticklabels: false }
       }}
+      useResizeHandler={true}
+      style={{ width: '100%', height: '100%', minHeight: '600px' }}
     />
   );
 };

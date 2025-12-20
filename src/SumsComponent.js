@@ -20,8 +20,7 @@ const SumsComponent = ({ data }) => {
     <Plot
       data={plotData}
       layout={{
-        width: 800,
-        height: 600,
+        autosize: true,
         title: t('Total Occurrences per Query'),
         font: {
           family: 'EB Garamond, Georgia, serif'
@@ -34,6 +33,8 @@ const SumsComponent = ({ data }) => {
           autorange: 'reversed'
         }
       }}
+      useResizeHandler={true}
+      style={{ width: '100%', height: '100%', minHeight: '600px' }}
     />
   );
 };

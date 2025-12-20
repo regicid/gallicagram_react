@@ -57,8 +57,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
     <Plot
       data={plotData}
       layout={{
-        width: 800,
-        height: 600,
+        autosize: true,
         title: t('Frequency over time'),
         font: {
           family: 'EB Garamond, Georgia, serif'
@@ -71,6 +70,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
           rangemode: plotType === 'area' ? 'tozero' : 'normal'
         }
       }}
+      useResizeHandler={true}
+      style={{ width: '100%', height: '100%', minHeight: '600px' }}
       onClick={onPointClick}
     />
   );

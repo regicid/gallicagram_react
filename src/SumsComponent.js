@@ -24,7 +24,7 @@ const SumsComponent = ({ data }) => {
         height: 600,
         title: t('Total Occurrences per Query'),
         font: {
-          family: 'Lato, sans-serif'
+          family: 'EB Garamond, Georgia, serif'
         },
         xaxis: {
           title: t('Total Occurrences')

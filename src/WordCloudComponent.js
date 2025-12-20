@@ -38,6 +38,9 @@ const WordCloudComponent = ({ data }) => {
         width: 800,
         height: 600,
         title: t('Word Cloud'),
+        font: {
+          family: 'EB Garamond, Georgia, serif'
+        },
         xaxis: { showgrid: false, zeroline: false, showticklabels: false },
         yaxis: { showgrid: false, zeroline: false, showticklabels: false }
       }}

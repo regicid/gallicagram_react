@@ -2,40 +2,40 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import { useTranslation } from 'react-i18next';
 
-const zscore = (data) => {
+export const zscore = (data) => {
   const mean = data.reduce((a, b) => a + b, 0) / data.length;
   const stdDev = Math.sqrt(data.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / data.length);
   return data.map(x => (x - mean) / stdDev);
 };
 
+// Set1 palette
+export const defaultPalette = [
+  '#377EB8FF', // blue
+  '#E41A1CFF', // red
+  '#4DAF4AFF', // green
+  '#984EA3FF', // purple
+  '#FF7F00FF', // orange
+  '#FFFF33FF', // yellow
+  '#A65628FF', // brown
+  '#F781BFFF', // pink
+  '#999999FF', // grey
+];
+
+// Paul Tol's colorblind-safe palette (bright scheme)
+// Reference: https://personal.sron.nl/~pault/
+export const colorblindPalette = [
+  '#4477AA', // blue
+  '#EE6677', // red
+  '#228833', // green
+  '#CCBB44', // yellow
+  '#66CCEE', // cyan
+  '#AA3377', // purple
+  '#BBBBBB', // grey
+  '#EE9944', // orange
+];
+
 const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
   const { t } = useTranslation();
-
-  // Set1 palette
-  const defaultPalette = [
-    '#377EB8FF', // blue
-    '#E41A1CFF', // red
-    '#4DAF4AFF', // green
-    '#984EA3FF', // purple
-    '#FF7F00FF', // orange
-    '#FFFF33FF', // yellow
-    '#A65628FF', // brown
-    '#F781BFFF', // pink
-    '#999999FF', // grey
-  ];
-
-  // Paul Tol's colorblind-safe palette (bright scheme)
-  // Reference: https://personal.sron.nl/~pault/
-  const colorblindPalette = [
-    '#4477AA', // blue
-    '#EE6677', // red
-    '#228833', // green
-    '#CCBB44', // yellow
-    '#66CCEE', // cyan
-    '#AA3377', // purple
-    '#BBBBBB', // grey
-    '#EE9944', // orange
-  ];
 
   let plotData = advancedOptions?.rescale && data.length > 0 && plotType === 'line'
     ? data.map(trace => ({ ...trace, y: zscore(trace.y) }))
@@ -61,7 +61,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
         height: 600,
         title: t('Frequency over time'),
         font: {
-          family: 'Lato, sans-serif'
+          family: 'EB Garamond, Georgia, serif'
         },
         xaxis: {
           title: t('Date')

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import FormComponent, { AdvancedOptionsComponent } from './FormComponent';
-import PlotComponent from './PlotComponent';
+import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './PlotComponent';
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
@@ -17,6 +17,7 @@ import WordCloudComponent from './WordCloudComponent';
 const theme = createTheme({
   typography: {
     fontFamily: [
+      'EB Garamond',
       'Georgia',
       'serif',
     ].join(','),
@@ -793,6 +794,390 @@ function App() {
       });
   };
 
+  const handleDownloadPlot = () => {
+    if ((plotType === 'sums' || plotType === 'wordcloud') && sumsData.length === 0) return;
+    if ((plotType !== 'sums' && plotType !== 'wordcloud') && plotData.length === 0) return;
+
+    // Ensure fonts are loaded before drawing
+    document.fonts.ready.then(() => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const scale = 2; // Increase resolution
+        const width = 1200 * scale;
+        const height = 800 * scale;
+        let margin = { top: 60 * scale, right: 60 * scale, bottom: 100 * scale, left: 100 * scale };
+        canvas.width = width;
+        canvas.height = height;
+
+        // Background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+
+        const activeQuery = queries.find(q => q.id === activeQueryId);
+        const advancedOptions = activeQuery?.advancedOptions || {};
+        const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
+
+        // Fonts
+        ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+        ctx.fillStyle = 'black';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2 * scale;
+
+        if (plotType === 'wordcloud') {
+            const words = sumsData.map((d, i) => {
+                const angle = sumsData.length > 1 ? (i / (sumsData.length - 1)) * 2 * Math.PI : 0;
+                const maxTotal = sumsData.length > 0 && sumsData[0].total > 0 ? sumsData[0].total : 1;
+                // Center is (width/2, height/2), radius scaled
+                const radius = Math.min(width, height) * 0.35; 
+                return {
+                    ...d,
+                    x: width/2 + Math.cos(angle) * radius * (0.1 + 0.9 * i/sumsData.length), // Spiral-ish
+                    y: height/2 + Math.sin(angle) * radius * (0.1 + 0.9 * i/sumsData.length),
+                    size: (20 + (d.total / maxTotal) * 80) * scale
+                };
+            });
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'black';
+            
+            words.forEach(w => {
+                ctx.font = `${w.size}px 'EB Garamond', Georgia, serif`;
+                ctx.fillText(w.word, w.x, w.y);
+            });
+
+            // Title
+            ctx.font = `bold ${24 * scale}px 'EB Garamond', Georgia, serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'black';
+            ctx.fillText(t('Word Cloud'), width / 2, 40 * scale);
+
+        } else if (plotType === 'sums') {
+            // Horizontal Bar Chart
+            const maxVal = Math.max(...sumsData.map(d => d.total));
+            const minVal = 0;
+            
+            // Calculate room needed for value labels at the end of bars
+            ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+            let maxValLabelWidth = 0;
+            sumsData.forEach(d => {
+                const labelWidth = ctx.measureText(d.total.toLocaleString()).width;
+                if (labelWidth > maxValLabelWidth) maxValLabelWidth = labelWidth;
+            });
+            margin.right = Math.max(margin.right, maxValLabelWidth + 20 * scale);
+
+            // Scales
+            // Y axis is categories (words), evenly spaced
+            const itemHeight = (height - margin.top - margin.bottom) / sumsData.length;
+            const barHeight = itemHeight * 0.6;
+            
+            // X axis is value
+            const xScale = (val) => margin.left + (val / maxVal) * (width - margin.left - margin.right);
+
+            // Axes Drawing
+            ctx.beginPath();
+            // Y Axis line
+            ctx.moveTo(margin.left, margin.top);
+            ctx.lineTo(margin.left, height - margin.bottom);
+            // X Axis line
+            ctx.moveTo(margin.left, height - margin.bottom);
+            ctx.lineTo(width - margin.right, height - margin.bottom);
+            ctx.stroke();
+
+            // Title
+            ctx.textAlign = 'center';
+            ctx.font = `${20 * scale}px 'EB Garamond', Georgia, serif`;
+            ctx.fillText(t('Total Occurrences per Query'), width/2, 40 * scale);
+
+                    // X Axis Label
+                    ctx.font = `${24 * scale}px 'EB Garamond', Georgia, serif`;
+                    ctx.fillText(t('Total Occurrences'), width/2, height - 25 * scale);
+            // Bars and Labels
+            sumsData.forEach((d, i) => {
+                const y = margin.top + i * itemHeight + itemHeight/2;
+                const barWidth = xScale(d.total) - margin.left;
+                
+                ctx.fillStyle = palette[i % palette.length];
+                ctx.fillRect(margin.left, y - barHeight/2, barWidth, barHeight);
+                
+                // Y Label (Word)
+                ctx.fillStyle = 'black';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+                ctx.fillText(d.word, margin.left - 10 * scale, y);
+                
+                // Value Label
+                ctx.textAlign = 'left';
+                ctx.fillText(d.total.toLocaleString(), margin.left + barWidth + 5 * scale, y);
+            });
+
+        } else {
+            // Line, Area, Bar
+            const effectiveIsRescaled = advancedOptions.rescale && plotType === 'line';
+
+            const processTrace = (trace) => {
+                let y = trace.y;
+                if (effectiveIsRescaled) {
+                    y = zscore(y);
+                } else if (plotType !== 'bar') {
+                     y = y.map(v => v !== null && v !== undefined ? v * 1000 : v);
+                }
+                return { ...trace, y };
+            };
+
+            let tracesToDraw = plotData.map(processTrace);
+            let rawTracesToDraw = rawPlotData.map(processTrace);
+
+            // Determine Ranges
+            let allX = [];
+            let allY = [];
+            tracesToDraw.forEach(t => {
+                allX.push(...t.x);
+                allY.push(...t.y);
+            });
+            if (smoothing > 0 && (plotType === 'line' || plotType === 'area')) {
+                 rawTracesToDraw.forEach(t => {
+                    allY.push(...t.y);
+                });
+            }
+            allY = allY.filter(y => y !== null && y !== undefined);
+
+            const dates = allX.map(d => new Date(d).getTime());
+            const minDate = Math.min(...dates);
+            const maxDate = Math.max(...dates);
+            const dataMin = Math.min(...allY);
+            const dataMax = Math.max(...allY);
+
+            // Padding
+            const range = dataMax - dataMin;
+            const padding = range === 0 ? (dataMax === 0 ? 1 : Math.abs(dataMax) * 0.05) : range * 0.05;
+            // Clamp min to 0 unless z-score
+            const paddedMin = effectiveIsRescaled ? dataMin - padding : Math.max(0, dataMin - padding);
+            const paddedMax = dataMax + padding;
+
+            // Nice Ticks
+            const targetTicks = 6;
+            const roughStep = (paddedMax - paddedMin) / (targetTicks - 1);
+            const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+            const normalizedStep = roughStep / magnitude;
+            let tickStep;
+            if (normalizedStep <= 1) tickStep = 1 * magnitude;
+            else if (normalizedStep <= 2) tickStep = 2 * magnitude;
+            else if (normalizedStep <= 5) tickStep = 5 * magnitude;
+            else tickStep = 10 * magnitude;
+
+            const minValue = Math.floor(paddedMin / tickStep) * tickStep;
+            const maxValue = Math.ceil(paddedMax / tickStep) * tickStep;
+
+            // Calculate max tick width to adjust margin dynamically
+            ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+            let maxTickWidth = 0;
+            for (let val = minValue; val <= maxValue + tickStep/10; val += tickStep) {
+                const label = parseFloat(val.toPrecision(10)).toString();
+                const metrics = ctx.measureText(label);
+                if (metrics.width > maxTickWidth) maxTickWidth = metrics.width;
+            }
+            // Ensure enough room for Y title (approx 40px * scale) and ticks
+            margin.left = Math.max(margin.left, maxTickWidth + 60 * scale);
+
+            // Scales
+            const xScale = (date) => {
+                const t = new Date(date).getTime();
+                return margin.left + (t - minDate) / (maxDate - minDate) * (width - margin.left - margin.right);
+            };
+            const yScale = (val) => {
+                return height - margin.bottom - (val - minValue) / (maxValue - minValue) * (height - margin.top - margin.bottom);
+            };
+
+            // Axes
+            ctx.beginPath();
+            ctx.moveTo(margin.left, height - margin.bottom);
+            ctx.lineTo(width - margin.right, height - margin.bottom);
+            ctx.moveTo(margin.left, height - margin.bottom);
+            ctx.lineTo(margin.left, margin.top);
+            ctx.stroke();
+
+            // X Ticks
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+            const yearSpan = (maxDate - minDate) / (1000 * 60 * 60 * 24 * 365.25);
+            const tickInterval = yearSpan > 100 ? 20 : (yearSpan > 50 ? 10 : 5);
+            const startYear = new Date(minDate).getFullYear();
+            const endYear = new Date(maxDate).getFullYear();
+            for (let y = Math.ceil(startYear / tickInterval) * tickInterval; y <= endYear; y += tickInterval) {
+                const date = new Date(y, 0, 1);
+                const x = xScale(date);
+                ctx.beginPath();
+                ctx.moveTo(x, height - margin.bottom);
+                ctx.lineTo(x, height - margin.bottom + 5 * scale);
+                ctx.stroke();
+                ctx.fillText(y.toString(), x, height - margin.bottom + 10 * scale);
+            }
+
+            // Y Ticks
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let val = minValue; val <= maxValue + tickStep/10; val += tickStep) {
+                const y = yScale(val);
+                if (y >= margin.top && y <= height - margin.bottom) {
+                    ctx.beginPath();
+                    ctx.moveTo(margin.left, y);
+                    ctx.lineTo(margin.left - 5 * scale, y);
+                    ctx.stroke();
+                    const label = parseFloat(val.toPrecision(10)).toString(); 
+                    ctx.fillText(label, margin.left - 10 * scale, y);
+                }
+            }
+
+                    // Labels
+                    ctx.textAlign = 'center';
+                    ctx.font = `${24 * scale}px 'EB Garamond', Georgia, serif`;
+                    ctx.fillText(t('Date'), margin.left + (width - margin.left - margin.right) / 2, height - margin.bottom + 50 * scale);
+            
+                    ctx.save();
+                    // Place Y title relative to margin.left to avoid overlap
+                    ctx.translate(margin.left - maxTickWidth - 40 * scale, margin.top + (height - margin.top - margin.bottom) / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    let yTitle;
+                    if (effectiveIsRescaled) {
+                         yTitle = t('Z-score');
+                    } else if (plotType === 'bar') {
+                         yTitle = t('Frequency in the corpus');
+                    } else {
+                         yTitle = t('Frequency in the corpus (‰)');
+                    }
+                    ctx.fillText(yTitle, 0, 0);
+                    ctx.restore();
+            // Drawing Data
+            tracesToDraw.forEach((trace, i) => {
+                const color = palette[i % palette.length];
+                ctx.fillStyle = color;
+                ctx.strokeStyle = color;
+
+                if (plotType === 'bar') {
+                    const barWidth = (width - margin.left - margin.right) / trace.x.length * 0.8;
+                    trace.y.forEach((yVal, idx) => {
+                        if (yVal !== null && yVal !== undefined) {
+                            const x = xScale(trace.x[idx]);
+                            const y = yScale(yVal);
+                            const h = height - margin.bottom - y;
+                            ctx.fillRect(x - barWidth/2, y, barWidth, h);
+                        }
+                    });
+                } else if (plotType === 'area') {
+                    ctx.globalAlpha = 0.5;
+                    ctx.beginPath();
+                    const points = [];
+                    trace.y.forEach((yVal, idx) => {
+                        if (yVal !== null && yVal !== undefined) {
+                            points.push({x: xScale(trace.x[idx]), y: yScale(yVal)});
+                        }
+                    });
+
+                    if (points.length > 0) {
+                         ctx.moveTo(points[0].x, height - margin.bottom);
+                         ctx.lineTo(points[0].x, points[0].y);
+                         
+                         for (let j = 0; j < points.length - 1; j++) {
+                            const p0 = points[j > 0 ? j - 1 : j];
+                            const p1 = points[j];
+                            const p2 = points[j + 1];
+                            const p3 = points[j + 2 < points.length ? j + 2 : j + 1];
+
+                            const cp1x = p1.x + (p2.x - p0.x) / 6;
+                            let cp1y = p1.y + (p2.y - p0.y) / 6;
+                            const cp2x = p2.x - (p3.x - p1.x) / 6;
+                            let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+                            const yBottom = height - margin.bottom;
+                            const yTop = margin.top;
+                            cp1y = Math.max(yTop, Math.min(yBottom, cp1y));
+                            cp2y = Math.max(yTop, Math.min(yBottom, cp2y));
+
+                            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                         }
+                         
+                         ctx.lineTo(points[points.length-1].x, height - margin.bottom);
+                         ctx.closePath();
+                         ctx.fill();
+                         
+                         ctx.globalAlpha = 1.0;
+                         ctx.lineWidth = 2 * scale;
+                         ctx.stroke();
+                    }
+
+                } else { 
+                    if (smoothing > 0) {
+                         const rawTrace = rawTracesToDraw[i];
+                         rawTrace.y.forEach((yVal, idx) => {
+                             if (yVal !== null && yVal !== undefined) {
+                                 const cx = xScale(rawTrace.x[idx]);
+                                 const cy = yScale(yVal);
+                                 ctx.beginPath();
+                                 ctx.arc(cx, cy, 3 * scale, 0, 2*Math.PI);
+                                 ctx.fill();
+                             }
+                         });
+                    }
+                    
+                    ctx.lineWidth = 3 * scale;
+                    ctx.beginPath();
+                    const points = [];
+                    trace.y.forEach((yVal, idx) => {
+                        if (yVal !== null && yVal !== undefined) {
+                            points.push({x: xScale(trace.x[idx]), y: yScale(yVal)});
+                        }
+                    });
+                    
+                    if (points.length > 0) {
+                        ctx.moveTo(points[0].x, points[0].y);
+                        for (let j = 0; j < points.length - 1; j++) {
+                            const p0 = points[j > 0 ? j - 1 : j];
+                            const p1 = points[j];
+                            const p2 = points[j + 1];
+                            const p3 = points[j + 2 < points.length ? j + 2 : j + 1];
+                            const cp1x = p1.x + (p2.x - p0.x) / 6;
+                            let cp1y = p1.y + (p2.y - p0.y) / 6;
+                            const cp2x = p2.x - (p3.x - p1.x) / 6;
+                            let cp2y = p2.y - (p3.y - p1.y) / 6;
+                            const yBottom = height - margin.bottom;
+                            const yTop = margin.top;
+                            cp1y = Math.max(yTop, Math.min(yBottom, cp1y));
+                            cp2y = Math.max(yTop, Math.min(yBottom, cp2y));
+                            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+            });
+
+            // Legend
+            if (tracesToDraw.length > 1) {
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+                let legendX = margin.left;
+                const legendY = height - 30 * scale;
+                tracesToDraw.forEach((trace, i) => {
+                     const color = palette[i % palette.length];
+                     ctx.fillStyle = color;
+                     ctx.fillRect(legendX, legendY - 5 * scale, 20 * scale, 10 * scale);
+                     ctx.fillStyle = 'black';
+                     ctx.fillText(trace.name, legendX + 25 * scale, legendY);
+                     legendX += ctx.measureText(trace.name).width + 50 * scale;
+                });
+            }
+        }
+
+        const link = document.createElement('a');
+        link.download = 'gallicagram_plot.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+  };
+
   const handleDownloadCSV = () => {
     if (plotData.length === 0) {
       alert("No data to download.");
@@ -984,7 +1369,7 @@ function App() {
                   </IconButton>
                 </Tooltip>
               </div>
-              <Button variant="contained" color="success" disabled={isLoading || plotData.length === 0}>
+              <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || plotData.length === 0}>
                 {t('Download Plot')}
               </Button>
               <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>

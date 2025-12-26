@@ -1,22 +1,22 @@
-Titre	Période (conseillée)	Volume (en mots)	Code API	Longueur max	Résolution	Seuils	Date de téléchargement	Contexte
+Titre	Période (conseillée)	Volume (en mots)	Code API	Longueur max	Résolution	Seuils	Date de téléchargement	Gallica_context_filter
 Le Monde	1944-2024	1.5 milliards	lemonde	4	Journalière	Aucun	Janvier 2023	
-Presse de Gallica	1789-1950	57 milliards	presse	3	Mensuelle	"2gram>1;3gram>1"	Mars 2021	Gallica:&source=periodical
-Livres de Gallica	1600-1940	16 milliards	livres	5	Annuelle	2gram>1, etc	Mars 2021	
+Presse de Gallica	1789-1950	57 milliards	presse	3	Mensuelle	"2gram>1;3gram>1"	Mars 2021	source=periodical
+Livres de Gallica	1600-1940	16 milliards	livres	5	Annuelle	2gram>1, etc	Mars 2021	source=book
 Deutsches Zeitungsportal (DDB)	1780-1950	39 milliards	ddb	2	Mensuelle	1gram > 1, 2gram>2	Août 2023	
 American Stories	1798-1963	20 milliards	american_stories	3	Annuelle	1gram>1,2gram>2,3gram>3	Octobre 2023	
-Journal de Paris	1777-1827	86 millions	paris	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb327986698
-Moniteur Universel	1789-1869	511 millions	moniteur	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb34452336z
-Journal des Débats	1789-1944	1.2 milliards	journal_des_debats	1gram	Journalière	Aucun	Août 2023	Gallica:&source=periodical&codes=cb39294634r
-La Presse	1836-1869	253 millions	la_presse	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb34448033b
-Le Constitutionnel	1821-1913	64 millions	constitutionnel	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb32747578p
-Le Figaro	1854-1952	870 millions	figaro	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb34355551z
-Le Temps	1861-1942	1 milliard	temps	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb34431794k
-Le Petit Journal	1863-1942	745 millions	petit_journal	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb32895690j
-Le Petit Parisien	1876-1944	631 millions	petit_parisien	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb34419111x
-L'Humanité	1904-1952	318 millions	huma	2	Journalière	2gram>1	Août 2023	Gallica:&source=periodical&codes=cb327877302
+Journal de Paris	1777-1827	86 millions	paris	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb327986698
+Moniteur Universel	1789-1869	511 millions	moniteur	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb34452336z
+Journal des Débats	1789-1944	1.2 milliards	journal_des_debats	1gram	Journalière	Aucun	Août 2023	source=periodical&codes=cb39294634r
+La Presse	1836-1869	253 millions	la_presse	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34448033b
+Le Constitutionnel	1821-1913	64 millions	constitutionnel	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb32747578p
+Le Figaro	1854-1952	870 millions	figaro	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34355551z
+Le Temps	1861-1942	1 milliard	temps	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34431794k
+Le Petit Journal	1863-1942	745 millions	petit_journal	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb32895690j
+Le Petit Parisien	1876-1944	631 millions	petit_parisien	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34419111x
+L'Humanité	1904-1952	318 millions	huma	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb327877302
 Opensubtitles (français)	1935-2020	17 millions	subtitles	3	Annuelle	Aucun	Juillet 2023	
 Opensubtitles (anglais)	1930-2020	102 millions	subtitles_en	3	Annuelle	Aucun	Juillet 2023	
-Rap (Genius)	1989-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024	https://shiny.ens-paris-saclay.fr/guni/source_rap?mot={mot}&year={year}
+Rap français (Genius)	1989-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024	
 Persée	1789-2023	1 milliard	route à part (query_persee)	2	Annuelle	Aucun	Décembre 2023	
 Ouest-France	1899-2025	?	ouest	2	Annuelle	Aucun	Octobre 2025
 Majinbook français	1700-2023	?	majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025

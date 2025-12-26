@@ -83,5 +83,12 @@
   "End date warning": "End date ({{endDate}}) is after the recommended period end ({{periodEnd}}) for {{corpusName}}",
   "Smoothing Help": "Smoothing Help",
   "Moving Average Help": "Moving Average calculates the average value over a sliding window of data points. For each point, it looks at neighboring points within the window size and computes their mean. This reduces noise and reveals trends in the data.",
-  "Loess Smoothing Help": "Loess (Locally Estimated Scatterplot Smoothing) fits multiple local regression models to subsets of the data. It creates a smooth curve that follows the data patterns more closely than a moving average, especially for non-linear trends."
+  "Loess Smoothing Help": "Loess (Locally Estimated Scatterplot Smoothing) fits multiple local regression models to subsets of the data. It creates a smooth curve that follows the data patterns more closely than a moving average, especially for non-linear trends.",
+  "All documents": "All documents",
+  "We do not handle the context (yet?) for this corpus": "We do not handle the context (yet?) for this corpus",
+  "Context for": "Context for",
+  "Corpus": "Corpus",
+  "No data": "No data",
+  "Show context": "Show context",
+  "Hide context": "Hide context"
 }

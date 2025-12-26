@@ -3,8 +3,233 @@ import Occurrence from './Occurrence';
 import { useTranslation } from 'react-i18next';
 import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
+import Papa from 'papaparse';
 
-const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isLoading }) => {
+const SpecialContextDisplay = ({ record, corpus }) => {
+  const { t } = useTranslation();
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [externalUrl, setExternalUrl] = useState(null);
+
+  useEffect(() => {
+    const getDates = () => {
+        let year, month, day;
+        const dateObj = new Date(record.date);
+        
+        if (!isNaN(dateObj.getTime())) {
+             year = dateObj.getFullYear();
+             month = dateObj.getMonth() + 1;
+             day = dateObj.getDate();
+        } else {
+            year = parseInt(record.date);
+            month = 1;
+            day = 1;
+        }
+    
+        const resolution = record.resolution || 'annee';
+        
+        let start_day, start_month, start_year, end_day, end_month, end_year;
+        
+        if (resolution === 'jour') {
+            start_day = day; start_month = month; start_year = year;
+            end_day = day; end_month = month; end_year = year;
+        } else if (resolution === 'mois') {
+            start_day = 1; start_month = month; start_year = year;
+            const lastDay = new Date(year, month, 0).getDate();
+            end_day = lastDay; end_month = month; end_year = year;
+        } else {
+            start_day = 1; start_month = 1; start_year = year;
+            end_day = 31; end_month = 12; end_year = year;
+        }
+        return { start_day, start_month, start_year, end_day, end_month, end_year, year };
+    };
+
+    const fetchContext = async () => {
+      setIsLoading(true);
+      setError(null);
+      setExternalUrl(null);
+
+      try {
+        const rawWord = record.terms[0];
+        const word = rawWord.split('+')[0].trim();
+        const { start_day, start_month, start_year, end_day, end_month, end_year, year } = getDates();
+
+        if (corpus === 'lemonde') {
+          const queryParams = `?search_keywords=%22${encodeURIComponent(word)}%22&start_at=${start_day}%2F${start_month}%2F${start_year}&end_at=${end_day}%2F${end_month}%2F${end_year}`;
+          const externalSearchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
+          const fetchUrl = `/api/lemonde${queryParams}`;
+          
+          setExternalUrl({ url: externalSearchUrl, label: t('All documents') });
+
+          const response = await fetch(fetchUrl);
+          if (!response.ok) throw new Error('Failed to fetch Le Monde content');
+          const text = await response.text();
+          
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, 'text/html');
+          const section = doc.querySelector('section.js-river-search');
+          if (!section) throw new Error('No results section found');
+          
+          const results = [];
+          const links = section.querySelectorAll('a');
+          links.forEach(link => {
+              const href = link.href;
+              const titleEl = link.querySelector('.teaser__title') || link;
+              const title = titleEl.innerText.trim();
+              if (title && href) {
+                  results.push({ title, href });
+              }
+          });
+          setData({ type: 'lemonde', content: results });
+
+        } else if (corpus === 'route à part (query_persee)') {
+          const queryParams = `?l=fre&da=${year}&q=%22${encodeURIComponent(word)}%22`;
+          const externalSearchUrl = `https://www.persee.fr/search${queryParams}`;
+          const fetchUrl = `/api/persee${queryParams}`;
+
+          setExternalUrl({ url: externalSearchUrl, label: t('All documents') });
+
+          const response = await fetch(fetchUrl);
+          if (!response.ok) throw new Error('Failed to fetch Persée content');
+          const text = await response.text();
+          
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, 'text/html');
+          const content = doc.getElementById('content-search-results');
+          if (!content) throw new Error('No results content found');
+          
+          const results = [];
+          const docResults = content.querySelectorAll('div.doc-result');
+          docResults.forEach(div => {
+              const titleLink = div.querySelector('a.title.title-free');
+              if (!titleLink) return;
+              const href = titleLink.href;
+              const title = titleLink.innerText.trim();
+              const author = div.querySelector('.name')?.innerText.trim() || '';
+              const collection = div.querySelector('.collection')?.innerText.trim() || '';
+              const searchContext = div.querySelector('.searchContext')?.innerHTML || ''; 
+              
+              results.push({ title, href, author, collection, searchContext });
+          });
+          setData({ type: 'persee', content: results });
+
+        } else if (corpus === 'rap') {
+          const searchUrl = `https://shiny.ens-paris-saclay.fr/guni/source_rap?mot=${encodeURIComponent(word)}&year=${year}`;
+          setExternalUrl({ url: 'https://huggingface.co/datasets/regicid/LRFAF', label: t('Corpus') });
+
+          const response = await fetch(searchUrl);
+          if (!response.ok) throw new Error('Failed to fetch Rap data');
+          const csvText = await response.text();
+          
+          const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+          if (parsed.errors.length) throw new Error('Error parsing CSV');
+          
+          const sortedData = parsed.data.sort((a, b) => (b.counts || 0) - (a.counts || 0));
+          setData({ type: 'rap', content: sortedData });
+        } else {
+             setError(t('We do not handle the context (yet?) for this corpus'));
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchContext();
+  }, [record, corpus, t]);
+
+  if (isLoading) return <div>{t('Loading...')}</div>;
+  if (error) return <div className="error">{error}</div>;
+  if (!data) return <div>{t('No data')}</div>;
+
+  return (
+    <div className="special-context-display">
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('Context for')} {record.terms[0]} ({record.date.split('T')[0]})</h3>
+          {externalUrl && (
+              <a href={externalUrl.url} target="_blank" rel="noopener noreferrer" className="external-link-button">
+                  {externalUrl.label}
+              </a>
+          )}
+      </div>
+
+      {data.type === 'lemonde' && (
+        <ul className="lemonde-list">
+          {data.content.map((item, i) => (
+            <li key={i}>
+              <a href={item.href} target="_blank" rel="noopener noreferrer">{item.title}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {data.type === 'persee' && (
+        <div className="persee-list">
+          {data.content.map((item, i) => (
+            <div key={i} className="persee-item" style={{marginBottom: '10px', borderBottom: '1px solid #eee', paddingBottom: '5px'}}>
+              <div>
+                <a href={item.href} target="_blank" rel="noopener noreferrer" style={{fontWeight: 'bold'}}>{item.title}</a>
+              </div>
+              <div style={{fontSize: '0.9em', color: '#555'}}>
+                {item.author && <span>{item.author} - </span>}
+                {item.collection && <span>{item.collection}</span>}
+              </div>
+              {item.searchContext && (
+                <div className="searchContext" dangerouslySetInnerHTML={{__html: item.searchContext}} style={{fontSize: '0.9em', marginTop: '5px'}} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.type === 'rap' && (
+        <div className="rap-table-container" style={{overflowX: 'auto'}}>
+          {data.content.length === 0 ? <div>{t('No data')}</div> : (
+              <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                <thead>
+                  <tr>
+                    {Object.keys(data.content[0])
+                        .filter(h => h.toLowerCase() !== 'url')
+                        .map(h => (
+                      <th key={h} style={{borderBottom: '1px solid #ccc', padding: '5px', textAlign: 'left', backgroundColor: '#f5f5f5'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.content.map((row, i) => (
+                    <tr key={i}>
+                      {Object.keys(row)
+                        .filter(key => key.toLowerCase() !== 'url')
+                        .map((key, j) => {
+                            const val = row[key];
+                            const isTitle = key.toLowerCase() === 'title' || key.toLowerCase() === 'titre';
+                            // Look for URL in case-insensitive keys
+                            const urlKey = Object.keys(row).find(k => k.toLowerCase() === 'url');
+                            const url = urlKey ? row[urlKey] : null;
+
+                            if (isTitle && url) {
+                                 return (
+                                     <td key={j} style={{padding: '5px', borderBottom: '1px solid #eee'}}>
+                                        <a href={url} target="_blank" rel="noopener noreferrer">{val}</a>
+                                     </td>
+                                 );
+                            }
+                            return <td key={j} style={{padding: '5px', borderBottom: '1px solid #eee'}}>{val}</td>;
+                        })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isLoading, corpus, corpusConfigs }) => {
   const { t } = useTranslation();
   const observerTarget = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +265,11 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
     };
   }, [hasMorePages, isLoading, currentPage, onPageChange]);
 
+  // Check for dummy record indicating special corpus handling
+  if (records.length > 0 && records[0].dummy) {
+      return <SpecialContextDisplay record={records[0]} corpus={corpus} />;
+  }
+
   if (isLoading && records.length === 0) {
     return <div>{t('Loading occurrences...')}</div>;
   }
@@ -67,7 +297,12 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
       )}
       <div className="records-list">
         {filteredRecords.map((record, index) => (
-          <Occurrence key={record.ark + record.url + index} record={record} />
+          <Occurrence 
+            key={record.ark + record.url + index} 
+            record={record} 
+            corpus={corpus}
+            corpusConfigs={corpusConfigs}
+          />
         ))}
       </div>
       {hasMorePages && (

@@ -3,6 +3,14 @@
     {
       "source": "/ngrams/:path*",
       "destination": "https://books.google.com/ngrams/:path*"
+    },
+    {
+      "source": "/api/lemonde",
+      "destination": "https://www.lemonde.fr/recherche/"
+    },
+    {
+      "source": "/api/persee",
+      "destination": "https://www.persee.fr/search"
     }
   ]
 }

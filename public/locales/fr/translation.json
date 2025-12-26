@@ -83,5 +83,12 @@
   "End date warning": "La date de fin ({{endDate}}) est postérieure à la fin de la période conseillée ({{periodEnd}}) pour {{corpusName}}",
   "Smoothing Help": "Aide sur le lissage",
   "Moving Average Help": "La moyenne mobile calcule la valeur moyenne sur une fenêtre glissante de points de données. Pour chaque point, elle examine les points voisins dans la fenêtre et calcule leur moyenne. Cela réduit le bruit et révèle les tendances dans les données.",
-  "Loess Smoothing Help": "Le lissage Loess (Locally Estimated Scatterplot Smoothing) ajuste plusieurs modèles de régression locale à des sous-ensembles des données. Il crée une courbe lisse qui suit les motifs des données plus étroitement qu'une moyenne mobile, en particulier pour les tendances non linéaires."
+  "Loess Smoothing Help": "Le lissage Loess (Locally Estimated Scatterplot Smoothing) ajuste plusieurs modèles de régression locale à des sous-ensembles des données. Il crée une courbe lisse qui suit les motifs des données plus étroitement qu'une moyenne mobile, en particulier pour les tendances non linéaires.",
+  "All documents": "Tous les documents",
+  "We do not handle the context (yet?) for this corpus": "Nous ne pouvons pour le moment pas vous offrir le contexte pour ce corpus",
+  "Context for": "Contexte pour",
+  "Corpus": "Corpus",
+  "No data": "Pas de données",
+  "Show context": "Afficher le contexte",
+  "Hide context": "Masquer le contexte"
 }

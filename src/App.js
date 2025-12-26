@@ -183,15 +183,17 @@ function App() {
   const [isContextLoading, setIsContextLoading] = useState(false);
   const [fetchContextAfterPlot, setFetchContextAfterPlot] = useState(false);
   const [corpusPeriods, setCorpusPeriods] = useState({});
+  const [corpusConfigs, setCorpusConfigs] = useState({});
   const [dateWarnings, setDateWarnings] = useState([]);
 
   useEffect(() => {
-    // Load corpus periods from TSV
+    // Load corpus periods and configs from TSV
     fetch('/corpus.tsv')
       .then(response => response.text())
       .then(data => {
         const lines = data.split('\n');
         const periods = {};
+        const configs = {};
         lines.slice(1).forEach(line => {
           const columns = line.split('\t');
           if (columns[0] && columns[1] && columns[3]) {
@@ -204,9 +206,13 @@ function App() {
                 name: columns[0].trim()
               };
             }
+            const code = columns[3].trim();
+            const filter = columns[8] ? columns[8].trim() : '';
+            configs[code] = { filter };
           }
         });
         setCorpusPeriods(periods);
+        setCorpusConfigs(configs);
       })
       .catch(error => console.error('Error loading corpus periods:', error));
   }, []);
@@ -449,14 +455,40 @@ function App() {
       return;
     }
 
+    const corpusCode = query.corpus;
+    const config = corpusConfigs[corpusCode];
+    const isGallica = config && config.filter;
+
+    if (!isGallica) {
+      // Handle non-Gallica corpora by creating a dummy record
+      const dummyRecord = {
+        date: date.toISOString(),
+        paper_title: `${t('Context for')} ${query.word} (${date.getFullYear()})`,
+        url: '#',
+        terms: [query.word],
+        dummy: true,
+        resolution: query.resolution
+      };
+      setOccurrences([dummyRecord]);
+      setTotalOccurrences(1);
+      setIsContextLoading(false);
+      return;
+    }
+
     const params = new URLSearchParams({
       terms: query.word,
       year: date.getFullYear(),
       limit: searchParams.limit,
       cursor: searchParams.cursor,
-      source: query.corpus === 'livres' ? 'book' : (query.corpus === 'presse' ? 'periodical' : 'all'),
       sort: 'relevance'
     });
+
+    if (config && config.filter) {
+      const filterParams = new URLSearchParams(config.filter);
+      filterParams.forEach((value, key) => {
+        params.append(key, value);
+      });
+    }
 
     try {
       const response = await fetch(`${GALLICA_PROXY_API_URL}/api/occurrences_no_context?${params}`);
@@ -475,7 +507,7 @@ function App() {
     } finally {
       setIsContextLoading(false);
     }
-  }, []);
+  }, [corpusConfigs, t]);
 
   useEffect(() => {
     if (fetchContextAfterPlot && plotData.length > 0) {
@@ -1385,6 +1417,8 @@ function App() {
                 onPageChange={handleContextPageChange}
                 searchParams={contextSearchParams}
                 isLoading={isContextLoading}
+                corpus={selectedQuery?.corpus}
+                corpusConfigs={corpusConfigs}
             />
           }
         </div>

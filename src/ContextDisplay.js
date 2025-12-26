@@ -72,13 +72,21 @@ const SpecialContextDisplay = ({ record, corpus }) => {
           if (!section) throw new Error('No results section found');
           
           const results = [];
-          const links = section.querySelectorAll('a');
-          links.forEach(link => {
-              const href = link.href;
-              const titleEl = link.querySelector('.teaser__title') || link;
-              const title = titleEl.innerText.trim();
+          const teasers = section.querySelectorAll('section.teaser');
+          teasers.forEach(teaser => {
+              const link = teaser.querySelector('a.teaser__link');
+              const href = link ? link.href : '';
+              const titleEl = teaser.querySelector('.teaser__title');
+              const title = titleEl ? titleEl.innerText.trim() : '';
+              
+              const descEl = teaser.querySelector('.teaser__desc');
+              const description = descEl ? descEl.innerText.trim() : '';
+
+              const dateEl = teaser.querySelector('.meta__date');
+              const date = dateEl ? dateEl.innerText.trim() : '';
+
               if (title && href) {
-                  results.push({ title, href });
+                  results.push({ title, href, description, date });
               }
           });
           setData({ type: 'lemonde', content: results });
@@ -156,10 +164,22 @@ const SpecialContextDisplay = ({ record, corpus }) => {
       </div>
 
       {data.type === 'lemonde' && (
-        <ul className="lemonde-list">
+        <ul className="lemonde-list" style={{listStyle: 'none', padding: 0}}>
           {data.content.map((item, i) => (
-            <li key={i}>
-              <a href={item.href} target="_blank" rel="noopener noreferrer">{item.title}</a>
+            <li key={i} style={{marginBottom: '15px', borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
+              <div style={{marginBottom: '5px'}}>
+                  <a href={item.href} target="_blank" rel="noopener noreferrer" style={{fontWeight: 'bold', fontSize: '1.1em'}}>{item.title}</a>
+              </div>
+              {item.date && (
+                  <div style={{fontSize: '0.85em', color: '#666', marginBottom: '5px'}}>
+                      {item.date}
+                  </div>
+              )}
+              {item.description && (
+                  <div style={{fontSize: '0.95em'}}>
+                      {item.description}
+                  </div>
+              )}
             </li>
           ))}
         </ul>
@@ -229,7 +249,7 @@ const SpecialContextDisplay = ({ record, corpus }) => {
   );
 };
 
-const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isLoading, corpus, corpusConfigs }) => {
+const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isLoading, corpus, corpusConfigs, resolution }) => {
   const { t } = useTranslation();
   const observerTarget = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -302,6 +322,7 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
             record={record} 
             corpus={corpus}
             corpusConfigs={corpusConfigs}
+            resolution={resolution}
           />
         ))}
       </div>

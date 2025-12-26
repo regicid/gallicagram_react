@@ -1419,6 +1419,7 @@ function App() {
                 isLoading={isContextLoading}
                 corpus={selectedQuery?.corpus}
                 corpusConfigs={corpusConfigs}
+                resolution={selectedQuery?.resolution}
             />
           }
         </div>

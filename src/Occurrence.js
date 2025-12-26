@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 
 const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
 
-const Occurrence = ({ record, corpus, corpusConfigs }) => {
+const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
   const [context, setContext] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -28,6 +28,18 @@ const Occurrence = ({ record, corpus, corpusConfigs }) => {
         url: record.url,
       });
       terms.forEach(term => params.append('terms', term));
+
+      // Handle resolution specific parameters (month, day)
+      // record.date typically comes as ISO string or YYYY-MM-DD
+      if (resolution === 'mois' || resolution === 'jour') {
+          const dateObj = new Date(record.date);
+          if (!isNaN(dateObj.getTime())) {
+              params.append('month', dateObj.getMonth() + 1); // getMonth is 0-indexed
+              if (resolution === 'jour') {
+                  params.append('day', dateObj.getDate());
+              }
+          }
+      }
 
       // Add corpus specific filters if available
       const config = corpusConfigs?.[corpus];

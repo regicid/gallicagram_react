@@ -184,6 +184,7 @@ function App() {
   const [fetchContextAfterPlot, setFetchContextAfterPlot] = useState(false);
   const [corpusPeriods, setCorpusPeriods] = useState({});
   const [corpusConfigs, setCorpusConfigs] = useState({});
+  const [perseeData, setPerseeData] = useState(null);
   const [dateWarnings, setDateWarnings] = useState([]);
 
   useEffect(() => {
@@ -215,6 +216,12 @@ function App() {
         setCorpusConfigs(configs);
       })
       .catch(error => console.error('Error loading corpus periods:', error));
+
+    // Load Persee revues
+    fetch('/revues_persee.json')
+        .then(res => res.json())
+        .then(data => setPerseeData(data))
+        .catch(err => console.error("Error loading persee revues", err));
   }, []);
 
   useEffect(() => {
@@ -483,6 +490,17 @@ function App() {
       sort: 'relevance'
     });
 
+    // Add resolution specific parameters (month, day)
+    const resolution = query.resolution;
+    if (resolution === 'mois' || resolution === 'jour') {
+        if (!isNaN(date.getTime())) {
+            params.append('month', date.getMonth() + 1); // getMonth is 0-indexed
+            if (resolution === 'jour') {
+                params.append('day', date.getDate());
+            }
+        }
+    }
+
     if (config && config.filter) {
       const filterParams = new URLSearchParams(config.filter);
       filterParams.forEach((value, key) => {
@@ -643,8 +661,14 @@ function App() {
       fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
   }
 
-  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution) => {
-    const url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, revues) => {
+    let url;
+    if (corpus === 'route à part (query_persee)') {
+        const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
+        url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ')}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
+    } else {
+        url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+    }
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
       .then(response => {
@@ -718,7 +742,7 @@ function App() {
       if (corpus === 'google') {
         fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, globalStartDate, globalEndDate));
       } else {
-        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution));
+        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, query.revues));
       }
 
       Promise.all(fetchPromises)
@@ -1275,6 +1299,7 @@ function App() {
                 formData={activeQuery}
                 onFormChange={handleFormChange}
                 onPlot={handlePlot}
+                perseeData={perseeData}
               />
               <div className="form-group">
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
@@ -1417,9 +1442,9 @@ function App() {
                 onPageChange={handleContextPageChange}
                 searchParams={contextSearchParams}
                 isLoading={isContextLoading}
-                corpus={selectedQuery?.corpus}
+                corpus={(selectedQuery || activeQuery)?.corpus}
                 corpusConfigs={corpusConfigs}
-                resolution={selectedQuery?.resolution}
+                resolution={(selectedQuery || activeQuery)?.resolution}
             />
           }
         </div>

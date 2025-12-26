@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@mui/material/Button';
 
 const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
@@ -14,11 +14,7 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
     );
   }
 
-  const fetchContext = async () => {
-    if (context) { // toggle
-        setContext(null);
-        return;
-    }
+  const performFetch = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -30,11 +26,10 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
       terms.forEach(term => params.append('terms', term));
 
       // Handle resolution specific parameters (month, day)
-      // record.date typically comes as ISO string or YYYY-MM-DD
       if (resolution === 'mois' || resolution === 'jour') {
           const dateObj = new Date(record.date);
           if (!isNaN(dateObj.getTime())) {
-              params.append('month', dateObj.getMonth() + 1); // getMonth is 0-indexed
+              params.append('month', dateObj.getMonth() + 1);
               if (resolution === 'jour') {
                   params.append('day', dateObj.getDate());
               }
@@ -51,8 +46,6 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
       } else if (corpus === 'livres') {
           params.append('source', 'book');
       } else if (['presse', 'journal_des_debats', 'moniteur'].includes(corpus)) {
-          // Default to periodical if no specific config but is a known periodical corpus
-          // Note: Most are handled by corpusConfigs now, this is a fallback
           if (!params.has('source')) {
              params.append('source', 'periodical');
           }
@@ -70,6 +63,18 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
     } finally {
       setIsLoading(false);
     }
+  }, [record, corpus, corpusConfigs, resolution]);
+
+  useEffect(() => {
+      performFetch();
+  }, [performFetch]);
+
+  const handleToggleContext = () => {
+      if (context) {
+          setContext(null);
+      } else {
+          performFetch();
+      }
   };
 
   return (
@@ -80,7 +85,7 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
         </a>
       </h4>
       <p>{record.date}</p>
-      <Button variant="contained" color="success" onClick={fetchContext} disabled={isLoading}>
+      <Button variant="contained" color="success" onClick={handleToggleContext} disabled={isLoading}>
         {isLoading ? 'Loading...' : (context ? 'Hide context' : 'Show context')}
       </Button>
       {error && <div className="error" style={{color: 'red'}}>{error}</div>}

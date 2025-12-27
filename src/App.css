@@ -188,6 +188,7 @@ button:hover {
 
 .plot-component {
   min-height: 600px;
+  min-width: 200px;
 }
 
 @media (max-width: 768px) {
@@ -212,6 +213,7 @@ button:hover {
 
   .plot-area {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .plot-controls {

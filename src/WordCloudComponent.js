@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import { useTranslation } from 'react-i18next';
 
-const WordCloudComponent = ({ data }) => {
+const WordCloudComponent = ({ data, darkMode }) => {
   const { t } = useTranslation();
 
   if (!data || data.length === 0) {
@@ -27,9 +27,19 @@ const WordCloudComponent = ({ data }) => {
     mode: 'text',
     textfont: {
       size: words.map(w => w.size),
-      color: 'black'
+      color: darkMode ? '#eaeaea' : 'black'
     }
   }];
+
+  const plotlyTheme = darkMode ? {
+    paper_bgcolor: '#1a1a2e',
+    plot_bgcolor: '#16213e',
+    font: { color: '#eaeaea', family: 'EB Garamond, Georgia, serif' }
+  } : {
+    paper_bgcolor: 'white',
+    plot_bgcolor: 'white',
+    font: { family: 'EB Garamond, Georgia, serif' }
+  };
 
   return (
     <Plot
@@ -37,9 +47,7 @@ const WordCloudComponent = ({ data }) => {
       layout={{
         autosize: true,
         title: t('Word Cloud'),
-        font: {
-          family: 'EB Garamond, Georgia, serif'
-        },
+        ...plotlyTheme,
         xaxis: { showgrid: false, zeroline: false, showticklabels: false },
         yaxis: { showgrid: false, zeroline: false, showticklabels: false }
       }}

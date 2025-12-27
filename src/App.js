@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton, Switch } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
@@ -38,6 +38,8 @@ const initialQuery = {
   stopwords: 500,
   advancedOptions: {
     rescale: false,
+    showConfidenceInterval: true,
+    showTotalBarplot: false,
   }
 };
 
@@ -193,6 +195,7 @@ function App() {
   const [corpusConfigs, setCorpusConfigs] = useState({});
   const [perseeData, setPerseeData] = useState(null);
   const [dateWarnings, setDateWarnings] = useState([]);
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     // Load corpus periods and configs from TSV
@@ -859,7 +862,7 @@ function App() {
     }
 
     // Run tasks with concurrency limit (batching)
-    const chunkSize = 5;
+    const chunkSize = 10;
     const allData = [];
     for (let i = 0; i < tasks.length; i += chunkSize) {
       const chunk = tasks.slice(i, i + chunkSize);
@@ -1513,11 +1516,15 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-      <div className="App">
+      <div className={`App ${darkMode ? 'dark' : ''}`}>
         <header className="App-header">
           <img src="/logo.png" className="App-logo" alt="logo" />
           <div className="header-links">
             <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
+            <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
+              <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
+              <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />
+            </span>
             <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
             <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">{t('API')}</a>
             <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('en')}>🇬🇧</button>
@@ -1608,11 +1615,11 @@ function App() {
                   </div>
                 )}
                 {plotType === 'sums' ? (
-                  <SumsComponent data={sumsData} />
+                  <SumsComponent data={sumsData} darkMode={darkMode} />
                 ) : plotType === 'wordcloud' ? (
-                  <WordCloudComponent data={sumsData} />
+                  <WordCloudComponent data={sumsData} darkMode={darkMode} />
                 ) : (
-                  <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
+                  <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} darkMode={darkMode} />
                 )}
               </div>
               <div className="plot-controls">

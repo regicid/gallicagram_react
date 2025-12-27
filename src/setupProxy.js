@@ -34,7 +34,7 @@ module.exports = function (app) {
       target: 'https://gallica.bnf.fr',
       changeOrigin: true,
       pathRewrite: {
-        '^/api/sru': '/SRU',
+        '^/': '/SRU',
       },
     })
   );

@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import { useTranslation } from 'react-i18next';
 
-const SumsComponent = ({ data }) => {
+const SumsComponent = ({ data, darkMode }) => {
   const { t } = useTranslation();
 
   if (!data || data.length === 0) {
@@ -16,21 +16,41 @@ const SumsComponent = ({ data }) => {
     orientation: 'h'
   }];
 
+  const plotlyTheme = darkMode ? {
+    paper_bgcolor: '#1a1a2e',
+    plot_bgcolor: '#16213e',
+    font: { color: '#eaeaea', family: 'EB Garamond, Georgia, serif' }
+  } : {
+    paper_bgcolor: 'white',
+    plot_bgcolor: 'white',
+    font: { family: 'EB Garamond, Georgia, serif' }
+  };
+
   return (
     <Plot
       data={plotData}
       layout={{
         autosize: true,
         title: t('Total Occurrences per Query'),
-        font: {
-          family: 'EB Garamond, Georgia, serif'
+        ...plotlyTheme,
+        margin: {
+          l: 150,
+          r: 20,
+          t: 50,
+          b: 50,
+          pad: 4
         },
         xaxis: {
-          title: t('Total Occurrences')
+          title: t('Total Occurrences'),
+          tickfont: { size: 14 },
+          gridcolor: darkMode ? '#0f3460' : undefined
         },
         yaxis: {
           title: t('Query'),
-          autorange: 'reversed'
+          autorange: 'reversed',
+          automargin: true,
+          tickfont: { size: 14 },
+          gridcolor: darkMode ? '#0f3460' : undefined
         }
       }}
       useResizeHandler={true}

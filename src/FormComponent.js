@@ -458,6 +458,26 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
           }
           label={t('Loess Smoothing')}
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.showConfidenceInterval !== false}
+              onChange={onAdvancedOptionsChange}
+              name="showConfidenceInterval"
+            />
+          }
+          label={t('Show Confidence Interval')}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.showTotalBarplot || false}
+              onChange={onAdvancedOptionsChange}
+              name="showTotalBarplot"
+            />
+          }
+          label={t('Show Total Barplot')}
+        />
       </AccordionDetails>
     </Accordion>
   );

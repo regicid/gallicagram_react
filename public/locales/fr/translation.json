@@ -1,4 +1,3 @@
-
 {
   "Gallicagram": "Gallicagram",
   "X": "X",
@@ -92,5 +91,20 @@
   "Show context": "Afficher le contexte",
   "Hide context": "Masquer le contexte",
   "le_monde_warning": "NB : Ici, nous nous appuyons sur le moteur de recherche du Monde, qui fonctionne parfois de manière mystérieuse.",
-  "Read on Le Monde": "Lire sur Le Monde"
+  "Read on Le Monde": "Lire sur Le Monde",
+  "Search Mode": "Mode de recherche",
+  "By ngram": "Par ngram",
+  "By document": "Par document",
+  "By cooccurrence": "Par cooccurrence",
+  "By Joker": "Par Joker",
+  "By nearby word": "Par mot proche",
+  "Second Word": "Deuxième mot",
+  "Distance": "Distance",
+  "N Joker": "N Joker",
+  "Length": "Longueur",
+  "Stopwords": "Mots vides",
+  "Show Confidence Interval": "Afficher l'intervalle de confiance",
+  "Show Total Barplot": "Afficher le graphique des totaux",
+  "Total": "Total",
+  "Option 3": "Option 3"
 }

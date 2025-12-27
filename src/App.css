@@ -185,3 +185,36 @@ button:hover {
 .pagination {
     margin-top: 10px;
 }
+
+@media (max-width: 768px) {
+  .App-body {
+    flex-direction: column;
+  }
+
+  .form-container {
+    flex: none;
+    width: 100%;
+    max-width: none;
+    border-right: none;
+    border-bottom: 1px solid #ccc;
+    padding-right: 0;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+  }
+
+  .plot-container {
+    padding-left: 0;
+  }
+
+  .plot-area {
+    flex-direction: column;
+  }
+
+  .plot-controls {
+    flex: none;
+    width: 100%;
+    max-width: none;
+    padding-left: 0;
+    margin-top: 20px;
+  }
+}

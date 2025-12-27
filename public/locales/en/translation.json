@@ -90,5 +90,7 @@
   "Corpus": "Corpus",
   "No data": "No data",
   "Show context": "Show context",
-  "Hide context": "Hide context"
+  "Hide context": "Hide context",
+  "le_monde_warning": "NB: Here, we rely on Le Monde search engine, which sometimes works in mysterious ways.",
+  "Read on Le Monde": "Read on Le Monde"
 }

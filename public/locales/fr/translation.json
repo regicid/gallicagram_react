@@ -90,5 +90,7 @@
   "Corpus": "Corpus",
   "No data": "Pas de données",
   "Show context": "Afficher le contexte",
-  "Hide context": "Masquer le contexte"
+  "Hide context": "Masquer le contexte",
+  "le_monde_warning": "NB : Ici, nous nous appuyons sur le moteur de recherche du Monde, qui fonctionne parfois de manière mystérieuse.",
+  "Read on Le Monde": "Lire sur Le Monde"
 }

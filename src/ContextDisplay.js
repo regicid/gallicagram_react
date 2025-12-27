@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
+import Button from '@mui/material/Button';
 
 const SpecialContextDisplay = ({ record, corpus }) => {
   const { t } = useTranslation();
@@ -164,25 +165,45 @@ const SpecialContextDisplay = ({ record, corpus }) => {
       </div>
 
       {data.type === 'lemonde' && (
-        <ul className="lemonde-list" style={{listStyle: 'none', padding: 0}}>
-          {data.content.map((item, i) => (
-            <li key={i} style={{marginBottom: '15px', borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
-              <div style={{marginBottom: '5px'}}>
-                  <a href={item.href} target="_blank" rel="noopener noreferrer" style={{fontWeight: 'bold', fontSize: '1.1em'}}>{item.title}</a>
-              </div>
-              {item.date && (
-                  <div style={{fontSize: '0.85em', color: '#666', marginBottom: '5px'}}>
+        <>
+          <p style={{fontStyle: 'italic', fontSize: '0.9em', marginBottom: '1rem'}}>{t('le_monde_warning')}</p>
+          <div className="records-list">
+            {data.content.map((item, i) => (
+              <div key={i} className="occurrence-card" style={{
+                border: '1px solid #ccc', 
+                borderRadius: '5px', 
+                padding: '15px', 
+                backgroundColor: '#fff',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+              }}>
+                <h4 style={{marginTop: 0, marginBottom: '10px'}}>
+                  <a href={item.href} target="_blank" rel="noopener noreferrer" style={{textDecoration: 'none', color: '#2c3e50'}}>
+                    {item.title}
+                  </a>
+                </h4>
+                {item.date && (
+                  <p style={{fontSize: '0.9em', color: '#666', marginBottom: '10px', fontStyle: 'italic'}}>
                       {item.date}
-                  </div>
-              )}
-              {item.description && (
-                  <div style={{fontSize: '0.95em'}}>
+                  </p>
+                )}
+                {item.description && (
+                  <p style={{marginBottom: '15px'}}>
                       {item.description}
-                  </div>
-              )}
-            </li>
-          ))}
-        </ul>
+                  </p>
+                )}
+                <Button 
+                  variant="contained" 
+                  color="success" 
+                  href={item.href} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  {t('Read on Le Monde')}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {data.type === 'persee' && (

@@ -1,6 +1,6 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
-module.exports = function(app) {
+module.exports = function (app) {
   app.use(
     '/ngrams',
     createProxyMiddleware({
@@ -25,6 +25,16 @@ module.exports = function(app) {
       changeOrigin: true,
       pathRewrite: {
         '^/': '/search',
+      },
+    })
+  );
+  app.use(
+    '/api/sru',
+    createProxyMiddleware({
+      target: 'https://gallica.bnf.fr',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/api/sru': '/SRU',
       },
     })
   );

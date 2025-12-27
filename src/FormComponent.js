@@ -13,7 +13,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   const { t } = useTranslation();
-  const { word, corpus, resolution, revues, rubriques, byRubrique } = formData;
+  const { word, corpus, resolution, revues, rubriques, byRubrique, searchMode, word2, distance, n_joker, length, stopwords } = formData;
   const [corpora, setCorpora] = useState([]);
   const [selectedDisciplines, setSelectedDisciplines] = useState([]);
   const [disciplineSearch, setDisciplineSearch] = useState('');
@@ -27,7 +27,13 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
         const lines = data.split('\n');
         const corporaData = lines.slice(1).map(line => {
           const columns = line.split('\t');
-          return { label: `${columns[0]} (${columns[1]})`, value: columns[3], resolution: columns[5], maxLength: parseInt(columns[4], 10) };
+          return {
+            label: `${columns[0]} (${columns[1]})`,
+            value: columns[3],
+            resolution: columns[5],
+            maxLength: parseInt(columns[4], 10),
+            contextFilter: columns[8] || ''
+          };
         }).filter(c => c.value);
         setCorpora([...corporaData, { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle' }]);
       });
@@ -38,44 +44,44 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
     const disciplines = Object.keys(perseeData).sort();
     const mapping = {};
     Object.values(perseeData).forEach(d => {
-        Object.entries(d).forEach(([code, name]) => {
-            mapping[code] = name;
-        });
+      Object.entries(d).forEach(([code, name]) => {
+        mapping[code] = name;
+      });
     });
     return { allDisciplines: disciplines, codeToName: mapping };
   }, [perseeData]);
 
   useEffect(() => {
     if (corpus === 'route à part (query_persee)' && perseeData && !hasInitializedPersee) {
-        // Only initialize if we haven't done so yet for this session/mount
-        setSelectedDisciplines(Object.keys(perseeData));
-        
-        const allCodes = Object.values(perseeData).flatMap(d => Object.keys(d));
-        const uniqueCodes = [...new Set(allCodes)];
-        onFormChange({ ...formData, revues: uniqueCodes });
-        
-        setHasInitializedPersee(true);
+      // Only initialize if we haven't done so yet for this session/mount
+      setSelectedDisciplines(Object.keys(perseeData));
+
+      const allCodes = Object.values(perseeData).flatMap(d => Object.keys(d));
+      const uniqueCodes = [...new Set(allCodes)];
+      onFormChange({ ...formData, revues: uniqueCodes });
+
+      setHasInitializedPersee(true);
     }
   }, [corpus, perseeData, hasInitializedPersee, formData, onFormChange]);
 
   const availableJournals = useMemo(() => {
-      if (!perseeData) return [];
-      const codes = new Set();
-      selectedDisciplines.forEach(disc => {
-          const journalMap = perseeData[disc];
-          if (journalMap) {
-             Object.keys(journalMap).forEach(code => codes.add(code));
-          }
-      });
-      return Array.from(codes).map(code => ({ code, name: codeToName[code] })).sort((a, b) => a.name.localeCompare(b.name));
+    if (!perseeData) return [];
+    const codes = new Set();
+    selectedDisciplines.forEach(disc => {
+      const journalMap = perseeData[disc];
+      if (journalMap) {
+        Object.keys(journalMap).forEach(code => codes.add(code));
+      }
+    });
+    return Array.from(codes).map(code => ({ code, name: codeToName[code] })).sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedDisciplines, perseeData, codeToName]);
 
   const filteredDisciplines = useMemo(() => {
-      return allDisciplines.filter(d => d.toLowerCase().includes(disciplineSearch.toLowerCase()));
+    return allDisciplines.filter(d => d.toLowerCase().includes(disciplineSearch.toLowerCase()));
   }, [allDisciplines, disciplineSearch]);
 
   const filteredJournals = useMemo(() => {
-      return availableJournals.filter(j => j.name.toLowerCase().includes(journalSearch.toLowerCase()));
+    return availableJournals.filter(j => j.name.toLowerCase().includes(journalSearch.toLowerCase()));
   }, [availableJournals, journalSearch]);
 
   const handleChange = (e) => {
@@ -83,23 +89,23 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   };
 
   const handleDisciplineChange = (event) => {
-      const value = event.target.value;
-      setSelectedDisciplines(value);
-      
-      const newAvailableCodes = new Set();
-      value.forEach(disc => {
-          if (perseeData[disc]) {
-              Object.keys(perseeData[disc]).forEach(c => newAvailableCodes.add(c));
-          }
-      });
-      
-      const currentRevues = revues || [];
-      const newRevues = currentRevues.filter(r => newAvailableCodes.has(r));
-      onFormChange({ ...formData, revues: newRevues });
+    const value = event.target.value;
+    setSelectedDisciplines(value);
+
+    const newAvailableCodes = new Set();
+    value.forEach(disc => {
+      if (perseeData[disc]) {
+        Object.keys(perseeData[disc]).forEach(c => newAvailableCodes.add(c));
+      }
+    });
+
+    const currentRevues = revues || [];
+    const newRevues = currentRevues.filter(r => newAvailableCodes.has(r));
+    onFormChange({ ...formData, revues: newRevues });
   };
 
   const handleJournalChange = (event) => {
-      onFormChange({ ...formData, revues: event.target.value });
+    onFormChange({ ...formData, revues: event.target.value });
   };
 
   const handleRubriqueChange = (event) => {
@@ -107,26 +113,26 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   };
 
   const handleSelectAllDisciplines = (e) => {
-      e.stopPropagation();
-      setSelectedDisciplines(allDisciplines);
-      const allCodes = Object.values(perseeData).flatMap(d => Object.keys(d));
-      onFormChange({ ...formData, revues: [...new Set(allCodes)] });
+    e.stopPropagation();
+    setSelectedDisciplines(allDisciplines);
+    const allCodes = Object.values(perseeData).flatMap(d => Object.keys(d));
+    onFormChange({ ...formData, revues: [...new Set(allCodes)] });
   };
 
   const handleUnselectAllDisciplines = (e) => {
-      e.stopPropagation();
-      setSelectedDisciplines([]);
-      onFormChange({ ...formData, revues: [] });
+    e.stopPropagation();
+    setSelectedDisciplines([]);
+    onFormChange({ ...formData, revues: [] });
   };
 
   const handleSelectAllJournals = (e) => {
-      e.stopPropagation();
-      onFormChange({ ...formData, revues: availableJournals.map(j => j.code) });
+    e.stopPropagation();
+    onFormChange({ ...formData, revues: availableJournals.map(j => j.code) });
   };
 
   const handleUnselectAllJournals = (e) => {
-      e.stopPropagation();
-      onFormChange({ ...formData, revues: [] });
+    e.stopPropagation();
+    onFormChange({ ...formData, revues: [] });
   };
 
   const handleSubmit = (e) => {
@@ -136,6 +142,21 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
 
   const selectedCorpus = corpora.find(c => c.value === corpus);
   const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
+  const isGallicaCorpus = selectedCorpus && selectedCorpus.contextFilter;
+  const isJokerCompatible = ['presse', 'livres', 'lemonde', 'lemonde_rubriques'].includes(corpus); // Added 'lemonde' as per instruction 10
+
+  // Available search modes
+  const searchModes = [
+    { value: 'ngram', label: 'By ngram' },
+  ];
+  if (isGallicaCorpus) {
+    searchModes.push({ value: 'document', label: 'By document' });
+    searchModes.push({ value: 'cooccurrence', label: 'By cooccurrence' });
+  }
+  if (isJokerCompatible) {
+    searchModes.push({ value: 'joker', label: 'By Joker' });
+    searchModes.push({ value: 'nearby', label: 'By nearby word' });
+  }
 
   const helpTooltipContent = (
     <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
@@ -186,6 +207,76 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
         </FormControl>
       </div>
 
+      {(isGallicaCorpus || isJokerCompatible) && (
+        <div className="form-group" style={{ marginBottom: '1rem' }}>
+          <FormControl fullWidth>
+            <InputLabel id="search-mode-select-label">{t('Search Mode')}</InputLabel>
+            <Select
+              labelId="search-mode-select-label"
+              id="search-mode-select"
+              value={searchMode || 'ngram'}
+              label={t('Search Mode')}
+              name="searchMode"
+              onChange={handleChange}
+              sx={{ fontFamily: 'serif' }}
+            >
+              {searchModes.map(m => (
+                <MenuItem key={m.value} value={m.value}>{t(m.label)}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
+      )}
+
+      {searchMode === 'cooccurrence' && (
+        <div className="form-group" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+          <TextField
+            label={t('Second Word')}
+            name="word2"
+            value={word2 || ''}
+            onChange={handleChange}
+            fullWidth
+          />
+          <TextField
+            label={t('Distance')}
+            name="distance"
+            type="number"
+            value={distance || 10}
+            onChange={handleChange}
+            sx={{ width: '150px' }}
+          />
+        </div>
+      )}
+
+      {(searchMode === 'joker' || searchMode === 'nearby') && (
+        <div className="form-group" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <TextField
+            label={t('N Joker')}
+            name="n_joker"
+            type="number"
+            value={n_joker || 10}
+            onChange={handleChange}
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            label={t('Length')}
+            name="length"
+            type="number"
+            value={length || ((word ? word.split(' ').length : 0) + 1)}
+            onChange={handleChange}
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            label={t('Stopwords')}
+            name="stopwords"
+            type="number"
+            value={stopwords || 500}
+            onChange={handleChange}
+            sx={{ flex: 1 }}
+          />
+        </div>
+      )}
+
       {corpus === 'lemonde_rubriques' && (
         <FormControl fullWidth style={{ marginBottom: '1rem' }}>
           <InputLabel id="rubriques-label">{t('Rubriques')}</InputLabel>
@@ -231,8 +322,8 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
               renderValue={(selected) => selected.length === allDisciplines.length ? t('All Disciplines') : `${selected.length} ${t('selected')}`}
             >
               <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
-                 <Button fullWidth size="small" variant="outlined" onClick={handleSelectAllDisciplines}>{t('All')}</Button>
-                 <Button fullWidth size="small" variant="outlined" onClick={handleUnselectAllDisciplines}>{t('None')}</Button>
+                <Button fullWidth size="small" variant="outlined" onClick={handleSelectAllDisciplines}>{t('All')}</Button>
+                <Button fullWidth size="small" variant="outlined" onClick={handleUnselectAllDisciplines}>{t('None')}</Button>
               </Box>
               <Box sx={{ p: 1 }}>
                 <TextField
@@ -265,8 +356,8 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
               renderValue={(selected) => selected.length === availableJournals.length ? t('All Journals') : `${selected.length} ${t('selected')}`}
             >
               <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
-                 <Button fullWidth size="small" variant="outlined" onClick={handleSelectAllJournals}>{t('All')}</Button>
-                 <Button fullWidth size="small" variant="outlined" onClick={handleUnselectAllJournals}>{t('None')}</Button>
+                <Button fullWidth size="small" variant="outlined" onClick={handleSelectAllJournals}>{t('All')}</Button>
+                <Button fullWidth size="small" variant="outlined" onClick={handleUnselectAllJournals}>{t('None')}</Button>
               </Box>
               <Box sx={{ p: 1 }}>
                 <TextField

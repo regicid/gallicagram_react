@@ -30,6 +30,12 @@ const initialQuery = {
   word: 'liberté',
   corpus: 'presse',
   resolution: 'annee',
+  searchMode: 'ngram',
+  word2: '',
+  distance: 10,
+  n_joker: 10,
+  length: 2, // Will be updated based on word length
+  stopwords: 500,
   advancedOptions: {
     rescale: false,
   }
@@ -220,9 +226,9 @@ function App() {
 
     // Load Persee revues
     fetch('/revues_persee.json')
-        .then(res => res.json())
-        .then(data => setPerseeData(data))
-        .catch(err => console.error("Error loading persee revues", err));
+      .then(res => res.json())
+      .then(data => setPerseeData(data))
+      .catch(err => console.error("Error loading persee revues", err));
   }, []);
 
   useEffect(() => {
@@ -370,7 +376,7 @@ function App() {
         return d.data.n !== undefined ? d.data.n : null;
       }
     });
-    
+
     return {
       x: processedData.map(d => d.x),
       y: yValues,
@@ -393,20 +399,28 @@ function App() {
     if (apiResponses.length === 0) return;
 
     if (plotType === 'sums' || plotType === 'wordcloud') {
-      const data = apiResponses.map(res => {
-        let total;
-        if (res.query.corpus === 'google') {
-          total = 0;
-        } else {
-          total = res.total || 0;
-        }
-        return {
-          word: res.query.word || `${t('Query')} ${res.query.id}`,
-          total: total
-        };
-      });
-      data.sort((a, b) => b.total - a.total);
-      setSumsData(data);
+      // Check if any response is from list mode (Joker/Nearby)
+      const listModeResponse = apiResponses.find(res => res.query && res.query.isListMode);
+
+      if (listModeResponse) {
+        // Use the data directly
+        setSumsData(listModeResponse.data);
+      } else {
+        const data = apiResponses.map(res => {
+          let total;
+          if (res.query.corpus === 'google') {
+            total = 0;
+          } else {
+            total = res.total || 0;
+          }
+          return {
+            word: res.query.word || `${t('Query')} ${res.query.id}`,
+            total: total
+          };
+        });
+        data.sort((a, b) => b.total - a.total);
+        setSumsData(data);
+      }
     } else {
       const firstCorpus = queries[0]?.corpus;
       const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
@@ -439,6 +453,16 @@ function App() {
       setRawPlotData(traces);
     }
   }, [apiResponses, plotType, queries, activeQueryId, processData, t]);
+
+  // Effect to switch to 'sums' view for list modes
+  useEffect(() => {
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    if (activeQuery && (activeQuery.searchMode === 'joker' || activeQuery.searchMode === 'nearby')) {
+      if (plotType !== 'sums' && plotType !== 'wordcloud') {
+        setPlotType('sums');
+      }
+    }
+  }, [queries, activeQueryId, plotType]);
 
   useEffect(() => {
     if (plotType !== 'line' && plotType !== 'area') {
@@ -496,12 +520,12 @@ function App() {
     // Add resolution specific parameters (month, day)
     const resolution = query.resolution;
     if (resolution === 'mois' || resolution === 'jour') {
-        if (!isNaN(date.getTime())) {
-            params.append('month', date.getMonth() + 1); // getMonth is 0-indexed
-            if (resolution === 'jour') {
-                params.append('day', date.getDate());
-            }
+      if (!isNaN(date.getTime())) {
+        params.append('month', date.getMonth() + 1); // getMonth is 0-indexed
+        if (resolution === 'jour') {
+          params.append('day', date.getDate());
         }
+      }
     }
 
     if (config && config.filter) {
@@ -665,22 +689,22 @@ function App() {
   };
 
   const handleContextPageChange = (pageIndex) => {
-      const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };
-      setContextSearchParams(newSearchParams);
-      fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
+    const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };
+    setContextSearchParams(newSearchParams);
+    fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
   }
 
   const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, revues, rubriques, byRubrique) => {
     let url;
     if (corpus === 'route à part (query_persee)') {
-        const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
-        url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ')}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
+      const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
+      url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ')}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
     } else if (corpus === 'lemonde_rubriques') {
-        const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
-        const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
-        url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}${rubriqueParam}${byRubriqueParam}`;
+      const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
+      const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
+      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}${rubriqueParam}${byRubriqueParam}`;
     } else {
-        url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
     }
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
@@ -741,11 +765,162 @@ function App() {
       });
   };
 
+  const fetchByDocument = async (query, globalStartDate, globalEndDate) => {
+    const { word, corpus, resolution } = query;
+    const code = corpusConfigs[corpus]?.filter?.match(/codes=([^&]+)/)?.[1];
+    const source = corpusConfigs[corpus]?.filter?.match(/source=([^&]+)/)?.[1];
+
+    // Determine context filter part
+    let contextQuery = "";
+    if (corpus === 'livres') {
+      contextQuery = 'dc.type all "monographie"';
+    } else if (corpus === 'presse') {
+      contextQuery = 'dc.type all "fascicule"';
+    } else if (code) {
+      contextQuery = `arkPress adj "${code}_date"`;
+    } else {
+      // Fallback or error if no code/source found for other corpora
+      console.warn("No specific code found for 'By document' search on this corpus");
+    }
+
+    const start = parseInt(globalStartDate);
+    const end = parseInt(globalEndDate);
+    const results = [];
+
+    // Helper to fetch count
+    const fetchCount = async (cqlQuery) => {
+      const url = `/api/sru?operation=searchRetrieve&exactSearch=True&version=1.2&startRecord=0&maximumRecords=0&collapsing=false&query=${encodeURIComponent(cqlQuery)}`;
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        // Parse XML to find <srw:numberOfRecords>
+        const match = text.match(/<srw:numberOfRecords>(\d+)<\/srw:numberOfRecords>/);
+        return match ? parseInt(match[1], 10) : 0;
+      } catch (e) {
+        console.error("Error fetching SRU", e);
+        return 0;
+      }
+    };
+
+    const fetchPeriod = async (year, monthIndex = null) => {
+      let dateFilter = "";
+      let startDateStr = "";
+      let endDateStr = "";
+
+      if (resolution === 'mois' && monthIndex !== null) {
+        const m = monthIndex + 1;
+        const nm = m === 12 ? 1 : m + 1;
+        const ny = m === 12 ? year + 1 : year;
+        startDateStr = `${year}-${String(m).padStart(2, '0')}-01`;
+        endDateStr = `${ny}-${String(nm).padStart(2, '0')}-01`;
+        dateFilter = `gallicapublication_date>="${startDateStr}" and gallicapublication_date<"${endDateStr}"`;
+      } else {
+        startDateStr = `${year}-01-01`;
+        endDateStr = `${year + 1}-01-01`;
+        dateFilter = `gallicapublication_date>="${startDateStr}" and gallicapublication_date<"${endDateStr}"`;
+      }
+
+      let queryTerm;
+      if (query.searchMode === 'cooccurrence') {
+        const w1 = query.word;
+        const w2 = query.word2;
+        const dist = query.distance || 10;
+        // The instruction says: (( text all "word1" prox/unit=word/distance=n_distance "word2"))
+        queryTerm = `(( text all "${w1}" prox/unit=word/distance=${dist} "${w2}"))`;
+      } else {
+        queryTerm = `(text adj "${word}")`;
+      }
+      const fullQuery = `${queryTerm} and ${dateFilter} and ${contextQuery}`;
+      const totalQuery = `${dateFilter} and ${contextQuery}`;
+
+      const [n, total] = await Promise.all([
+        fetchCount(fullQuery),
+        fetchCount(totalQuery)
+      ]);
+
+      return {
+        year,
+        mois: monthIndex !== null ? monthIndex + 1 : undefined,
+        n,
+        total
+      };
+    };
+
+    // Prepare tasks
+    const tasks = [];
+    for (let year = start; year <= end; year++) {
+      if (resolution === 'mois') {
+        for (let m = 0; m < 12; m++) {
+          tasks.push(() => fetchPeriod(year, m));
+        }
+      } else {
+        tasks.push(() => fetchPeriod(year));
+      }
+    }
+
+    // Run tasks with concurrency limit (batching)
+    const chunkSize = 5;
+    const allData = [];
+    for (let i = 0; i < tasks.length; i += chunkSize) {
+      const chunk = tasks.slice(i, i + chunkSize);
+      const chunkResults = await Promise.all(chunk.map(t => t()));
+      allData.push(...chunkResults);
+    }
+
+    return [{ data: allData, query: { ...query, startDate: globalStartDate, endDate: globalEndDate } }];
+  };
+
+  const fetchListMode = (query, globalStartDate, globalEndDate, route) => {
+    const { word, corpus, n_joker, length, stopwords } = query;
+    // Handle Le Monde corpus specificities
+    let actualCorpus = corpus;
+    if (corpus === 'lemonde_rubriques' || corpus === 'lemonde') {
+      actualCorpus = 'lemonde';
+    }
+
+    const url = `https://shiny.ens-paris-saclay.fr/guni/${route}?mot=${word}&corpus=${actualCorpus}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}&length=${length || 2}&stopwords=${stopwords || 500}`;
+
+    return fetch(url)
+      .then(res => res.text())
+      .then(csvText => {
+        return new Promise(resolve => {
+          Papa.parse(csvText, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              // Map results to { word: row.gram, total: row.tot }
+              const data = results.data.map(row => ({
+                word: row.gram,
+                total: row.tot
+              }));
+              resolve([{ data, query: { ...query, startDate: globalStartDate, endDate: globalEndDate, isListMode: true } }]);
+            }
+          });
+        });
+      });
+  };
+
   const fetchDataForQuery = (query, globalStartDate, globalEndDate) => {
     return new Promise((resolve, reject) => {
-      const { word, corpus, resolution, revues, rubriques, byRubrique } = query;
+      const { word, corpus, resolution, revues, rubriques, byRubrique, searchMode } = query;
       if (!word) {
         resolve([{ data: [], query: { ...query, startDate: globalStartDate, endDate: globalEndDate } }]);
+        return;
+      }
+
+      if (searchMode === 'document' || searchMode === 'cooccurrence') {
+        fetchByDocument(query, globalStartDate, globalEndDate).then(resolve).catch(reject);
+        return;
+      }
+
+      if (searchMode === 'joker') {
+        fetchListMode(query, globalStartDate, globalEndDate, 'joker').then(resolve).catch(reject);
+        return;
+      }
+
+      if (searchMode === 'nearby') {
+        fetchListMode(query, globalStartDate, globalEndDate, 'associated').then(resolve).catch(reject);
         return;
       }
 
@@ -792,71 +967,71 @@ function App() {
             resolve([{ data: combinedData, query: queryWithDates }]);
           } else {
             if (corpus === 'lemonde_rubriques' && byRubrique) {
-                // Flatten results from multiple words (if any) and group by rubrique
-                const allRows = results.flat();
-                const grouped = {};
-                allRows.forEach(row => {
-                    const rub = row.rubrique || 'Unknown';
-                    if (!grouped[rub]) grouped[rub] = [];
-                    grouped[rub].push(row);
-                });
+              // Flatten results from multiple words (if any) and group by rubrique
+              const allRows = results.flat();
+              const grouped = {};
+              allRows.forEach(row => {
+                const rub = row.rubrique || 'Unknown';
+                if (!grouped[rub]) grouped[rub] = [];
+                grouped[rub].push(row);
+              });
 
-                const rubriqueResponses = Object.entries(grouped).map(([rub, rows]) => {
-                    const combinedData = {};
-                    rows.forEach(row => {
-                        const year = row.date || row.annee || row.year;
-                        if (!year) return;
-
-                        let dateKey;
-                        if (resolution === 'annee') {
-                          dateKey = `${year}`;
-                        } else if (resolution === 'mois') {
-                          dateKey = `${year}-${row.mois || 1}`;
-                        } else { // jour
-                          dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
-                        }
-
-                        if (!combinedData[dateKey]) {
-                          combinedData[dateKey] = { ...row, n: 0, total: 0 };
-                        }
-                        combinedData[dateKey].n += row.n || 0;
-                        if (combinedData[dateKey].total === 0) {
-                          combinedData[dateKey].total = row.total || 0;
-                        }
-                    });
-                    const dataValues = Object.values(combinedData);
-                    const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
-                    return { data: dataValues, query: { ...queryWithDates, word: `${word} - ${rub}` }, total };
-                });
-                resolve(rubriqueResponses);
-            } else {
+              const rubriqueResponses = Object.entries(grouped).map(([rub, rows]) => {
                 const combinedData = {};
-                results.forEach(data => {
-                  data.forEach(row => {
-                    const year = row.date || row.annee || row.year;
-                    if (!year) return;
+                rows.forEach(row => {
+                  const year = row.date || row.annee || row.year;
+                  if (!year) return;
 
-                    let dateKey;
-                    if (resolution === 'annee') {
-                      dateKey = `${year}`;
-                    } else if (resolution === 'mois') {
-                      dateKey = `${year}-${row.mois || 1}`;
-                    } else { // jour
-                      dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
-                    }
+                  let dateKey;
+                  if (resolution === 'annee') {
+                    dateKey = `${year}`;
+                  } else if (resolution === 'mois') {
+                    dateKey = `${year}-${row.mois || 1}`;
+                  } else { // jour
+                    dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
+                  }
 
-                    if (!combinedData[dateKey]) {
-                      combinedData[dateKey] = { ...row, n: 0, total: 0 };
-                    }
-                    combinedData[dateKey].n += row.n || 0;
-                    if (combinedData[dateKey].total === 0) {
-                      combinedData[dateKey].total = row.total || 0;
-                    }
-                  });
+                  if (!combinedData[dateKey]) {
+                    combinedData[dateKey] = { ...row, n: 0, total: 0 };
+                  }
+                  combinedData[dateKey].n += row.n || 0;
+                  if (combinedData[dateKey].total === 0) {
+                    combinedData[dateKey].total = row.total || 0;
+                  }
                 });
                 const dataValues = Object.values(combinedData);
                 const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
-                resolve([{ data: dataValues, query: queryWithDates, total }]);
+                return { data: dataValues, query: { ...queryWithDates, word: `${word} - ${rub}` }, total };
+              });
+              resolve(rubriqueResponses);
+            } else {
+              const combinedData = {};
+              results.forEach(data => {
+                data.forEach(row => {
+                  const year = row.date || row.annee || row.year;
+                  if (!year) return;
+
+                  let dateKey;
+                  if (resolution === 'annee') {
+                    dateKey = `${year}`;
+                  } else if (resolution === 'mois') {
+                    dateKey = `${year}-${row.mois || 1}`;
+                  } else { // jour
+                    dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
+                  }
+
+                  if (!combinedData[dateKey]) {
+                    combinedData[dateKey] = { ...row, n: 0, total: 0 };
+                  }
+                  combinedData[dateKey].n += row.n || 0;
+                  if (combinedData[dateKey].total === 0) {
+                    combinedData[dateKey].total = row.total || 0;
+                  }
+                });
+              });
+              const dataValues = Object.values(combinedData);
+              const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
+              resolve([{ data: dataValues, query: queryWithDates, total }]);
             }
           }
         })
@@ -910,380 +1085,380 @@ function App() {
 
     // Ensure fonts are loaded before drawing
     document.fonts.ready.then(() => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const scale = 2; // Increase resolution
-        const width = 1200 * scale;
-        const height = 800 * scale;
-        let margin = { top: 60 * scale, right: 60 * scale, bottom: 100 * scale, left: 100 * scale };
-        canvas.width = width;
-        canvas.height = height;
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const scale = 2; // Increase resolution
+      const width = 1200 * scale;
+      const height = 800 * scale;
+      let margin = { top: 60 * scale, right: 60 * scale, bottom: 100 * scale, left: 100 * scale };
+      canvas.width = width;
+      canvas.height = height;
 
-        // Background
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, width, height);
+      // Background
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, width, height);
 
-        const activeQuery = queries.find(q => q.id === activeQueryId);
-        const advancedOptions = activeQuery?.advancedOptions || {};
-        const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
+      const activeQuery = queries.find(q => q.id === activeQueryId);
+      const advancedOptions = activeQuery?.advancedOptions || {};
+      const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
 
-        // Fonts
-        ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+      // Fonts
+      ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+      ctx.fillStyle = 'black';
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 2 * scale;
+
+      if (plotType === 'wordcloud') {
+        const words = sumsData.map((d, i) => {
+          const angle = sumsData.length > 1 ? (i / (sumsData.length - 1)) * 2 * Math.PI : 0;
+          const maxTotal = sumsData.length > 0 && sumsData[0].total > 0 ? sumsData[0].total : 1;
+          // Center is (width/2, height/2), radius scaled
+          const radius = Math.min(width, height) * 0.35;
+          return {
+            ...d,
+            x: width / 2 + Math.cos(angle) * radius * (0.1 + 0.9 * i / sumsData.length), // Spiral-ish
+            y: height / 2 + Math.sin(angle) * radius * (0.1 + 0.9 * i / sumsData.length),
+            size: (20 + (d.total / maxTotal) * 80) * scale
+          };
+        });
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillStyle = 'black';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2 * scale;
 
-        if (plotType === 'wordcloud') {
-            const words = sumsData.map((d, i) => {
-                const angle = sumsData.length > 1 ? (i / (sumsData.length - 1)) * 2 * Math.PI : 0;
-                const maxTotal = sumsData.length > 0 && sumsData[0].total > 0 ? sumsData[0].total : 1;
-                // Center is (width/2, height/2), radius scaled
-                const radius = Math.min(width, height) * 0.35; 
-                return {
-                    ...d,
-                    x: width/2 + Math.cos(angle) * radius * (0.1 + 0.9 * i/sumsData.length), // Spiral-ish
-                    y: height/2 + Math.sin(angle) * radius * (0.1 + 0.9 * i/sumsData.length),
-                    size: (20 + (d.total / maxTotal) * 80) * scale
-                };
-            });
+        words.forEach(w => {
+          ctx.font = `${w.size}px 'EB Garamond', Georgia, serif`;
+          ctx.fillText(w.word, w.x, w.y);
+        });
 
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = 'black';
-            
-            words.forEach(w => {
-                ctx.font = `${w.size}px 'EB Garamond', Georgia, serif`;
-                ctx.fillText(w.word, w.x, w.y);
-            });
+        // Title
+        ctx.font = `bold ${24 * scale}px 'EB Garamond', Georgia, serif`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'black';
+        ctx.fillText(t('Word Cloud'), width / 2, 40 * scale);
 
-            // Title
-            ctx.font = `bold ${24 * scale}px 'EB Garamond', Georgia, serif`;
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'black';
-            ctx.fillText(t('Word Cloud'), width / 2, 40 * scale);
+      } else if (plotType === 'sums') {
+        // Horizontal Bar Chart
+        const maxVal = Math.max(...sumsData.map(d => d.total));
 
-        } else if (plotType === 'sums') {
-            // Horizontal Bar Chart
-            const maxVal = Math.max(...sumsData.map(d => d.total));
-            
-            // Calculate room needed for value labels at the end of bars
-            ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
-            let maxValLabelWidth = 0;
-            sumsData.forEach(d => {
-                const labelWidth = ctx.measureText(d.total.toLocaleString()).width;
-                if (labelWidth > maxValLabelWidth) maxValLabelWidth = labelWidth;
-            });
-            margin.right = Math.max(margin.right, maxValLabelWidth + 20 * scale);
+        // Calculate room needed for value labels at the end of bars
+        ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+        let maxValLabelWidth = 0;
+        sumsData.forEach(d => {
+          const labelWidth = ctx.measureText(d.total.toLocaleString()).width;
+          if (labelWidth > maxValLabelWidth) maxValLabelWidth = labelWidth;
+        });
+        margin.right = Math.max(margin.right, maxValLabelWidth + 20 * scale);
 
-            // Scales
-            // Y axis is categories (words), evenly spaced
-            const itemHeight = (height - margin.top - margin.bottom) / sumsData.length;
-            const barHeight = itemHeight * 0.6;
-            
-            // X axis is value
-            const xScale = (val) => margin.left + (val / maxVal) * (width - margin.left - margin.right);
+        // Scales
+        // Y axis is categories (words), evenly spaced
+        const itemHeight = (height - margin.top - margin.bottom) / sumsData.length;
+        const barHeight = itemHeight * 0.6;
 
-            // Axes Drawing
-            ctx.beginPath();
-            // Y Axis line
-            ctx.moveTo(margin.left, margin.top);
-            ctx.lineTo(margin.left, height - margin.bottom);
-            // X Axis line
-            ctx.moveTo(margin.left, height - margin.bottom);
-            ctx.lineTo(width - margin.right, height - margin.bottom);
-            ctx.stroke();
+        // X axis is value
+        const xScale = (val) => margin.left + (val / maxVal) * (width - margin.left - margin.right);
 
-            // Title
-            ctx.textAlign = 'center';
-            ctx.font = `${20 * scale}px 'EB Garamond', Georgia, serif`;
-            ctx.fillText(t('Total Occurrences per Query'), width/2, 40 * scale);
+        // Axes Drawing
+        ctx.beginPath();
+        // Y Axis line
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, height - margin.bottom);
+        // X Axis line
+        ctx.moveTo(margin.left, height - margin.bottom);
+        ctx.lineTo(width - margin.right, height - margin.bottom);
+        ctx.stroke();
 
-                    // X Axis Label
-                    ctx.font = `${24 * scale}px 'EB Garamond', Georgia, serif`;
-                    ctx.fillText(t('Total Occurrences'), width/2, height - 25 * scale);
-            // Bars and Labels
-            sumsData.forEach((d, i) => {
-                const y = margin.top + i * itemHeight + itemHeight/2;
-                const barWidth = xScale(d.total) - margin.left;
-                
-                ctx.fillStyle = palette[i % palette.length];
-                ctx.fillRect(margin.left, y - barHeight/2, barWidth, barHeight);
-                
-                // Y Label (Word)
-                ctx.fillStyle = 'black';
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'middle';
-                ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
-                ctx.fillText(d.word, margin.left - 10 * scale, y);
-                
-                // Value Label
-                ctx.textAlign = 'left';
-                ctx.fillText(d.total.toLocaleString(), margin.left + barWidth + 5 * scale, y);
-            });
+        // Title
+        ctx.textAlign = 'center';
+        ctx.font = `${20 * scale}px 'EB Garamond', Georgia, serif`;
+        ctx.fillText(t('Total Occurrences per Query'), width / 2, 40 * scale);
 
-        } else {
-            // Line, Area, Bar
-            const effectiveIsRescaled = advancedOptions.rescale && plotType === 'line';
+        // X Axis Label
+        ctx.font = `${24 * scale}px 'EB Garamond', Georgia, serif`;
+        ctx.fillText(t('Total Occurrences'), width / 2, height - 25 * scale);
+        // Bars and Labels
+        sumsData.forEach((d, i) => {
+          const y = margin.top + i * itemHeight + itemHeight / 2;
+          const barWidth = xScale(d.total) - margin.left;
 
-            const processTrace = (trace) => {
-                let y = trace.y;
-                if (effectiveIsRescaled) {
-                    y = zscore(y);
-                } else if (plotType !== 'bar') {
-                     y = y.map(v => v !== null && v !== undefined ? v * 1000 : v);
-                }
-                return { ...trace, y };
-            };
+          ctx.fillStyle = palette[i % palette.length];
+          ctx.fillRect(margin.left, y - barHeight / 2, barWidth, barHeight);
 
-            let tracesToDraw = plotData.map(processTrace);
-            let rawTracesToDraw = rawPlotData.map(processTrace);
+          // Y Label (Word)
+          ctx.fillStyle = 'black';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+          ctx.fillText(d.word, margin.left - 10 * scale, y);
 
-            // Determine Ranges
-            let allX = [];
-            let allY = [];
-            tracesToDraw.forEach(t => {
-                allX.push(...t.x);
-                allY.push(...t.y);
-            });
-            if (smoothing > 0 && (plotType === 'line' || plotType === 'area')) {
-                 rawTracesToDraw.forEach(t => {
-                    allY.push(...t.y);
-                });
-            }
-            allY = allY.filter(y => y !== null && y !== undefined);
+          // Value Label
+          ctx.textAlign = 'left';
+          ctx.fillText(d.total.toLocaleString(), margin.left + barWidth + 5 * scale, y);
+        });
 
-            const dates = allX.map(d => new Date(d).getTime());
-            const minDate = Math.min(...dates);
-            const maxDate = Math.max(...dates);
-            const dataMin = Math.min(...allY);
-            const dataMax = Math.max(...allY);
+      } else {
+        // Line, Area, Bar
+        const effectiveIsRescaled = advancedOptions.rescale && plotType === 'line';
 
-            // Padding
-            const range = dataMax - dataMin;
-            const padding = range === 0 ? (dataMax === 0 ? 1 : Math.abs(dataMax) * 0.05) : range * 0.05;
-            // Clamp min to 0 unless z-score
-            const paddedMin = effectiveIsRescaled ? dataMin - padding : Math.max(0, dataMin - padding);
-            const paddedMax = dataMax + padding;
+        const processTrace = (trace) => {
+          let y = trace.y;
+          if (effectiveIsRescaled) {
+            y = zscore(y);
+          } else if (plotType !== 'bar') {
+            y = y.map(v => v !== null && v !== undefined ? v * 1000 : v);
+          }
+          return { ...trace, y };
+        };
 
-            // Nice Ticks
-            const targetTicks = 6;
-            const roughStep = (paddedMax - paddedMin) / (targetTicks - 1);
-            const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-            const normalizedStep = roughStep / magnitude;
-            let tickStep;
-            if (normalizedStep <= 1) tickStep = 1 * magnitude;
-            else if (normalizedStep <= 2) tickStep = 2 * magnitude;
-            else if (normalizedStep <= 5) tickStep = 5 * magnitude;
-            else tickStep = 10 * magnitude;
+        let tracesToDraw = plotData.map(processTrace);
+        let rawTracesToDraw = rawPlotData.map(processTrace);
 
-            const minValue = Math.floor(paddedMin / tickStep) * tickStep;
-            const maxValue = Math.ceil(paddedMax / tickStep) * tickStep;
+        // Determine Ranges
+        let allX = [];
+        let allY = [];
+        tracesToDraw.forEach(t => {
+          allX.push(...t.x);
+          allY.push(...t.y);
+        });
+        if (smoothing > 0 && (plotType === 'line' || plotType === 'area')) {
+          rawTracesToDraw.forEach(t => {
+            allY.push(...t.y);
+          });
+        }
+        allY = allY.filter(y => y !== null && y !== undefined);
 
-            // Calculate max tick width to adjust margin dynamically
-            ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
-            let maxTickWidth = 0;
-            for (let val = minValue; val <= maxValue + tickStep/10; val += tickStep) {
-                const label = parseFloat(val.toPrecision(10)).toString();
-                const metrics = ctx.measureText(label);
-                if (metrics.width > maxTickWidth) maxTickWidth = metrics.width;
-            }
-            // Ensure enough room for Y title (approx 40px * scale) and ticks
-            margin.left = Math.max(margin.left, maxTickWidth + 60 * scale);
+        const dates = allX.map(d => new Date(d).getTime());
+        const minDate = Math.min(...dates);
+        const maxDate = Math.max(...dates);
+        const dataMin = Math.min(...allY);
+        const dataMax = Math.max(...allY);
 
-            // Scales
-            const xScale = (date) => {
-                const t = new Date(date).getTime();
-                return margin.left + (t - minDate) / (maxDate - minDate) * (width - margin.left - margin.right);
-            };
-            const yScale = (val) => {
-                return height - margin.bottom - (val - minValue) / (maxValue - minValue) * (height - margin.top - margin.bottom);
-            };
+        // Padding
+        const range = dataMax - dataMin;
+        const padding = range === 0 ? (dataMax === 0 ? 1 : Math.abs(dataMax) * 0.05) : range * 0.05;
+        // Clamp min to 0 unless z-score
+        const paddedMin = effectiveIsRescaled ? dataMin - padding : Math.max(0, dataMin - padding);
+        const paddedMax = dataMax + padding;
 
-            // Axes
-            ctx.beginPath();
-            ctx.moveTo(margin.left, height - margin.bottom);
-            ctx.lineTo(width - margin.right, height - margin.bottom);
-            ctx.moveTo(margin.left, height - margin.bottom);
-            ctx.lineTo(margin.left, margin.top);
-            ctx.stroke();
+        // Nice Ticks
+        const targetTicks = 6;
+        const roughStep = (paddedMax - paddedMin) / (targetTicks - 1);
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+        const normalizedStep = roughStep / magnitude;
+        let tickStep;
+        if (normalizedStep <= 1) tickStep = 1 * magnitude;
+        else if (normalizedStep <= 2) tickStep = 2 * magnitude;
+        else if (normalizedStep <= 5) tickStep = 5 * magnitude;
+        else tickStep = 10 * magnitude;
 
-            // X Ticks
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
-            const yearSpan = (maxDate - minDate) / (1000 * 60 * 60 * 24 * 365.25);
-            const tickInterval = yearSpan > 100 ? 20 : (yearSpan > 50 ? 10 : 5);
-            const startYear = new Date(minDate).getFullYear();
-            const endYear = new Date(maxDate).getFullYear();
-            for (let y = Math.ceil(startYear / tickInterval) * tickInterval; y <= endYear; y += tickInterval) {
-                const date = new Date(y, 0, 1);
-                const x = xScale(date);
-                ctx.beginPath();
-                ctx.moveTo(x, height - margin.bottom);
-                ctx.lineTo(x, height - margin.bottom + 5 * scale);
-                ctx.stroke();
-                ctx.fillText(y.toString(), x, height - margin.bottom + 10 * scale);
-            }
+        const minValue = Math.floor(paddedMin / tickStep) * tickStep;
+        const maxValue = Math.ceil(paddedMax / tickStep) * tickStep;
 
-            // Y Ticks
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            for (let val = minValue; val <= maxValue + tickStep/10; val += tickStep) {
-                const y = yScale(val);
-                if (y >= margin.top && y <= height - margin.bottom) {
-                    ctx.beginPath();
-                    ctx.moveTo(margin.left, y);
-                    ctx.lineTo(margin.left - 5 * scale, y);
-                    ctx.stroke();
-                    const label = parseFloat(val.toPrecision(10)).toString(); 
-                    ctx.fillText(label, margin.left - 10 * scale, y);
-                }
-            }
+        // Calculate max tick width to adjust margin dynamically
+        ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+        let maxTickWidth = 0;
+        for (let val = minValue; val <= maxValue + tickStep / 10; val += tickStep) {
+          const label = parseFloat(val.toPrecision(10)).toString();
+          const metrics = ctx.measureText(label);
+          if (metrics.width > maxTickWidth) maxTickWidth = metrics.width;
+        }
+        // Ensure enough room for Y title (approx 40px * scale) and ticks
+        margin.left = Math.max(margin.left, maxTickWidth + 60 * scale);
 
-                    // Labels
-                    ctx.textAlign = 'center';
-                    ctx.font = `${24 * scale}px 'EB Garamond', Georgia, serif`;
-                    ctx.fillText(t('Date'), margin.left + (width - margin.left - margin.right) / 2, height - margin.bottom + 50 * scale);
-            
-                    ctx.save();
-                    // Place Y title relative to margin.left to avoid overlap
-                    ctx.translate(margin.left - maxTickWidth - 40 * scale, margin.top + (height - margin.top - margin.bottom) / 2);
-                    ctx.rotate(-Math.PI / 2);
-                    let yTitle;
-                    if (effectiveIsRescaled) {
-                         yTitle = t('Z-score');
-                    } else if (plotType === 'bar') {
-                         yTitle = t('Frequency in the corpus');
-                    } else {
-                         yTitle = t('Frequency in the corpus (‰)');
-                    }
-                    ctx.fillText(yTitle, 0, 0);
-                    ctx.restore();
-            // Drawing Data
-            tracesToDraw.forEach((trace, i) => {
-                const color = palette[i % palette.length];
-                ctx.fillStyle = color;
-                ctx.strokeStyle = color;
+        // Scales
+        const xScale = (date) => {
+          const t = new Date(date).getTime();
+          return margin.left + (t - minDate) / (maxDate - minDate) * (width - margin.left - margin.right);
+        };
+        const yScale = (val) => {
+          return height - margin.bottom - (val - minValue) / (maxValue - minValue) * (height - margin.top - margin.bottom);
+        };
 
-                if (plotType === 'bar') {
-                    const barWidth = (width - margin.left - margin.right) / trace.x.length * 0.8;
-                    trace.y.forEach((yVal, idx) => {
-                        if (yVal !== null && yVal !== undefined) {
-                            const x = xScale(trace.x[idx]);
-                            const y = yScale(yVal);
-                            const h = height - margin.bottom - y;
-                            ctx.fillRect(x - barWidth/2, y, barWidth, h);
-                        }
-                    });
-                } else if (plotType === 'area') {
-                    ctx.globalAlpha = 0.5;
-                    ctx.beginPath();
-                    const points = [];
-                    trace.y.forEach((yVal, idx) => {
-                        if (yVal !== null && yVal !== undefined) {
-                            points.push({x: xScale(trace.x[idx]), y: yScale(yVal)});
-                        }
-                    });
+        // Axes
+        ctx.beginPath();
+        ctx.moveTo(margin.left, height - margin.bottom);
+        ctx.lineTo(width - margin.right, height - margin.bottom);
+        ctx.moveTo(margin.left, height - margin.bottom);
+        ctx.lineTo(margin.left, margin.top);
+        ctx.stroke();
 
-                    if (points.length > 0) {
-                         ctx.moveTo(points[0].x, height - margin.bottom);
-                         ctx.lineTo(points[0].x, points[0].y);
-                         
-                         for (let j = 0; j < points.length - 1; j++) {
-                            const p0 = points[j > 0 ? j - 1 : j];
-                            const p1 = points[j];
-                            const p2 = points[j + 1];
-                            const p3 = points[j + 2 < points.length ? j + 2 : j + 1];
-
-                            const cp1x = p1.x + (p2.x - p0.x) / 6;
-                            let cp1y = p1.y + (p2.y - p0.y) / 6;
-                            const cp2x = p2.x - (p3.x - p1.x) / 6;
-                            let cp2y = p2.y - (p3.y - p1.y) / 6;
-
-                            const yBottom = height - margin.bottom;
-                            const yTop = margin.top;
-                            cp1y = Math.max(yTop, Math.min(yBottom, cp1y));
-                            cp2y = Math.max(yTop, Math.min(yBottom, cp2y));
-
-                            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-                         }
-                         
-                         ctx.lineTo(points[points.length-1].x, height - margin.bottom);
-                         ctx.closePath();
-                         ctx.fill();
-                         
-                         ctx.globalAlpha = 1.0;
-                         ctx.lineWidth = 2 * scale;
-                         ctx.stroke();
-                    }
-
-                } else { 
-                    if (smoothing > 0) {
-                         const rawTrace = rawTracesToDraw[i];
-                         rawTrace.y.forEach((yVal, idx) => {
-                             if (yVal !== null && yVal !== undefined) {
-                                 const cx = xScale(rawTrace.x[idx]);
-                                 const cy = yScale(yVal);
-                                 ctx.beginPath();
-                                 ctx.arc(cx, cy, 3 * scale, 0, 2*Math.PI);
-                                 ctx.fill();
-                             }
-                         });
-                    }
-                    
-                    ctx.lineWidth = 3 * scale;
-                    ctx.beginPath();
-                    const points = [];
-                    trace.y.forEach((yVal, idx) => {
-                        if (yVal !== null && yVal !== undefined) {
-                            points.push({x: xScale(trace.x[idx]), y: yScale(yVal)});
-                        }
-                    });
-                    
-                    if (points.length > 0) {
-                        ctx.moveTo(points[0].x, points[0].y);
-                        for (let j = 0; j < points.length - 1; j++) {
-                            const p0 = points[j > 0 ? j - 1 : j];
-                            const p1 = points[j];
-                            const p2 = points[j + 1];
-                            const p3 = points[j + 2 < points.length ? j + 2 : j + 1];
-                            const cp1x = p1.x + (p2.x - p0.x) / 6;
-                            let cp1y = p1.y + (p2.y - p0.y) / 6;
-                            const cp2x = p2.x - (p3.x - p1.x) / 6;
-                            let cp2y = p2.y - (p3.y - p1.y) / 6;
-                            const yBottom = height - margin.bottom;
-                            const yTop = margin.top;
-                            cp1y = Math.max(yTop, Math.min(yBottom, cp1y));
-                            cp2y = Math.max(yTop, Math.min(yBottom, cp2y));
-                            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-                        }
-                    }
-                    ctx.stroke();
-                }
-            });
-
-            // Legend
-            if (tracesToDraw.length > 1) {
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'middle';
-                ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
-                let legendX = margin.left;
-                const legendY = height - 30 * scale;
-                tracesToDraw.forEach((trace, i) => {
-                     const color = palette[i % palette.length];
-                     ctx.fillStyle = color;
-                     ctx.fillRect(legendX, legendY - 5 * scale, 20 * scale, 10 * scale);
-                     ctx.fillStyle = 'black';
-                     ctx.fillText(trace.name, legendX + 25 * scale, legendY);
-                     legendX += ctx.measureText(trace.name).width + 50 * scale;
-                });
-            }
+        // X Ticks
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+        const yearSpan = (maxDate - minDate) / (1000 * 60 * 60 * 24 * 365.25);
+        const tickInterval = yearSpan > 100 ? 20 : (yearSpan > 50 ? 10 : 5);
+        const startYear = new Date(minDate).getFullYear();
+        const endYear = new Date(maxDate).getFullYear();
+        for (let y = Math.ceil(startYear / tickInterval) * tickInterval; y <= endYear; y += tickInterval) {
+          const date = new Date(y, 0, 1);
+          const x = xScale(date);
+          ctx.beginPath();
+          ctx.moveTo(x, height - margin.bottom);
+          ctx.lineTo(x, height - margin.bottom + 5 * scale);
+          ctx.stroke();
+          ctx.fillText(y.toString(), x, height - margin.bottom + 10 * scale);
         }
 
-        const link = document.createElement('a');
-        link.download = 'gallicagram_plot.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        // Y Ticks
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (let val = minValue; val <= maxValue + tickStep / 10; val += tickStep) {
+          const y = yScale(val);
+          if (y >= margin.top && y <= height - margin.bottom) {
+            ctx.beginPath();
+            ctx.moveTo(margin.left, y);
+            ctx.lineTo(margin.left - 5 * scale, y);
+            ctx.stroke();
+            const label = parseFloat(val.toPrecision(10)).toString();
+            ctx.fillText(label, margin.left - 10 * scale, y);
+          }
+        }
+
+        // Labels
+        ctx.textAlign = 'center';
+        ctx.font = `${24 * scale}px 'EB Garamond', Georgia, serif`;
+        ctx.fillText(t('Date'), margin.left + (width - margin.left - margin.right) / 2, height - margin.bottom + 50 * scale);
+
+        ctx.save();
+        // Place Y title relative to margin.left to avoid overlap
+        ctx.translate(margin.left - maxTickWidth - 40 * scale, margin.top + (height - margin.top - margin.bottom) / 2);
+        ctx.rotate(-Math.PI / 2);
+        let yTitle;
+        if (effectiveIsRescaled) {
+          yTitle = t('Z-score');
+        } else if (plotType === 'bar') {
+          yTitle = t('Frequency in the corpus');
+        } else {
+          yTitle = t('Frequency in the corpus (‰)');
+        }
+        ctx.fillText(yTitle, 0, 0);
+        ctx.restore();
+        // Drawing Data
+        tracesToDraw.forEach((trace, i) => {
+          const color = palette[i % palette.length];
+          ctx.fillStyle = color;
+          ctx.strokeStyle = color;
+
+          if (plotType === 'bar') {
+            const barWidth = (width - margin.left - margin.right) / trace.x.length * 0.8;
+            trace.y.forEach((yVal, idx) => {
+              if (yVal !== null && yVal !== undefined) {
+                const x = xScale(trace.x[idx]);
+                const y = yScale(yVal);
+                const h = height - margin.bottom - y;
+                ctx.fillRect(x - barWidth / 2, y, barWidth, h);
+              }
+            });
+          } else if (plotType === 'area') {
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            const points = [];
+            trace.y.forEach((yVal, idx) => {
+              if (yVal !== null && yVal !== undefined) {
+                points.push({ x: xScale(trace.x[idx]), y: yScale(yVal) });
+              }
+            });
+
+            if (points.length > 0) {
+              ctx.moveTo(points[0].x, height - margin.bottom);
+              ctx.lineTo(points[0].x, points[0].y);
+
+              for (let j = 0; j < points.length - 1; j++) {
+                const p0 = points[j > 0 ? j - 1 : j];
+                const p1 = points[j];
+                const p2 = points[j + 1];
+                const p3 = points[j + 2 < points.length ? j + 2 : j + 1];
+
+                const cp1x = p1.x + (p2.x - p0.x) / 6;
+                let cp1y = p1.y + (p2.y - p0.y) / 6;
+                const cp2x = p2.x - (p3.x - p1.x) / 6;
+                let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+                const yBottom = height - margin.bottom;
+                const yTop = margin.top;
+                cp1y = Math.max(yTop, Math.min(yBottom, cp1y));
+                cp2y = Math.max(yTop, Math.min(yBottom, cp2y));
+
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+              }
+
+              ctx.lineTo(points[points.length - 1].x, height - margin.bottom);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.globalAlpha = 1.0;
+              ctx.lineWidth = 2 * scale;
+              ctx.stroke();
+            }
+
+          } else {
+            if (smoothing > 0) {
+              const rawTrace = rawTracesToDraw[i];
+              rawTrace.y.forEach((yVal, idx) => {
+                if (yVal !== null && yVal !== undefined) {
+                  const cx = xScale(rawTrace.x[idx]);
+                  const cy = yScale(yVal);
+                  ctx.beginPath();
+                  ctx.arc(cx, cy, 3 * scale, 0, 2 * Math.PI);
+                  ctx.fill();
+                }
+              });
+            }
+
+            ctx.lineWidth = 3 * scale;
+            ctx.beginPath();
+            const points = [];
+            trace.y.forEach((yVal, idx) => {
+              if (yVal !== null && yVal !== undefined) {
+                points.push({ x: xScale(trace.x[idx]), y: yScale(yVal) });
+              }
+            });
+
+            if (points.length > 0) {
+              ctx.moveTo(points[0].x, points[0].y);
+              for (let j = 0; j < points.length - 1; j++) {
+                const p0 = points[j > 0 ? j - 1 : j];
+                const p1 = points[j];
+                const p2 = points[j + 1];
+                const p3 = points[j + 2 < points.length ? j + 2 : j + 1];
+                const cp1x = p1.x + (p2.x - p0.x) / 6;
+                let cp1y = p1.y + (p2.y - p0.y) / 6;
+                const cp2x = p2.x - (p3.x - p1.x) / 6;
+                let cp2y = p2.y - (p3.y - p1.y) / 6;
+                const yBottom = height - margin.bottom;
+                const yTop = margin.top;
+                cp1y = Math.max(yTop, Math.min(yBottom, cp1y));
+                cp2y = Math.max(yTop, Math.min(yBottom, cp2y));
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+              }
+            }
+            ctx.stroke();
+          }
+        });
+
+        // Legend
+        if (tracesToDraw.length > 1) {
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+          let legendX = margin.left;
+          const legendY = height - 30 * scale;
+          tracesToDraw.forEach((trace, i) => {
+            const color = palette[i % palette.length];
+            ctx.fillStyle = color;
+            ctx.fillRect(legendX, legendY - 5 * scale, 20 * scale, 10 * scale);
+            ctx.fillStyle = 'black';
+            ctx.fillText(trace.name, legendX + 25 * scale, legendY);
+            legendX += ctx.measureText(trace.name).width + 50 * scale;
+          });
+        }
+      }
+
+      const link = document.createElement('a');
+      link.download = 'gallicagram_plot.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
     });
   };
 
@@ -1338,198 +1513,198 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-    <div className="App">
-      <header className="App-header">
-        <img src="/logo.png" className="App-logo" alt="logo" />
-        <div className="header-links">
-          <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
-          <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
-          <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">{t('API')}</a>
-          <button style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem'}} onClick={() => changeLanguage('en')}>🇬🇧</button>
-          <button style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem'}} onClick={() => changeLanguage('fr')}>🇫🇷</button>
-        </div>
-      </header>
-      <div className="App-body">
-        <div className="form-container">
-          <TabsComponent
-            queries={queries}
-            activeQueryId={activeQueryId}
-            onTabClick={setActiveQueryId}
-            onAddTab={addQuery}
-            onRemoveTab={removeQuery}
-            isOnlyQuery={queries.length === 1}
-          />
-          {activeQuery && (
-            <>
-              <FormComponent
-                formData={activeQuery}
-                onFormChange={handleFormChange}
-                onPlot={handlePlot}
-                perseeData={perseeData}
-              />
-              <div className="form-group">
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                  <TextField
-                    name="startDate"
-                    label={t('Start Date')}
-                    type="number"
-                    value={startDate}
-                    onChange={handleDateInputChange}
-                    onKeyDown={handleKeyDown}
-                    inputProps={{ min: 1600, max: 2025 }}
-                  />
-                  <TextField
-                    name="endDate"
-                    label={t('End Date')}
-                    type="number"
-                    value={endDate}
-                    onChange={handleDateInputChange}
-                    onKeyDown={handleKeyDown}
-                    inputProps={{ min: 1600, max: 2025 }}
-                  />
-                </Box>
-                <Box sx={{ width: '100%' }}>
-                  <Slider
-                    getAriaLabel={() => t('Date range')}
-                    value={[startDate, endDate]}
-                    onChange={handleSliderChange}
-                    valueLabelDisplay="off"
-                    min={1600}
-                    max={2025}
-                  />
-                </Box>
-              </div>
-              <AdvancedOptionsComponent
-                advancedOptions={activeQuery.advancedOptions}
-                onAdvancedOptionsChange={handleAdvancedOptionsChange}
-              />
-            </>
-          )}
-          <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
-            {isLoading ? t('Loading...') : t('Plot')}
-          </Button>
-          {dateWarnings.length > 0 && (
-            <Box sx={{ marginTop: '1rem', width: '100%' }}>
-              {dateWarnings.map((warning, index) => (
-                <Alert key={index} severity="warning" sx={{ marginBottom: '0.5rem' }}>
-                  {warning.message}
-                </Alert>
-              ))}
-            </Box>
-          )}
-          {totalPlotOccurrences > 0 && (
-            <Typography variant="body1" style={{ marginTop: '1rem' }}>
-              {t('Total Occurrences:')} {totalPlotOccurrences.toLocaleString()}
-            </Typography>
-          )}
-        </div>
-        <div className="plot-container">
-          {error && <div className="error">{error}</div>}
-          <div className="plot-area">
-            <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-              {isLoading && (
-                  <div className="loading-overlay">
-                      <FingerprintSpinner color="#d32f2f" size={100} />
-                  </div>
-              )}
-              {plotType === 'sums' ? (
-                <SumsComponent data={sumsData} />
-              ) : plotType === 'wordcloud' ? (
-                <WordCloudComponent data={sumsData} />
-              ) : (
-                <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
-              )}
-            </div>
-            <div className="plot-controls">
-              <h3>{t('Plot controls')}</h3>
-              <div className="form-group">
-                <FormControl fullWidth>
-                  <InputLabel id="plot-type-select-label">{t('Visualization:')}</InputLabel>
-                  <Select
-                    labelId="plot-type-select-label"
-                    id="plot-type-select"
-                    value={plotType}
-                    label={t('Visualization:')}
-                    onChange={(e) => setPlotType(e.target.value)}
-                    sx={{ fontFamily: 'serif' }}
-                  >
-                    <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>
-                    <MenuItem value={"area"}>{t('Area Chart (Frequency)')}</MenuItem>
-                    <MenuItem value={"bar"}>{t('Bar Plot (Raw Count)')}</MenuItem>
-                    <MenuItem value={"sums"}>{t('Sums')}</MenuItem>
-                    <MenuItem value={"wordcloud"}>{t('Word Cloud')}</MenuItem>
-                  </Select>
-                </FormControl>
-              </div>
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ flexGrow: 1 }}>
-                  <Typography id="smoothing-slider" gutterBottom>
-                    {activeQuery?.advancedOptions?.loessSmoothing
-                      ? t('Smoothing (Loess Span):')
-                      : t('Smoothing (Moving Average):')}
-                  </Typography>
-                  <Slider
-                    value={smoothing}
-                    onChange={(e, newValue) => setSmoothing(newValue)}
-                    aria-labelledby="smoothing-slider"
-                    valueLabelDisplay="on"
-                    step={1}
-                    marks
-                    min={0}
-                    max={10}
-                    disabled={plotType !== 'line' && plotType !== 'area'}
-                    sx={{ width: '90%' }}
-                  />
-                </div>
-                <Tooltip
-                  title={
-                    <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
-                      <strong>{t('Smoothing Help')}</strong>
-                      <br />
-                      <br />
-                      {activeQuery?.advancedOptions?.loessSmoothing
-                        ? t('Loess Smoothing Help')
-                        : t('Moving Average Help')}
-                    </div>
-                  }
-                  arrow
-                  placement="right"
-                >
-                  <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
-                    <HelpOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </div>
-              <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || plotData.length === 0}>
-                {t('Download Plot')}
-              </Button>
-              <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
-                {t('Download CSV')}
-              </Button>
-            </div>
+      <div className="App">
+        <header className="App-header">
+          <img src="/logo.png" className="App-logo" alt="logo" />
+          <div className="header-links">
+            <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
+            <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
+            <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">{t('API')}</a>
+            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('en')}>🇬🇧</button>
+            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('fr')}>🇫🇷</button>
           </div>
-          {(selectedDate || occurrences.length > 0) && 
-            <div style={{ position: 'relative' }}>
-                {isContextLoading && (
-                    <div className="loading-overlay">
-                        <FingerprintSpinner color="#d32f2f" size={100} />
-                    </div>
-                )}
-                <ContextDisplay 
-                    records={occurrences} 
-                    totalRecords={totalOccurrences}
-                    onPageChange={handleContextPageChange}
-                    searchParams={contextSearchParams}
-                    isLoading={isContextLoading}
-                    corpus={(selectedQuery || activeQuery)?.corpus}
-                    corpusConfigs={corpusConfigs}
-                    resolution={(selectedQuery || activeQuery)?.resolution}
+        </header>
+        <div className="App-body">
+          <div className="form-container">
+            <TabsComponent
+              queries={queries}
+              activeQueryId={activeQueryId}
+              onTabClick={setActiveQueryId}
+              onAddTab={addQuery}
+              onRemoveTab={removeQuery}
+              isOnlyQuery={queries.length === 1}
+            />
+            {activeQuery && (
+              <>
+                <FormComponent
+                  formData={activeQuery}
+                  onFormChange={handleFormChange}
+                  onPlot={handlePlot}
+                  perseeData={perseeData}
                 />
+                <div className="form-group">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <TextField
+                      name="startDate"
+                      label={t('Start Date')}
+                      type="number"
+                      value={startDate}
+                      onChange={handleDateInputChange}
+                      onKeyDown={handleKeyDown}
+                      inputProps={{ min: 1600, max: 2025 }}
+                    />
+                    <TextField
+                      name="endDate"
+                      label={t('End Date')}
+                      type="number"
+                      value={endDate}
+                      onChange={handleDateInputChange}
+                      onKeyDown={handleKeyDown}
+                      inputProps={{ min: 1600, max: 2025 }}
+                    />
+                  </Box>
+                  <Box sx={{ width: '100%' }}>
+                    <Slider
+                      getAriaLabel={() => t('Date range')}
+                      value={[startDate, endDate]}
+                      onChange={handleSliderChange}
+                      valueLabelDisplay="off"
+                      min={1600}
+                      max={2025}
+                    />
+                  </Box>
+                </div>
+                <AdvancedOptionsComponent
+                  advancedOptions={activeQuery.advancedOptions}
+                  onAdvancedOptionsChange={handleAdvancedOptionsChange}
+                />
+              </>
+            )}
+            <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
+              {isLoading ? t('Loading...') : t('Plot')}
+            </Button>
+            {dateWarnings.length > 0 && (
+              <Box sx={{ marginTop: '1rem', width: '100%' }}>
+                {dateWarnings.map((warning, index) => (
+                  <Alert key={index} severity="warning" sx={{ marginBottom: '0.5rem' }}>
+                    {warning.message}
+                  </Alert>
+                ))}
+              </Box>
+            )}
+            {totalPlotOccurrences > 0 && (
+              <Typography variant="body1" style={{ marginTop: '1rem' }}>
+                {t('Total Occurrences:')} {totalPlotOccurrences.toLocaleString()}
+              </Typography>
+            )}
+          </div>
+          <div className="plot-container">
+            {error && <div className="error">{error}</div>}
+            <div className="plot-area">
+              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+                {isLoading && (
+                  <div className="loading-overlay">
+                    <FingerprintSpinner color="#d32f2f" size={100} />
+                  </div>
+                )}
+                {plotType === 'sums' ? (
+                  <SumsComponent data={sumsData} />
+                ) : plotType === 'wordcloud' ? (
+                  <WordCloudComponent data={sumsData} />
+                ) : (
+                  <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} />
+                )}
+              </div>
+              <div className="plot-controls">
+                <h3>{t('Plot controls')}</h3>
+                <div className="form-group">
+                  <FormControl fullWidth>
+                    <InputLabel id="plot-type-select-label">{t('Visualization:')}</InputLabel>
+                    <Select
+                      labelId="plot-type-select-label"
+                      id="plot-type-select"
+                      value={plotType}
+                      label={t('Visualization:')}
+                      onChange={(e) => setPlotType(e.target.value)}
+                      sx={{ fontFamily: 'serif' }}
+                    >
+                      <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>
+                      <MenuItem value={"area"}>{t('Area Chart (Frequency)')}</MenuItem>
+                      <MenuItem value={"bar"}>{t('Bar Plot (Raw Count)')}</MenuItem>
+                      <MenuItem value={"sums"}>{t('Sums')}</MenuItem>
+                      <MenuItem value={"wordcloud"}>{t('Word Cloud')}</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ flexGrow: 1 }}>
+                    <Typography id="smoothing-slider" gutterBottom>
+                      {activeQuery?.advancedOptions?.loessSmoothing
+                        ? t('Smoothing (Loess Span):')
+                        : t('Smoothing (Moving Average):')}
+                    </Typography>
+                    <Slider
+                      value={smoothing}
+                      onChange={(e, newValue) => setSmoothing(newValue)}
+                      aria-labelledby="smoothing-slider"
+                      valueLabelDisplay="on"
+                      step={1}
+                      marks
+                      min={0}
+                      max={10}
+                      disabled={plotType !== 'line' && plotType !== 'area'}
+                      sx={{ width: '90%' }}
+                    />
+                  </div>
+                  <Tooltip
+                    title={
+                      <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+                        <strong>{t('Smoothing Help')}</strong>
+                        <br />
+                        <br />
+                        {activeQuery?.advancedOptions?.loessSmoothing
+                          ? t('Loess Smoothing Help')
+                          : t('Moving Average Help')}
+                      </div>
+                    }
+                    arrow
+                    placement="right"
+                  >
+                    <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
+                      <HelpOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </div>
+                <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || plotData.length === 0}>
+                  {t('Download Plot')}
+                </Button>
+                <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
+                  {t('Download CSV')}
+                </Button>
+              </div>
             </div>
-          }
+            {(selectedDate || occurrences.length > 0) &&
+              <div style={{ position: 'relative' }}>
+                {isContextLoading && (
+                  <div className="loading-overlay">
+                    <FingerprintSpinner color="#d32f2f" size={100} />
+                  </div>
+                )}
+                <ContextDisplay
+                  records={occurrences}
+                  totalRecords={totalOccurrences}
+                  onPageChange={handleContextPageChange}
+                  searchParams={contextSearchParams}
+                  isLoading={isContextLoading}
+                  corpus={(selectedQuery || activeQuery)?.corpus}
+                  corpusConfigs={corpusConfigs}
+                  resolution={(selectedQuery || activeQuery)?.resolution}
+                />
+              </div>
+            }
+          </div>
         </div>
       </div>
-    </div>
     </ThemeProvider>
   );
 }

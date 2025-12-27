@@ -578,6 +578,12 @@ function App() {
     }
   };
 
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      handlePlot();
+    }
+  };
+
   const validateDatesAgainstCorpus = useCallback(() => {
     const currentActiveQuery = queries.find(q => q.id === activeQueryId);
     if (!currentActiveQuery || !corpusPeriods[currentActiveQuery.corpus]) {
@@ -661,11 +667,15 @@ function App() {
       fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
   }
 
-  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, revues) => {
+  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, revues, rubriques, byRubrique) => {
     let url;
     if (corpus === 'route à part (query_persee)') {
         const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
         url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ')}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
+    } else if (corpus === 'lemonde_rubriques') {
+        const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
+        const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
+        url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}${rubriqueParam}${byRubriqueParam}`;
     } else {
         url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
     }
@@ -730,9 +740,9 @@ function App() {
 
   const fetchDataForQuery = (query, globalStartDate, globalEndDate) => {
     return new Promise((resolve, reject) => {
-      const { word, corpus, resolution } = query;
+      const { word, corpus, resolution, revues, rubriques, byRubrique } = query;
       if (!word) {
-        resolve({ data: [], query: { ...query, startDate: globalStartDate, endDate: globalEndDate } });
+        resolve([{ data: [], query: { ...query, startDate: globalStartDate, endDate: globalEndDate } }]);
         return;
       }
 
@@ -742,7 +752,7 @@ function App() {
       if (corpus === 'google') {
         fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, globalStartDate, globalEndDate));
       } else {
-        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, query.revues));
+        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, revues, rubriques, byRubrique));
       }
 
       Promise.all(fetchPromises)
@@ -750,7 +760,7 @@ function App() {
           const queryWithDates = { ...query, startDate: globalStartDate, endDate: globalEndDate };
           if (corpus === 'google') {
             if (results.length === 1) {
-              resolve({ data: results, query: queryWithDates });
+              resolve([{ data: results, query: queryWithDates }]);
               return;
             }
             const combinedNgram = results.map(r => r.ngram).join(' + ');
@@ -776,35 +786,75 @@ function App() {
               timeseries: combinedTimeseries,
               type: "ABS"
             }];
-            resolve({ data: combinedData, query: queryWithDates });
+            resolve([{ data: combinedData, query: queryWithDates }]);
           } else {
-            const combinedData = {};
-            results.forEach(data => {
-              data.forEach(row => {
-                const year = row.date || row.annee || row.year;
-                if (!year) return;
+            if (corpus === 'lemonde_rubriques' && byRubrique) {
+                // Flatten results from multiple words (if any) and group by rubrique
+                const allRows = results.flat();
+                const grouped = {};
+                allRows.forEach(row => {
+                    const rub = row.rubrique || 'Unknown';
+                    if (!grouped[rub]) grouped[rub] = [];
+                    grouped[rub].push(row);
+                });
 
-                let dateKey;
-                if (resolution === 'annee') {
-                  dateKey = `${year}`;
-                } else if (resolution === 'mois') {
-                  dateKey = `${year}-${row.mois || 1}`;
-                } else { // jour
-                  dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
-                }
+                const rubriqueResponses = Object.entries(grouped).map(([rub, rows]) => {
+                    const combinedData = {};
+                    rows.forEach(row => {
+                        const year = row.date || row.annee || row.year;
+                        if (!year) return;
 
-                if (!combinedData[dateKey]) {
-                  combinedData[dateKey] = { ...row, n: 0, total: 0 };
-                }
-                combinedData[dateKey].n += row.n || 0;
-                if (combinedData[dateKey].total === 0) {
-                  combinedData[dateKey].total = row.total || 0;
-                }
-              });
-            });
-            const dataValues = Object.values(combinedData);
-            const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
-            resolve({ data: dataValues, query: queryWithDates, total });
+                        let dateKey;
+                        if (resolution === 'annee') {
+                          dateKey = `${year}`;
+                        } else if (resolution === 'mois') {
+                          dateKey = `${year}-${row.mois || 1}`;
+                        } else { // jour
+                          dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
+                        }
+
+                        if (!combinedData[dateKey]) {
+                          combinedData[dateKey] = { ...row, n: 0, total: 0 };
+                        }
+                        combinedData[dateKey].n += row.n || 0;
+                        if (combinedData[dateKey].total === 0) {
+                          combinedData[dateKey].total = row.total || 0;
+                        }
+                    });
+                    const dataValues = Object.values(combinedData);
+                    const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
+                    return { data: dataValues, query: { ...queryWithDates, word: `${word} - ${rub}` }, total };
+                });
+                resolve(rubriqueResponses);
+            } else {
+                const combinedData = {};
+                results.forEach(data => {
+                  data.forEach(row => {
+                    const year = row.date || row.annee || row.year;
+                    if (!year) return;
+
+                    let dateKey;
+                    if (resolution === 'annee') {
+                      dateKey = `${year}`;
+                    } else if (resolution === 'mois') {
+                      dateKey = `${year}-${row.mois || 1}`;
+                    } else { // jour
+                      dateKey = `${year}-${row.mois || 1}-${row.jour || 1}`;
+                    }
+
+                    if (!combinedData[dateKey]) {
+                      combinedData[dateKey] = { ...row, n: 0, total: 0 };
+                    }
+                    combinedData[dateKey].n += row.n || 0;
+                    if (combinedData[dateKey].total === 0) {
+                      combinedData[dateKey].total = row.total || 0;
+                    }
+                  });
+                });
+                const dataValues = Object.values(combinedData);
+                const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
+                resolve([{ data: dataValues, query: queryWithDates, total }]);
+            }
           }
         })
         .catch(error => reject(error));
@@ -837,8 +887,9 @@ function App() {
 
     Promise.all(promises)
       .then(responses => {
-        setApiResponses(responses);
-        const total = responses.reduce((acc, res) => acc + (res.total || 0), 0);
+        const flatResponses = responses.flat();
+        setApiResponses(flatResponses);
+        const total = flatResponses.reduce((acc, res) => acc + (res.total || 0), 0);
         setTotalPlotOccurrences(total);
       })
       .catch(err => {
@@ -1309,6 +1360,7 @@ function App() {
                     type="number"
                     value={startDate}
                     onChange={handleDateInputChange}
+                    onKeyDown={handleKeyDown}
                     inputProps={{ min: 1600, max: 2025 }}
                   />
                   <TextField
@@ -1317,6 +1369,7 @@ function App() {
                     type="number"
                     value={endDate}
                     onChange={handleDateInputChange}
+                    onKeyDown={handleKeyDown}
                     inputProps={{ min: 1600, max: 2025 }}
                   />
                 </Box>

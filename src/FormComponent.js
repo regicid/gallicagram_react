@@ -13,7 +13,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   const { t } = useTranslation();
-  const { word, corpus, resolution, revues } = formData;
+  const { word, corpus, resolution, revues, rubriques, byRubrique } = formData;
   const [corpora, setCorpora] = useState([]);
   const [selectedDisciplines, setSelectedDisciplines] = useState([]);
   const [disciplineSearch, setDisciplineSearch] = useState('');
@@ -102,6 +102,10 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
       onFormChange({ ...formData, revues: event.target.value });
   };
 
+  const handleRubriqueChange = (event) => {
+    onFormChange({ ...formData, rubriques: event.target.value });
+  };
+
   const handleSelectAllDisciplines = (e) => {
       e.stopPropagation();
       setSelectedDisciplines(allDisciplines);
@@ -133,11 +137,35 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   const selectedCorpus = corpora.find(c => c.value === corpus);
   const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
 
+  const helpTooltipContent = (
+    <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+      <strong>{t('Query Syntax:')}</strong>
+      <br />
+      <br />
+      <strong>&:</strong> {t('Use & to plot multiple words as separate lines')}
+      <br />
+      <em>{t('Example:')} liberté&égalité</em>
+      <br />
+      <br />
+      <strong>+:</strong> {t('Use + to combine multiple words into one line')}
+      <br />
+      <em>{t('Example:')} liberté+égalité</em>
+      <br />
+      <br />
+      <strong>+ {t('button:')}</strong> {t('Add a new tab to compare different corpora or resolutions')}
+    </div>
+  );
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
         <label style={{ marginRight: '1rem' }}>{t('Word:')}</label>
         <input type="text" name="word" value={word} onChange={handleChange} required />
+        <Tooltip title={helpTooltipContent} arrow placement="right">
+          <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
+            <HelpOutlineIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </div>
       <div className="form-group" style={{ marginBottom: '1rem' }}>
         <FormControl fullWidth>
@@ -157,6 +185,38 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
           </Select>
         </FormControl>
       </div>
+
+      {corpus === 'lemonde_rubriques' && (
+        <FormControl fullWidth style={{ marginBottom: '1rem' }}>
+          <InputLabel id="rubriques-label">{t('Rubriques')}</InputLabel>
+          <Select
+            labelId="rubriques-label"
+            multiple
+            value={rubriques || []}
+            onChange={handleRubriqueChange}
+            input={<OutlinedInput label={t('Rubriques')} />}
+            renderValue={(selected) => selected.join(', ')}
+          >
+            {['politique', 'international', 'société', 'économie', 'culture', 'sport', 'science/technologie', 'inclassable'].map((name) => (
+              <MenuItem key={name} value={name}>
+                <Checkbox checked={(rubriques || []).indexOf(name) > -1} />
+                <ListItemText primary={name} />
+              </MenuItem>
+            ))}
+          </Select>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={!!byRubrique}
+                onChange={(e) => onFormChange({ ...formData, byRubrique: e.target.checked })}
+                name="byRubrique"
+              />
+            }
+            label={t('By rubrique')}
+            style={{ marginTop: '0.5rem' }}
+          />
+        </FormControl>
+      )}
 
       {corpus === 'route à part (query_persee)' && (
         <>

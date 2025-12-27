@@ -14,7 +14,7 @@ module.exports = function(app) {
       target: 'https://www.lemonde.fr',
       changeOrigin: true,
       pathRewrite: {
-        '^/api/lemonde': '/recherche',
+        '^/': '/recherche/',
       },
     })
   );
@@ -24,7 +24,7 @@ module.exports = function(app) {
       target: 'https://www.persee.fr',
       changeOrigin: true,
       pathRewrite: {
-        '^/api/persee': '/search',
+        '^/': '/search',
       },
     })
   );

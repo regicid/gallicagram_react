@@ -71,7 +71,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
         }
       }}
       useResizeHandler={true}
-      style={{ width: '100%', height: '100%', minHeight: '600px' }}
+      className="plot-component"
+      style={{ width: '100%', height: '100%' }}
       onClick={onPointClick}
     />
   );

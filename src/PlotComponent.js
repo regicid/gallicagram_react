@@ -53,6 +53,10 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
 
   const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? t('Z-score') : t('Frequency in the corpus');
 
+  const isTouchScreen = (('ontouchstart' in window) ||
+    (navigator.maxTouchPoints > 0) ||
+    (navigator.msMaxTouchPoints > 0));
+
   return (
     <Plot
       data={plotData}
@@ -62,13 +66,20 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType }) => {
         font: {
           family: 'EB Garamond, Georgia, serif'
         },
+        dragmode: isTouchScreen ? false : 'zoom',
         xaxis: {
-          title: t('Date')
+          title: t('Date'),
+          fixedrange: isTouchScreen
         },
         yaxis: {
           title: yAxisTitle,
-          rangemode: plotType === 'area' ? 'tozero' : 'normal'
+          rangemode: plotType === 'area' ? 'tozero' : 'normal',
+          fixedrange: isTouchScreen
         }
+      }}
+      config={{
+        displayModeBar: !isTouchScreen,
+        scrollZoom: false
       }}
       useResizeHandler={true}
       className="plot-component"

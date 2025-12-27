@@ -13,6 +13,7 @@ import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Aler
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
+import { FingerprintSpinner } from 'react-epic-spinners';
 
 const theme = createTheme({
   typography: {
@@ -373,6 +374,8 @@ function App() {
     return {
       x: processedData.map(d => d.x),
       y: yValues,
+      n: processedData.map(d => d.data ? d.data.n : null),
+      total: processedData.map(d => d.data ? d.data.total : null),
       type: plotType === 'line' || plotType === 'area' ? 'scatter' : 'bar',
       mode: plotType === 'line' || plotType === 'area'
         ? (processedData.length > 20 ? 'lines' : 'lines+markers')
@@ -1290,11 +1293,23 @@ function App() {
       return;
     }
 
-    const headers = ['date', ...plotData.map(trace => trace.name)];
+    const headers = ['date'];
+    plotData.forEach(trace => {
+      headers.push(trace.name);
+      if (trace.n && trace.total) {
+        headers.push(`${trace.name} (n)`);
+        headers.push(`${trace.name} (total)`);
+      }
+    });
+
     const rows = plotData[0].x.map((date, i) => {
       const row = { date: date.toISOString().split('T')[0] };
       plotData.forEach(trace => {
         row[trace.name] = trace.y[i];
+        if (trace.n && trace.total) {
+          row[`${trace.name} (n)`] = trace.n[i];
+          row[`${trace.name} (total)`] = trace.total[i];
+        }
       });
       return row;
     });
@@ -1411,7 +1426,12 @@ function App() {
         <div className="plot-container">
           {error && <div className="error">{error}</div>}
           <div className="plot-area">
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+              {isLoading && (
+                  <div className="loading-overlay">
+                      <FingerprintSpinner color="#d32f2f" size={100} />
+                  </div>
+              )}
               {plotType === 'sums' ? (
                 <SumsComponent data={sumsData} />
               ) : plotType === 'wordcloud' ? (
@@ -1489,16 +1509,23 @@ function App() {
             </div>
           </div>
           {(selectedDate || occurrences.length > 0) && 
-            <ContextDisplay 
-                records={occurrences} 
-                totalRecords={totalOccurrences}
-                onPageChange={handleContextPageChange}
-                searchParams={contextSearchParams}
-                isLoading={isContextLoading}
-                corpus={(selectedQuery || activeQuery)?.corpus}
-                corpusConfigs={corpusConfigs}
-                resolution={(selectedQuery || activeQuery)?.resolution}
-            />
+            <div style={{ position: 'relative' }}>
+                {isContextLoading && (
+                    <div className="loading-overlay">
+                        <FingerprintSpinner color="#d32f2f" size={100} />
+                    </div>
+                )}
+                <ContextDisplay 
+                    records={occurrences} 
+                    totalRecords={totalOccurrences}
+                    onPageChange={handleContextPageChange}
+                    searchParams={contextSearchParams}
+                    isLoading={isContextLoading}
+                    corpus={(selectedQuery || activeQuery)?.corpus}
+                    corpusConfigs={corpusConfigs}
+                    resolution={(selectedQuery || activeQuery)?.resolution}
+                />
+            </div>
           }
         </div>
       </div>

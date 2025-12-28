@@ -8,7 +8,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import { useTranslation } from 'react-i18next';
-import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
@@ -145,17 +145,29 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   const isGallicaCorpus = selectedCorpus && selectedCorpus.contextFilter;
   const isJokerCompatible = ['presse', 'livres', 'lemonde', 'lemonde_rubriques'].includes(corpus); // Added 'lemonde' as per instruction 10
 
-  // Available search modes
+  // Available search modes with descriptions
   const searchModes = [
-    { value: 'ngram', label: 'By ngram' },
+    { value: 'ngram', label: 'By ngram', description: 'Search mode ngram description' },
   ];
-  if (isGallicaCorpus) {
-    searchModes.push({ value: 'document', label: 'By document' });
-    searchModes.push({ value: 'cooccurrence', label: 'By cooccurrence' });
+  if (isGallicaCorpus || corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
+    const isLeMonde = corpus === 'lemonde' || corpus === 'lemonde_rubriques';
+    searchModes.push({
+      value: 'document',
+      label: isLeMonde ? 'By article' : 'By document',
+      description: isLeMonde ? 'Search mode article description' : 'Search mode document description'
+    });
+    searchModes.push({
+      value: 'cooccurrence',
+      label: isLeMonde ? 'Cooccurrence in articles' : 'By cooccurrence',
+      description: isLeMonde ? 'Search mode cooccurrence article description' : 'Search mode cooccurrence description'
+    });
   }
   if (isJokerCompatible) {
-    searchModes.push({ value: 'joker', label: 'By Joker' });
-    searchModes.push({ value: 'nearby', label: 'By nearby word' });
+    searchModes.push({ value: 'joker', label: 'By Joker', description: 'Search mode joker description' });
+    searchModes.push({ value: 'nearby', label: 'By nearby word', description: 'Search mode nearby description' });
+  }
+  if (corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
+    searchModes.push({ value: 'associated_article', label: 'By word in the same article', description: 'Search mode associated article description' });
   }
 
   const helpTooltipContent = (
@@ -221,7 +233,12 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
               sx={{ fontFamily: 'serif' }}
             >
               {searchModes.map(m => (
-                <MenuItem key={m.value} value={m.value}>{t(m.label)}</MenuItem>
+                <MenuItem key={m.value} value={m.value} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{t(m.label)}</span>
+                  <Tooltip title={t(m.description)} arrow placement="right">
+                    <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+                  </Tooltip>
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -241,43 +258,70 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
             label={t('Distance')}
             name="distance"
             type="number"
-            value={distance || 10}
+            value={distance ?? ''}
             onChange={handleChange}
             sx={{ width: '150px' }}
           />
         </div>
       )}
 
-      {(searchMode === 'joker' || searchMode === 'nearby') && (
+      {(searchMode === 'joker' || searchMode === 'nearby' || searchMode === 'associated_article') && (
         <div className="form-group" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <TextField
             label={t('N Joker')}
             name="n_joker"
             type="number"
-            value={n_joker || 10}
+            value={n_joker ?? ''}
             onChange={handleChange}
             sx={{ flex: 1 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Tooltip title={t('n_joker_help')} arrow placement="right">
+                    <HelpOutlineIcon fontSize="small" sx={{ color: 'action.secondary', fontSize: '16px', cursor: 'help' }} />
+                  </Tooltip>
+                </InputAdornment>
+              ),
+            }}
           />
           <TextField
             label={t('Length')}
             name="length"
             type="number"
-            value={length || ((word ? word.split(' ').length : 0) + 1)}
+            value={length ?? ''}
             onChange={handleChange}
             sx={{ flex: 1 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Tooltip title={t('length_help')} arrow placement="right">
+                    <HelpOutlineIcon fontSize="small" sx={{ color: 'action.secondary', fontSize: '16px', cursor: 'help' }} />
+                  </Tooltip>
+                </InputAdornment>
+              ),
+            }}
           />
           <TextField
             label={t('Stopwords')}
             name="stopwords"
             type="number"
-            value={stopwords || 500}
+            value={stopwords ?? ''}
             onChange={handleChange}
             sx={{ flex: 1 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Tooltip title={t('stopwords_help')} arrow placement="right">
+                    <HelpOutlineIcon fontSize="small" sx={{ color: 'action.secondary', fontSize: '16px', cursor: 'help' }} />
+                  </Tooltip>
+                </InputAdornment>
+              ),
+            }}
           />
         </div>
       )}
 
-      {corpus === 'lemonde_rubriques' && (
+      {(corpus === 'lemonde_rubriques' && (!searchMode || searchMode === 'ngram')) && (
         <FormControl fullWidth style={{ marginBottom: '1rem' }}>
           <InputLabel id="rubriques-label">{t('Rubriques')}</InputLabel>
           <Select
@@ -426,7 +470,14 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
               name="rescale"
             />
           }
-          label={t('Rescale all curves')}
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Rescale all curves')}
+              <Tooltip title={t('Rescale help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
         />
         <FormControlLabel
           control={
@@ -436,17 +487,31 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
               name="ratio"
             />
           }
-          label={t('Ratio')}
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Ratio')}
+              <Tooltip title={t('Ratio help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
         />
         <FormControlLabel
           control={
             <Checkbox
-              checked={advancedOptions.option3}
+              checked={advancedOptions.difference}
               onChange={onAdvancedOptionsChange}
-              name="option3"
+              name="difference"
             />
           }
-          label={t('Option 3')}
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Difference')}
+              <Tooltip title={t('Difference help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
         />
         <FormControlLabel
           control={
@@ -456,7 +521,14 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
               name="loessSmoothing"
             />
           }
-          label={t('Loess Smoothing')}
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Loess Smoothing')}
+              <Tooltip title={t('Loess Smoothing help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
         />
         <FormControlLabel
           control={
@@ -466,7 +538,14 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
               name="showConfidenceInterval"
             />
           }
-          label={t('Show Confidence Interval')}
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Show Confidence Interval')}
+              <Tooltip title={t('Show Confidence Interval help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
         />
         <FormControlLabel
           control={
@@ -476,7 +555,14 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
               name="showTotalBarplot"
             />
           }
-          label={t('Show Total Barplot')}
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Show Total Barplot')}
+              <Tooltip title={t('Show Total Barplot help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
         />
       </AccordionDetails>
     </Accordion>

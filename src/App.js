@@ -432,8 +432,28 @@ function App() {
 
       let traces = apiResponses.flatMap(res => processData(res, allSameCorpus, plotType, advancedOptions));
 
+      // Handle difference calculation for lineplot mode
+      if (plotType === 'line' && advancedOptions.difference && traces.length >= 2) {
+        const trace1 = traces[0];
+        const trace2 = traces[1];
+        const diffTrace = {
+          x: trace1.x,
+          y: trace1.y.map((v, i) => {
+            if (v !== null && trace2.y[i] !== null) {
+              return v - trace2.y[i];
+            }
+            return null;
+          }),
+          type: 'scatter',
+          mode: trace1.mode,
+          line: trace1.line,
+          name: `${trace1.name} - ${trace2.name}`,
+          connectgaps: false,
+        };
+        traces = [diffTrace];
+      }
       // Handle ratio calculation for lineplot mode
-      if (plotType === 'line' && advancedOptions.ratio && traces.length >= 2) {
+      else if (plotType === 'line' && advancedOptions.ratio && traces.length >= 2) {
         const trace1 = traces[0];
         const trace2 = traces[1];
         const ratioTrace = {
@@ -447,7 +467,7 @@ function App() {
           type: 'scatter',
           mode: trace1.mode,
           line: trace1.line,
-          name: `${trace1.name}/${trace2.name}`,
+          name: `${trace1.name} / ${trace2.name}`,
           connectgaps: false,
         };
         traces = [ratioTrace];
@@ -681,7 +701,35 @@ function App() {
     if (data.points.length > 0) {
       const point = data.points[0];
       const curveNumber = point.curveNumber;
-      const query = apiResponses[curveNumber].query;
+
+      // When confidence intervals are shown, CI traces are prepended to the plot data.
+      // Each original trace gets 2 CI traces (lower and upper bounds), so we need to
+      // calculate the correct index into apiResponses.
+      const activeQuery = queries.find(q => q.id === activeQueryId);
+      const showCI = activeQuery?.advancedOptions?.showConfidenceInterval !== false &&
+        plotType === 'line' &&
+        !activeQuery?.advancedOptions?.rescale;
+
+      let responseIndex = curveNumber;
+      if (showCI && apiResponses.length > 0) {
+        // CI traces come first: 2 traces per original trace (lower + upper bounds)
+        const numCITraces = apiResponses.length * 2;
+        if (curveNumber < numCITraces) {
+          // User clicked on a CI trace, ignore or map to corresponding data trace
+          responseIndex = Math.floor(curveNumber / 2);
+        } else {
+          // User clicked on a data trace, subtract the CI traces offset
+          responseIndex = curveNumber - numCITraces;
+        }
+      }
+
+      // Validate index is within bounds
+      if (responseIndex < 0 || responseIndex >= apiResponses.length) {
+        console.warn('Invalid curve index:', curveNumber, 'mapped to:', responseIndex);
+        return;
+      }
+
+      const query = apiResponses[responseIndex].query;
       setSelectedQuery(query);
       const date = new Date(point.x);
       setSelectedDate(date);
@@ -769,7 +817,35 @@ function App() {
   };
 
   const fetchByDocument = async (query, globalStartDate, globalEndDate) => {
-    const { word, corpus, resolution } = query;
+    const { word, corpus, resolution, searchMode, word2 } = query;
+
+    if (corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
+      let url;
+      if (searchMode === 'cooccurrence') {
+        url = `https://shiny.ens-paris-saclay.fr/guni/cooccur?mot1=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&mot2=${encodeURIComponent((word2 || '').trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${resolution}`;
+      } else {
+        url = `https://shiny.ens-paris-saclay.fr/guni/query_article?mot=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${resolution}`;
+      }
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Network response was not ok");
+        const text = await response.text();
+        const parsed = await new Promise((resolveParse) => {
+          Papa.parse(text, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: (res) => resolveParse(res.data)
+          });
+        });
+        return [{ data: parsed, query: { ...query, startDate: globalStartDate, endDate: globalEndDate } }];
+      } catch (error) {
+        console.error("Error fetching Le Monde article/cooccur mode:", error);
+        return [{ data: [], query: { ...query, startDate: globalStartDate, endDate: globalEndDate } }];
+      }
+    }
+
     const code = corpusConfigs[corpus]?.filter?.match(/codes=([^&]+)/)?.[1];
     const source = corpusConfigs[corpus]?.filter?.match(/source=([^&]+)/)?.[1];
 
@@ -893,7 +969,23 @@ function App() {
             skipEmptyLines: true,
             complete: (results) => {
               // Map results to { word: row.gram, total: row.tot }
-              const data = results.data.map(row => ({
+              let processedData = results.data;
+
+              // Filter out "d'word", "l'word" etc. for nearby search
+              if (route === 'associated') {
+                const lowerWord = word.toLowerCase();
+                processedData = processedData.filter(row => {
+                  if (!row.gram) return false;
+                  const gramLower = row.gram.toLowerCase();
+                  // Check if it ends with 'word (e.g. "l'immigration")
+                  if (gramLower.endsWith(`'${lowerWord}`)) {
+                    return false;
+                  }
+                  return true;
+                });
+              }
+
+              const data = processedData.map(row => ({
                 word: row.gram,
                 total: row.tot
               }));
@@ -924,6 +1016,11 @@ function App() {
 
       if (searchMode === 'nearby') {
         fetchListMode(query, globalStartDate, globalEndDate, 'associated').then(resolve).catch(reject);
+        return;
+      }
+
+      if (searchMode === 'associated_article') {
+        fetchListMode(query, globalStartDate, globalEndDate, 'associated_article').then(resolve).catch(reject);
         return;
       }
 
@@ -1520,13 +1617,14 @@ function App() {
         <header className="App-header">
           <img src="/logo.png" className="App-logo" alt="logo" />
           <div className="header-links">
-            <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
-            <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
+            <span style={{ marginRight: '10px', display: 'inline-flex', alignItems: 'center' }}>
               <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
               <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />
             </span>
+            <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
             <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
             <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">{t('API')}</a>
+            <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
             <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('en')}>🇬🇧</button>
             <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('fr')}>🇫🇷</button>
           </div>
@@ -1610,7 +1708,12 @@ function App() {
             <div className="plot-area">
               <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
                 {isLoading && (
-                  <div className="loading-overlay">
+                  <div className="loading-overlay" style={{ flexDirection: 'column' }}>
+                    {(activeQuery.searchMode === 'joker' || activeQuery.searchMode === 'nearby' || activeQuery.searchMode === 'associated_article') && (
+                      <Typography variant="body1" style={{ color: '#d32f2f', marginBottom: '1rem', textAlign: 'center', maxWidth: '80%' }}>
+                        {t('long_query_warning')}
+                      </Typography>
+                    )}
                     <FingerprintSpinner color="#d32f2f" size={100} />
                   </div>
                 )}

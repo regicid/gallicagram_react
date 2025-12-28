@@ -96,7 +96,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
         x: trace.x,
         y: ciLower,
         mode: 'lines',
-        line: { width: 0 },
+        line: { width: 0, shape: 'spline' },
         showlegend: false,
         hoverinfo: 'skip',
         fillcolor: 'transparent'
@@ -107,7 +107,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
         x: trace.x,
         y: ciUpper,
         mode: 'lines',
-        line: { width: 0 },
+        line: { width: 0, shape: 'spline' },
         fill: 'tonexty',
         fillcolor: fillColor,
         showlegend: false,
@@ -149,7 +149,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
         const color = palette[index % palette.length];
         totalBarTraces.push({
           x: trace.x,
-          y: trace.total.map(v => v ? -v : null), // Negative for downward pointing
+          y: trace.total.map(v => v ? v : null),
           type: 'bar',
           marker: { color: color },
           name: `${trace.name} (Total)`,

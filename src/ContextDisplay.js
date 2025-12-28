@@ -57,7 +57,7 @@ const SpecialContextDisplay = ({ record, corpus }) => {
         const { start_day, start_month, start_year, end_day, end_month, end_year, year } = getDates();
 
         if (corpus === 'lemonde_rubriques') {
-          const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&date_debut=01/01/${record.date.split('-')[0]}&date_fin=31/12/${record.date.split('-')[0]}`;
+          const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&start_at=01/01/${record.date.split('-')[0]}&end_at=31/12/${record.date.split('-')[0]}`;
           const externalSearchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
           const fetchUrl = `/api/lemonde${queryParams}`;
           

@@ -16,6 +16,11 @@ const SumsComponent = ({ data, darkMode }) => {
     orientation: 'h'
   }];
 
+  // Calculate dynamic font size based on number of items
+  // More items = smaller font to prevent overlap
+  const numItems = data.length;
+  const yTickFontSize = Math.max(8, Math.min(14, 200 / numItems));
+
   const plotlyTheme = darkMode ? {
     paper_bgcolor: '#1a1a2e',
     plot_bgcolor: '#16213e',
@@ -49,7 +54,7 @@ const SumsComponent = ({ data, darkMode }) => {
           title: t('Query'),
           autorange: 'reversed',
           automargin: true,
-          tickfont: { size: 14 },
+          tickfont: { size: yTickFontSize },
           gridcolor: darkMode ? '#0f3460' : undefined
         }
       }}

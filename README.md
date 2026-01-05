@@ -1,70 +1,84 @@
-# Getting Started with Create React App
+# Gallicagram React
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Gallicagram is a web application for visualizing linguistic trends in various historical corpora, including Gallica (BnF), Le Monde, and others. It allows users to plot word occurrences over time, view associated articles, and analyze co-occurrences.
 
-## Available Scripts
+## Architecture Overview
 
-In the project directory, you can run:
+This project is a Single Page Application (SPA) built with **React**. It uses a functional component architecture with Hooks for state management.
 
-### `npm start`
+### Tech Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **Framework**: React (Create React App)
+- **UI Component Library**: Material UI (@mui/material)
+- **Visualization**: 
+  - [Plotly.js](https://plotly.com/javascript/) (via `react-plotly.js`) for time series and bar charts.
+  - [D3.js](https://d3js.org/) (d3-cloud) for word clouds.
+- **Internationalization**: `react-i18next` for English/French support.
+- **Data Fetching**: Native `fetch` with `PapaParse` for CSV handling.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Key Components
 
-### `npm test`
+The application is structured around a main controller component (`App.js`) that manages the global state and coordinates child components.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **`src/App.js`**: The core component. It handles:
+  - Global state (queries, plot data, UI settings).
+  - API orchestration (fetching data from different endpoints based on the selected corpus).
+  - Data processing (formatting raw API responses for Plotly).
+  - Routing logic for different search modes (document, cooccurrence, article, etc.).
 
-### `npm run build`
+- **`src/FormComponent.js`**: The query interface.
+  - dynamic form generation based on selected corpus.
+  - Loads corpus configuration from `public/corpus.tsv`.
+  - Handles basic validation and user inputs (CLI-style or guided).
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- **`src/TabsComponent.js`**: Manages multiple active queries/tabs, allowing users to compare different searches.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- **`src/SumsComponent.js`**: Displays a bar chart ranking the total occurrences of queried terms.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **`src/ContextDisplay.js`**: A complex component that fetches and renders contextual information (snippets, article previews, or full text) when a user clicks on a data point.
 
-### `npm run eject`
+## Data & Configuration
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Corpus Configuration
+The application is data-driven. The available corpora and their properties are defined in **`public/corpus.tsv`**. 
+This file acts as a central registry, defining:
+- **Available Modes**: Which search modes (ngram, document, joker, nearby) are valid for each corpus.
+- **API Codes**: Identifiers used to construct API requests.
+- **Metadata**: Date ranges, volume, and specific context filters.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### API Integration
+The app interacts with multiple backends:
+1. **Gallica SRU API**: For collecting metadata and occurrence counts from BnF.
+2. **ENS Paris-Saclay API**: Custom endpoints (`/guni/`) for specific corpora like *Le Monde*.
+3. **Proxy**: A configured proxy (`src/setupProxy.js`) handles CORS and routing to external APIs.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Installation & Development
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+This project uses standard Node.js tooling.
 
-## Learn More
+### Prerequisites
+- Node.js (v14+ recommended)
+- npm
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Setup
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-### Code Splitting
+2. **Start the development server:**
+   ```bash
+   npm start
+   ```
+   Runs the app in development mode at [http://localhost:3000](http://localhost:3000).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+3. **Build for production:**
+   ```bash
+   npm run build
+   ```
+   Builds the app to the `build` folder.
 
-### Analyzing the Bundle Size
+## Translation
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Translations are stored in `public/locales/{en|fr}/translation.json`. The app detects the user's location (via IP) to set the default language to French or English.

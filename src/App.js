@@ -480,7 +480,7 @@ function App() {
   // Effect to switch to 'sums' view for list modes
   useEffect(() => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
-    if (activeQuery && (activeQuery.searchMode === 'joker' || activeQuery.searchMode === 'nearby')) {
+    if (activeQuery && (activeQuery.searchMode === 'joker' || activeQuery.searchMode === 'nearby' || activeQuery.searchMode === 'associated_article')) {
       if (plotType !== 'sums' && plotType !== 'wordcloud') {
         setPlotType('sums');
       }
@@ -821,9 +821,9 @@ function App() {
 
     if (corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
       let url;
-      if (searchMode === 'cooccurrence') {
+      if (searchMode === 'cooccurrence' || searchMode === 'cooccurrence_article') {
         url = `https://shiny.ens-paris-saclay.fr/guni/cooccur?mot1=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&mot2=${encodeURIComponent((word2 || '').trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${resolution}`;
-      } else {
+      } else { // 'article' or 'document' (legacy)
         url = `https://shiny.ens-paris-saclay.fr/guni/query_article?mot=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${resolution}`;
       }
 
@@ -847,7 +847,6 @@ function App() {
     }
 
     const code = corpusConfigs[corpus]?.filter?.match(/codes=([^&]+)/)?.[1];
-    const source = corpusConfigs[corpus]?.filter?.match(/source=([^&]+)/)?.[1];
 
     // Determine context filter part
     let contextQuery = "";
@@ -864,7 +863,6 @@ function App() {
 
     const start = parseInt(globalStartDate);
     const end = parseInt(globalEndDate);
-    const results = [];
 
     // Helper to fetch count
     const fetchCount = async (cqlQuery) => {
@@ -1004,7 +1002,7 @@ function App() {
         return;
       }
 
-      if (searchMode === 'document' || searchMode === 'cooccurrence') {
+      if (searchMode === 'document' || searchMode === 'cooccurrence' || searchMode === 'article' || searchMode === 'cooccurrence_article') {
         fetchByDocument(query, globalStartDate, globalEndDate).then(resolve).catch(reject);
         return;
       }
@@ -1617,16 +1615,17 @@ function App() {
         <header className="App-header">
           <img src="/logo.png" className="App-logo" alt="logo" />
           <div className="header-links">
-            <span style={{ marginRight: '10px', display: 'inline-flex', alignItems: 'center' }}>
-              <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
-              <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />
-            </span>
             <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
             <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
             <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">{t('API')}</a>
             <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
+            <a href="https://github.com/regicid/gallicagram_react" target="_blank" rel="noopener noreferrer">{t('Code')}</a>
             <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('en')}>🇬🇧</button>
             <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('fr')}>🇫🇷</button>
+            <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
+              <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
+              <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />
+            </span>
           </div>
         </header>
         <div className="App-body">

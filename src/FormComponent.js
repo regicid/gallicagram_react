@@ -32,7 +32,8 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
             value: columns[3],
             resolution: columns[5],
             maxLength: parseInt(columns[4], 10),
-            contextFilter: columns[8] || ''
+            contextFilter: columns[8] || '',
+            availableModes: columns[9] ? columns[9].split('|').map(m => m.trim()).filter(m => m) : []
           };
         }).filter(c => c.value);
         setCorpora([...corporaData, { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle' }]);
@@ -142,31 +143,55 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
 
   const selectedCorpus = corpora.find(c => c.value === corpus);
   const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
-  const isGallicaCorpus = selectedCorpus && selectedCorpus.contextFilter;
-  const isJokerCompatible = ['presse', 'livres', 'lemonde', 'lemonde_rubriques'].includes(corpus); // Added 'lemonde' as per instruction 10
+  const availableModes = selectedCorpus?.availableModes || [];
 
   // Available search modes with descriptions
   const searchModes = [
     { value: 'ngram', label: 'By ngram', description: 'Search mode ngram description' },
   ];
-  if (isGallicaCorpus || corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
-    const isLeMonde = corpus === 'lemonde' || corpus === 'lemonde_rubriques';
+
+  // Add modes based on what's available for this corpus
+  if (availableModes.includes('article')) {
+    searchModes.push({
+      value: 'article',
+      label: 'By article',
+      description: 'Search mode article description'
+    });
+  }
+
+  if (availableModes.includes('document')) {
     searchModes.push({
       value: 'document',
-      label: isLeMonde ? 'By article' : 'By document',
-      description: isLeMonde ? 'Search mode article description' : 'Search mode document description'
+      label: 'By document',
+      description: 'Search mode document description'
     });
+  }
+
+  if (availableModes.includes('cooccurrence_article')) {
+    searchModes.push({
+      value: 'cooccurrence_article',
+      label: 'Cooccurrence in articles',
+      description: 'Search mode cooccurrence article description'
+    });
+  }
+
+  if (availableModes.includes('cooccurrence')) {
     searchModes.push({
       value: 'cooccurrence',
-      label: isLeMonde ? 'Cooccurrence in articles' : 'By cooccurrence',
-      description: isLeMonde ? 'Search mode cooccurrence article description' : 'Search mode cooccurrence description'
+      label: 'By cooccurrence',
+      description: 'Search mode cooccurrence description'
     });
   }
-  if (isJokerCompatible) {
+
+  if (availableModes.includes('joker')) {
     searchModes.push({ value: 'joker', label: 'By Joker', description: 'Search mode joker description' });
+  }
+
+  if (availableModes.includes('nearby')) {
     searchModes.push({ value: 'nearby', label: 'By nearby word', description: 'Search mode nearby description' });
   }
-  if (corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
+
+  if (availableModes.includes('associated_article')) {
     searchModes.push({ value: 'associated_article', label: 'By word in the same article', description: 'Search mode associated article description' });
   }
 
@@ -219,7 +244,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
         </FormControl>
       </div>
 
-      {(isGallicaCorpus || isJokerCompatible) && (
+      {(searchModes.length > 1) && (
         <div className="form-group" style={{ marginBottom: '1rem' }}>
           <FormControl fullWidth>
             <InputLabel id="search-mode-select-label">{t('Search Mode')}</InputLabel>

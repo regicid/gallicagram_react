@@ -131,5 +131,6 @@
   "By article": "Par article",
   "Search mode article description": "Proportion d'articles contenant ce syntagme au moins une fois.",
   "Cooccurrence in articles": "Cooccurrence dans les articles",
-  "Search mode cooccurrence article description": "Proportion d'articles contenant deux syntagmes à proximité."
+  "Search mode cooccurrence article description": "Proportion d'articles contenant deux syntagmes à proximité.",
+  "Code": "Code"
 }

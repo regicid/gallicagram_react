@@ -131,5 +131,6 @@
   "By article": "By article",
   "Search mode article description": "Fraction of articles that feature this syntagm at least once.",
   "Cooccurrence in articles": "Cooccurrence in articles",
-  "Search mode cooccurrence article description": "Fraction of articles that feature two syntagms at proximity."
+  "Search mode cooccurrence article description": "Fraction of articles that feature two syntagms at proximity.",
+  "Code": "Code"
 }

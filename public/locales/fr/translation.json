@@ -132,5 +132,7 @@
   "Search mode article description": "Proportion d'articles contenant ce syntagme au moins une fois.",
   "Cooccurrence in articles": "Cooccurrence dans les articles",
   "Search mode cooccurrence article description": "Proportion d'articles contenant deux syntagmes à proximité.",
-  "Code": "Code"
+  "Code": "Code",
+  "Long query warning": "Votre requête contient {{count}} mots, mais le maximum pour {{corpusName}} est de {{max}}.",
+  "Long query warning lemonde restricted": "Pour le corpus Le Monde et ce mode de recherche, le nombre maximum de mots est de 1."
 }

@@ -219,7 +219,8 @@ function App() {
             }
             const code = columns[3].trim();
             const filter = columns[8] ? columns[8].trim() : '';
-            configs[code] = { filter };
+            const maxLength = columns[4] ? parseInt(columns[4].trim(), 10) : 2;
+            configs[code] = { filter, maxLength };
           }
         });
         setCorpusPeriods(periods);
@@ -664,6 +665,67 @@ function App() {
   useEffect(() => {
     validateDatesAgainstCorpus();
   }, [validateDatesAgainstCorpus]);
+
+  const [wordCountWarnings, setWordCountWarnings] = useState([]);
+
+  const validateWordCounts = useCallback(() => {
+    const currentActiveQuery = queries.find(q => q.id === activeQueryId);
+    if (!currentActiveQuery || !corpusConfigs[currentActiveQuery.corpus]) {
+      setWordCountWarnings([]);
+      return;
+    }
+
+    const config = corpusConfigs[currentActiveQuery.corpus];
+    let maxLength = config.maxLength !== undefined ? config.maxLength : 2;
+
+    // Specific logic for Le Monde corpus
+    if ((currentActiveQuery.corpus === 'lemonde' || currentActiveQuery.corpus === 'lemonde_rubriques') &&
+      (currentActiveQuery.searchMode === 'associated_article' ||
+        currentActiveQuery.searchMode === 'cooccurrence' ||
+        currentActiveQuery.searchMode === 'cooccurrence_article')) {
+      maxLength = 1;
+    }
+
+    const warnings = [];
+
+    if (currentActiveQuery.word) {
+      const wordCount = currentActiveQuery.word.trim().split(/[\s+]+/).length; // Split by space or plus
+      if (wordCount > maxLength) {
+        let messageKey = 'Long query warning';
+        if ((currentActiveQuery.corpus === 'lemonde' || currentActiveQuery.corpus === 'lemonde_rubriques') &&
+          (currentActiveQuery.searchMode === 'associated_article' ||
+            currentActiveQuery.searchMode === 'cooccurrence' ||
+            currentActiveQuery.searchMode === 'cooccurrence_article')) {
+          messageKey = 'Long query warning lemonde restricted';
+        }
+
+        warnings.push({
+          message: t(messageKey, { count: wordCount, max: maxLength, corpusName: corpusPeriods[currentActiveQuery.corpus]?.name || currentActiveQuery.corpus })
+        });
+      } else if (['joker', 'nearby', 'associated_article'].includes(currentActiveQuery.searchMode)) {
+        const lengthParam = parseInt(currentActiveQuery.length, 10);
+        if (lengthParam > maxLength) {
+          let messageKey = 'Long query warning';
+          // Re-use logic for Le Monde if needed, or just standard warning
+          if ((currentActiveQuery.corpus === 'lemonde' || currentActiveQuery.corpus === 'lemonde_rubriques') &&
+            (currentActiveQuery.searchMode === 'associated_article' ||
+              currentActiveQuery.searchMode === 'cooccurrence' ||
+              currentActiveQuery.searchMode === 'cooccurrence_article')) {
+            messageKey = 'Long query warning lemonde restricted';
+          }
+          warnings.push({
+            message: t(messageKey, { count: lengthParam, max: maxLength, corpusName: corpusPeriods[currentActiveQuery.corpus]?.name || currentActiveQuery.corpus })
+          });
+        }
+      }
+    }
+
+    setWordCountWarnings(warnings);
+  }, [queries, activeQueryId, corpusConfigs, corpusPeriods, t]);
+
+  useEffect(() => {
+    validateWordCounts();
+  }, [validateWordCounts]);
 
   const handleAdvancedOptionsChange = (event) => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
@@ -1561,6 +1623,15 @@ function App() {
   };
 
   const handleDownloadCSV = () => {
+    if ((plotType === 'sums' || plotType === 'wordcloud') && sumsData.length > 0) {
+      const csv = Papa.unparse({
+        fields: ['Word', 'Count'],
+        data: sumsData.map(d => ({ Word: d.word, Count: d.total }))
+      });
+      downloadCSV(csv);
+      return;
+    }
+
     if (plotData.length === 0) {
       alert("No data to download.");
       return;
@@ -1592,7 +1663,11 @@ function App() {
       data: rows
     });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    downloadCSV(csv);
+  };
+
+  const downloadCSV = (csvContent) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -1696,6 +1771,15 @@ function App() {
                 ))}
               </Box>
             )}
+            {wordCountWarnings.length > 0 && (
+              <Box sx={{ marginTop: '1rem', width: '100%' }}>
+                {wordCountWarnings.map((warning, index) => (
+                  <Alert key={`word-${index}`} severity="warning" sx={{ marginBottom: '0.5rem' }}>
+                    {warning.message}
+                  </Alert>
+                ))}
+              </Box>
+            )}
             {totalPlotOccurrences > 0 && (
               <Typography variant="body1" style={{ marginTop: '1rem' }}>
                 {t('Total Occurrences:')} {totalPlotOccurrences.toLocaleString()}
@@ -1708,11 +1792,7 @@ function App() {
               <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
                 {isLoading && (
                   <div className="loading-overlay" style={{ flexDirection: 'column' }}>
-                    {(activeQuery.searchMode === 'joker' || activeQuery.searchMode === 'nearby' || activeQuery.searchMode === 'associated_article') && (
-                      <Typography variant="body1" style={{ color: '#d32f2f', marginBottom: '1rem', textAlign: 'center', maxWidth: '80%' }}>
-                        {t('long_query_warning')}
-                      </Typography>
-                    )}
+
                     <FingerprintSpinner color="#d32f2f" size={100} />
                   </div>
                 )}

@@ -132,5 +132,7 @@
   "Search mode article description": "Fraction of articles that feature this syntagm at least once.",
   "Cooccurrence in articles": "Cooccurrence in articles",
   "Search mode cooccurrence article description": "Fraction of articles that feature two syntagms at proximity.",
-  "Code": "Code"
+  "Code": "Code",
+  "Long query warning": "Your query has {{count}} words, but the maximum for {{corpusName}} is {{max}}.",
+  "Long query warning lemonde restricted": "For Le Monde corpus and this search mode, the maximum number of words is 1."
 }

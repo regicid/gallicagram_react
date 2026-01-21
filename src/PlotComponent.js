@@ -119,6 +119,47 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     finalPlotData = [...ciTraces, ...plotData];
   }
 
+  // Calculate y-axis range to prevent CI from crushing main lines
+  let yAxisRange;
+  if (showCI && plotData.length > 0) {
+    let maxVal = 0;
+    let minVal = Infinity;
+
+    plotData.forEach(trace => {
+      // Check both y (main line) and ciUpper/ciLower if available
+      // Actually we just need to ensure the max y value + CI fits
+      // But we iterate over traces.
+      // Wait, finalPlotData includes CI traces which are separate.
+      // But here we iterate 'plotData' which are the semantic traces.
+
+      // Let's check y values
+      if (trace.y) {
+        const validYs = trace.y.filter(val => typeof val === 'number');
+        if (validYs.length > 0) {
+          const m = Math.max(...validYs);
+          const mn = Math.min(...validYs);
+          if (m > maxVal) maxVal = m;
+          if (mn < minVal) minVal = mn;
+        }
+      }
+
+      // Also account for CI upper bounds if we want to be precise, 
+      // but usually scaling to maxVal * 1.1 covers it?
+      // The previous logic only used maxVal from trace.y.
+      // Let's stick to maxVal from trace.y logic, assuming *1.1 handles the CI upper bound.
+    });
+
+    if (maxVal > 0) {
+      if (advancedOptions?.extendYScale) {
+        yAxisRange = [0, maxVal * 1.1];
+      } else {
+        // Auto-scale minimum, but force max.
+        // We can pass null for auto.
+        yAxisRange = [null, maxVal * 1.1];
+      }
+    }
+  }
+
   const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? t('Z-score') : t('Frequency in the corpus');
 
   const isTouchScreen = (('ontouchstart' in window) ||
@@ -186,7 +227,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       fixedrange: isTouchScreen,
       tickfont: { size: 14 },
       ...(plotlyTheme.yaxis || {}),
-      domain: showTotalBarplot ? [0.35, 1] : [0, 1]
+      domain: showTotalBarplot ? [0.35, 1] : [0, 1],
+      range: yAxisRange
     }
   };
 

@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton, Switch } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton, Switch, Snackbar } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
@@ -40,6 +40,7 @@ const initialQuery = {
     rescale: false,
     showConfidenceInterval: true,
     showTotalBarplot: false,
+    extendYScale: false,
   }
 };
 
@@ -152,6 +153,32 @@ function loessSmoothing(data, span) {
   return smoothed;
 }
 
+function movingSum(data, windowSize) {
+  if (windowSize === 0) {
+    return data;
+  }
+  const smoothed = [];
+  const halfWindow = Math.floor(windowSize / 2);
+  for (let i = 0; i < data.length; i++) {
+    const start = Math.max(0, i - halfWindow);
+    const end = Math.min(data.length - 1, i + halfWindow);
+    let sum = 0;
+    let count = 0;
+    for (let j = start; j <= end; j++) {
+      if (data[j] !== null && data[j] !== undefined) {
+        sum += data[j];
+        count++;
+      }
+    }
+    if (count > 0) {
+      smoothed.push(sum);
+    } else {
+      smoothed.push(null);
+    }
+  }
+  return smoothed;
+}
+
 const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
 
 function App() {
@@ -191,6 +218,8 @@ function App() {
   const [contextSearchParams, setContextSearchParams] = useState({ limit: 10, cursor: 0 });
   const [isContextLoading, setIsContextLoading] = useState(false);
   const [fetchContextAfterPlot, setFetchContextAfterPlot] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   const [corpusPeriods, setCorpusPeriods] = useState({});
   const [corpusConfigs, setCorpusConfigs] = useState({});
   const [perseeData, setPerseeData] = useState(null);
@@ -330,7 +359,13 @@ function App() {
     const start = parseInt(startDate);
     const end = parseInt(endDate);
 
-    if (resolution === 'annee') {
+    if (resolution === 'decennie') {
+      const startDecade = Math.floor(start / 10) * 10;
+      const endDecade = Math.floor(end / 10) * 10;
+      for (let decade = startDecade; decade <= endDecade; decade += 10) {
+        dataMap.set(Date.UTC(decade, 0), null);
+      }
+    } else if (resolution === 'annee') {
       for (let year = start; year <= end; year++) {
         dataMap.set(Date.UTC(year, 0), null);
       }
@@ -353,7 +388,10 @@ function App() {
       const year = row.date || row.annee || row.year;
       if (year && row.n !== undefined && row.total !== undefined) {
         let dateKey;
-        if (resolution === 'annee') {
+        if (resolution === 'decennie') {
+          const decade = Math.floor(year / 10) * 10;
+          dateKey = Date.UTC(decade, 0);
+        } else if (resolution === 'annee') {
           dateKey = Date.UTC(year, 0);
         } else if (resolution === 'mois') {
           const month = row.mois ? row.mois - 1 : 0;
@@ -364,7 +402,14 @@ function App() {
           dateKey = Date.UTC(year, month, day);
         }
         if (dataMap.has(dateKey)) {
-          dataMap.set(dateKey, { n: row.n, total: row.total });
+          if (resolution === 'decennie') {
+            const current = dataMap.get(dateKey);
+            const currentN = current ? current.n : 0;
+            const currentTotal = current ? current.total : 0;
+            dataMap.set(dateKey, { n: currentN + row.n, total: currentTotal + row.total });
+          } else {
+            dataMap.set(dateKey, { n: row.n, total: row.total });
+          }
         }
       }
     });
@@ -497,10 +542,25 @@ function App() {
     const useLoess = activeQuery?.advancedOptions?.loessSmoothing || false;
 
     const smoothedTraces = rawPlotData.map(trace => {
-      const smoothedY = useLoess
-        ? loessSmoothing(trace.y, smoothing)
-        : movingAverage(trace.y, smoothing);
-      return { ...trace, y: smoothedY };
+      if (useLoess) {
+        const smoothedY = loessSmoothing(trace.y, smoothing);
+        return { ...trace, y: smoothedY };
+      } else {
+        if (smoothing === 0) return trace;
+
+        if (trace.n && trace.total) {
+          const smoothedN = movingSum(trace.n, smoothing);
+          const smoothedTotal = movingSum(trace.total, smoothing);
+          const smoothedY = smoothedN.map((n, i) => {
+            const t = smoothedTotal[i];
+            return (n !== null && t !== null && t !== 0) ? n / t : null;
+          });
+          return { ...trace, y: smoothedY, n: smoothedN, total: smoothedTotal };
+        } else {
+          const smoothedY = movingAverage(trace.y, smoothing);
+          return { ...trace, y: smoothedY };
+        }
+      }
     });
     setPlotData(smoothedTraces);
   }, [smoothing, rawPlotData, plotType, queries, activeQueryId]);
@@ -666,6 +726,21 @@ function App() {
     validateDatesAgainstCorpus();
   }, [validateDatesAgainstCorpus]);
 
+  // Auto-adjust dates when corpus changes and current dates fall outside the new corpus's bounds
+  useEffect(() => {
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    if (!activeQuery || !corpusPeriods[activeQuery.corpus]) return;
+
+    const period = corpusPeriods[activeQuery.corpus];
+
+    // If either date is out of bounds, reset both to the corpus's recommended range
+    if (startDate < period.start || endDate > period.end) {
+      setStartDate(period.start);
+      setEndDate(period.end);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queries, activeQueryId, corpusPeriods]);
+
   const [wordCountWarnings, setWordCountWarnings] = useState([]);
 
   const validateWordCounts = useCallback(() => {
@@ -808,6 +883,7 @@ function App() {
   }
 
   const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, revues, rubriques, byRubrique) => {
+    const apiResolution = resolution === 'decennie' ? 'annee' : resolution;
     let url;
     if (corpus === 'route à part (query_persee)') {
       const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
@@ -815,9 +891,9 @@ function App() {
     } else if (corpus === 'lemonde_rubriques') {
       const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
       const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
-      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}${rubriqueParam}${byRubriqueParam}`;
+      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
     } else {
-      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${resolution}`;
+      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     }
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
@@ -880,13 +956,14 @@ function App() {
 
   const fetchByDocument = async (query, globalStartDate, globalEndDate) => {
     const { word, corpus, resolution, searchMode, word2 } = query;
+    const apiResolution = resolution === 'decennie' ? 'annee' : resolution;
 
     if (corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
       let url;
       if (searchMode === 'cooccurrence' || searchMode === 'cooccurrence_article') {
-        url = `https://shiny.ens-paris-saclay.fr/guni/cooccur?mot1=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&mot2=${encodeURIComponent((word2 || '').trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${resolution}`;
+        url = `https://shiny.ens-paris-saclay.fr/guni/cooccur?mot1=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&mot2=${encodeURIComponent((word2 || '').trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${apiResolution}`;
       } else { // 'article' or 'document' (legacy)
-        url = `https://shiny.ens-paris-saclay.fr/guni/query_article?mot=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${resolution}`;
+        url = `https://shiny.ens-paris-saclay.fr/guni/query_article?mot=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${apiResolution}`;
       }
 
       try {
@@ -954,6 +1031,7 @@ function App() {
         endDateStr = `${ny}-${String(nm).padStart(2, '0')}-01`;
         dateFilter = `gallicapublication_date>="${startDateStr}" and gallicapublication_date<"${endDateStr}"`;
       } else {
+        // annee or decennie (fetched as yearly slices)
         startDateStr = `${year}-01-01`;
         endDateStr = `${year + 1}-01-01`;
         dateFilter = `gallicapublication_date>="${startDateStr}" and gallicapublication_date<"${endDateStr}"`;
@@ -1202,12 +1280,30 @@ function App() {
   const handlePlot = () => {
     setError(null);
     setApiResponses([]);
+    setRawPlotData([]);
+    setPlotData([]);
     setOccurrences([]);
     setTotalOccurrences(0);
     setTotalPlotOccurrences(0);
     setSelectedDate(null);
     setIsLoading(true);
     setFetchContextAfterPlot(true);
+
+    // Compute adjusted dates synchronously to handle race condition with auto-adjust useEffect
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    let effectiveStartDate = startDate;
+    let effectiveEndDate = endDate;
+
+    if (activeQuery && corpusPeriods[activeQuery.corpus]) {
+      const period = corpusPeriods[activeQuery.corpus];
+      if (startDate < period.start || endDate > period.end) {
+        effectiveStartDate = period.start;
+        effectiveEndDate = period.end;
+        // Also update the state to keep UI in sync
+        setStartDate(effectiveStartDate);
+        setEndDate(effectiveEndDate);
+      }
+    }
 
     // Expand queries with '&' separator into multiple queries
     const expandedQueries = queries.flatMap(q => {
@@ -1221,7 +1317,7 @@ function App() {
       return [q];
     });
 
-    const promises = expandedQueries.map(q => fetchDataForQuery(q, startDate, endDate));
+    const promises = expandedQueries.map(q => fetchDataForQuery(q, effectiveStartDate, effectiveEndDate));
 
     Promise.all(promises)
       .then(responses => {
@@ -1229,6 +1325,13 @@ function App() {
         setApiResponses(flatResponses);
         const total = flatResponses.reduce((acc, res) => acc + (res.total || 0), 0);
         setTotalPlotOccurrences(total);
+
+        // Auto-switch to barplot if total occurrences < 100 and currently in line mode
+        if (plotType === 'line' && total < 100 && total > 0) {
+          setPlotType('bar');
+          setSnackbarMessage(t('Low data warning', { count: total }));
+          setSnackbarOpen(true);
+        }
       })
       .catch(err => {
         console.error("An error occurred during plotting:", err);
@@ -1632,13 +1735,13 @@ function App() {
       return;
     }
 
-    if (plotData.length === 0) {
+    if (rawPlotData.length === 0) {
       alert("No data to download.");
       return;
     }
 
     const headers = ['date'];
-    plotData.forEach(trace => {
+    rawPlotData.forEach(trace => {
       headers.push(trace.name);
       if (trace.n && trace.total) {
         headers.push(`${trace.name} (n)`);
@@ -1646,9 +1749,9 @@ function App() {
       }
     });
 
-    const rows = plotData[0].x.map((date, i) => {
+    const rows = rawPlotData[0].x.map((date, i) => {
       const row = { date: date.toISOString().split('T')[0] };
-      plotData.forEach(trace => {
+      rawPlotData.forEach(trace => {
         row[trace.name] = trace.y[i];
         if (trace.n && trace.total) {
           row[`${trace.name} (n)`] = trace.n[i];
@@ -1894,6 +1997,12 @@ function App() {
           </div>
         </div>
       </div>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+      />
     </ThemeProvider>
   );
 }

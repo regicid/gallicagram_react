@@ -454,6 +454,10 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
         <label>{t('Resolution:')}</label>
         <div className="checkbox-group" style={{ display: 'flex', justifyContent: 'center' }}>
           <label className="checkbox-label">
+            <input type="radio" name="resolution" value="decennie" checked={resolution === 'decennie'} onChange={handleChange} />
+            {t('Décennie')}
+          </label>
+          <label className="checkbox-label">
             <input type="radio" name="resolution" value="annee" checked={resolution === 'annee'} onChange={handleChange} />
             {t('Année')}
           </label>
@@ -584,6 +588,23 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
             <div style={{ display: 'flex', alignItems: 'center' }}>
               {t('Show Total Barplot')}
               <Tooltip title={t('Show Total Barplot help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.extendYScale || false}
+              onChange={onAdvancedOptionsChange}
+              name="extendYScale"
+            />
+          }
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Extend Y-scale to 0')}
+              <Tooltip title={t('Extend Y-scale to 0 help')} arrow placement="right">
                 <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
               </Tooltip>
             </div>

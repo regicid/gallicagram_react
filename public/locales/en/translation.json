@@ -134,5 +134,8 @@
   "Search mode cooccurrence article description": "Fraction of articles that feature two syntagms at proximity.",
   "Code": "Code",
   "Long query warning": "Your query has {{count}} words, but the maximum for {{corpusName}} is {{max}}.",
-  "Long query warning lemonde restricted": "For Le Monde corpus and this search mode, the maximum number of words is 1."
+  "Long query warning lemonde restricted": "For Le Monde corpus and this search mode, the maximum number of words is 1.",
+  "Extend Y-scale to 0": "Extend Y-scale to 0",
+  "Extend Y-scale to 0 help": "Forces the Y-axis to start at 0.",
+  "Low data warning": "Since this word is rare ({{count}} occurrences), we humbly suggest visualizing the results with this bar chart. You can switch back to the line chart by changing the option, but it will likely look like nothing."
 }

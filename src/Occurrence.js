@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@mui/material/Button';
 
-const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
+const GALLICA_PROXY_API_URL = 'http://157.136.252.194';
 
 const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
   const [context, setContext] = useState(null);
@@ -27,28 +27,28 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
 
       // Handle resolution specific parameters (month, day)
       if (resolution === 'mois' || resolution === 'jour') {
-          const dateObj = new Date(record.date);
-          if (!isNaN(dateObj.getTime())) {
-              params.append('month', dateObj.getMonth() + 1);
-              if (resolution === 'jour') {
-                  params.append('day', dateObj.getDate());
-              }
+        const dateObj = new Date(record.date);
+        if (!isNaN(dateObj.getTime())) {
+          params.append('month', dateObj.getMonth() + 1);
+          if (resolution === 'jour') {
+            params.append('day', dateObj.getDate());
           }
+        }
       }
 
       // Add corpus specific filters if available
       const config = corpusConfigs?.[corpus];
       if (config && config.filter) {
-          const filterParams = new URLSearchParams(config.filter);
-          filterParams.forEach((value, key) => {
-              params.append(key, value);
-          });
+        const filterParams = new URLSearchParams(config.filter);
+        filterParams.forEach((value, key) => {
+          params.append(key, value);
+        });
       } else if (corpus === 'livres') {
-          params.append('source', 'book');
+        params.append('source', 'book');
       } else if (['presse', 'journal_des_debats', 'moniteur'].includes(corpus)) {
-          if (!params.has('source')) {
-             params.append('source', 'periodical');
-          }
+        if (!params.has('source')) {
+          params.append('source', 'periodical');
+        }
       }
 
       const response = await fetch(`${GALLICA_PROXY_API_URL}/api/context?${params.toString()}`);
@@ -66,21 +66,21 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
   }, [record, corpus, corpusConfigs, resolution]);
 
   useEffect(() => {
-      performFetch();
+    performFetch();
   }, [performFetch]);
 
   const handleToggleContext = () => {
-      if (context) {
-          setContext(null);
-      } else {
-          performFetch();
-      }
+    if (context) {
+      setContext(null);
+    } else {
+      performFetch();
+    }
   };
 
   return (
     <div className="occurrence-card">
       <h4>
-        <a href={record.url} target="_blank" rel="noopener noreferrer" style={{textDecoration: 'none', color: 'inherit'}}>
+        <a href={record.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
           {record.paper_title}
         </a>
       </h4>
@@ -88,12 +88,12 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
       <Button variant="contained" color="success" onClick={handleToggleContext} disabled={isLoading}>
         {isLoading ? 'Loading...' : (context ? 'Hide context' : 'Show context')}
       </Button>
-      {error && <div className="error" style={{color: 'red'}}>{error}</div>}
+      {error && <div className="error" style={{ color: 'red' }}>{error}</div>}
       {context && (
         <div className="context-view">
           {context.map((c, index) => (
             <p key={`${c.left_context}${c.page_num}${c.right_context}${index}`}>
-              ...{c.left_context} <span className="pivot" style={{backgroundColor: 'yellow', fontWeight: 'bold'}}>{c.pivot}</span> {c.right_context}...
+              ...{c.left_context} <span className="pivot" style={{ backgroundColor: 'yellow', fontWeight: 'bold' }}>{c.pivot}</span> {c.right_context}...
             </p>
           ))}
         </div>

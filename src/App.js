@@ -179,7 +179,7 @@ function movingSum(data, windowSize) {
   return smoothed;
 }
 
-const GALLICA_PROXY_API_URL = 'https://gallica-proxy-production.up.railway.app';
+const GALLICA_PROXY_API_URL = 'http://157.136.252.194';
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -733,9 +733,11 @@ function App() {
 
     const period = corpusPeriods[activeQuery.corpus];
 
-    // If either date is out of bounds, reset both to the corpus's recommended range
-    if (startDate < period.start || endDate > period.end) {
+    // If either date is out of bounds, clamp them to the period limits
+    if (startDate < period.start) {
       setStartDate(period.start);
+    }
+    if (endDate > period.end) {
       setEndDate(period.end);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -764,7 +766,8 @@ function App() {
     const warnings = [];
 
     if (currentActiveQuery.word) {
-      const wordCount = currentActiveQuery.word.trim().split(/[\s+]+/).length; // Split by space or plus
+      // Split by space, plus, or ampersand
+      const wordCount = currentActiveQuery.word.trim().split(/[\s+&]+/).length;
       if (wordCount > maxLength) {
         let messageKey = 'Long query warning';
         if ((currentActiveQuery.corpus === 'lemonde' || currentActiveQuery.corpus === 'lemonde_rubriques') &&
@@ -1296,12 +1299,13 @@ function App() {
 
     if (activeQuery && corpusPeriods[activeQuery.corpus]) {
       const period = corpusPeriods[activeQuery.corpus];
-      if (startDate < period.start || endDate > period.end) {
-        effectiveStartDate = period.start;
-        effectiveEndDate = period.end;
-        // Also update the state to keep UI in sync
-        setStartDate(effectiveStartDate);
-        setEndDate(effectiveEndDate);
+      if (startDate < period.start) effectiveStartDate = period.start;
+      if (endDate > period.end) effectiveEndDate = period.end;
+
+      if (effectiveStartDate !== startDate || effectiveEndDate !== endDate) {
+        // Also update the state to keep UI in sync, but only if changed
+        if (effectiveStartDate !== startDate) setStartDate(effectiveStartDate);
+        if (effectiveEndDate !== endDate) setEndDate(effectiveEndDate);
       }
     }
 
@@ -1369,7 +1373,7 @@ function App() {
       ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
       ctx.fillStyle = 'black';
       ctx.strokeStyle = 'black';
-      ctx.lineWidth = 2 * scale;
+      ctx.lineWidth = 3 * scale;
 
       if (plotType === 'wordcloud') {
         const words = sumsData.map((d, i) => {
@@ -1499,8 +1503,16 @@ function App() {
         // Padding
         const range = dataMax - dataMin;
         const padding = range === 0 ? (dataMax === 0 ? 1 : Math.abs(dataMax) * 0.05) : range * 0.05;
-        // Clamp min to 0 unless z-score
-        const paddedMin = effectiveIsRescaled ? dataMin - padding : Math.max(0, dataMin - padding);
+        // Clamp min to 0 unless z-score, or if extendYScale is set
+        let paddedMin;
+        if (effectiveIsRescaled) {
+          paddedMin = dataMin - padding;
+        } else if (advancedOptions?.extendYScale) {
+          paddedMin = 0;
+        } else {
+          paddedMin = Math.max(0, dataMin - padding);
+        }
+
         const paddedMax = dataMax + padding;
 
         // Nice Ticks
@@ -1548,7 +1560,7 @@ function App() {
         // X Ticks
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+        ctx.font = `${20 * scale}px 'EB Garamond', Georgia, serif`;
         const yearSpan = (maxDate - minDate) / (1000 * 60 * 60 * 24 * 365.25);
         const tickInterval = yearSpan > 100 ? 20 : (yearSpan > 50 ? 10 : 5);
         const startYear = new Date(minDate).getFullYear();

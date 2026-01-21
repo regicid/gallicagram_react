@@ -179,7 +179,7 @@ function movingSum(data, windowSize) {
   return smoothed;
 }
 
-const GALLICA_PROXY_API_URL = 'http://157.136.252.194';
+const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 
 function App() {
   const { t, i18n } = useTranslation();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@mui/material/Button';
 
-const GALLICA_PROXY_API_URL = 'http://157.136.252.194';
+const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 
 const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
   const [context, setContext] = useState(null);

@@ -54,7 +54,7 @@ const SpecialContextDisplay = ({ record, corpus }) => {
       try {
         const rawWord = record.terms[0];
         const word = rawWord.split('+')[0].trim();
-        const { start_day, start_month, start_year, end_day, end_month, end_year, year } = getDates();
+        const { year } = getDates();
 
         if (corpus === 'lemonde_rubriques') {
           const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&start_at=01/01/${record.date.split('-')[0]}&end_at=31/12/${record.date.split('-')[0]}`;

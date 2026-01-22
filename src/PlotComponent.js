@@ -238,8 +238,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     // We bind this to a known state, or just 'true' to persist user interactions.
     // However, if we want it to reset when plotType changes, we can use plotType.
     uirevision: plotType,
-    datarevision: data.length, // Helps Plotly skip diffing if data length is same
-    autosize: true
+    datarevision: data.length // Helps Plotly skip diffing if data length is same
   };
 
   // Add second y-axis for total barplot

@@ -675,8 +675,11 @@ function App() {
   };
 
   const handleSliderChange = (event, newValue) => {
-    setStartDate(newValue[0]);
-    setEndDate(newValue[1]);
+    // Ensure start date doesn't exceed end date
+    if (newValue[0] <= newValue[1]) {
+      setStartDate(newValue[0]);
+      setEndDate(newValue[1]);
+    }
   };
 
   const handleDateInputChange = (e) => {
@@ -733,11 +736,9 @@ function App() {
 
     const period = corpusPeriods[activeQuery.corpus];
 
-    // If either date is out of bounds, clamp them to the period limits
-    if (startDate < period.start) {
+    // If EITHER date is out of bounds, reset BOTH to the period limits (as requested)
+    if (startDate < period.start || endDate > period.end) {
       setStartDate(period.start);
-    }
-    if (endDate > period.end) {
       setEndDate(period.end);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -837,7 +838,7 @@ function App() {
     }
   };
 
-  const handlePointClick = (data) => {
+  const handlePointClick = useCallback((data) => {
     if (data.points.length > 0) {
       const point = data.points[0];
       const curveNumber = point.curveNumber;
@@ -877,7 +878,7 @@ function App() {
       setContextSearchParams(newSearchParams);
       fetchOccurrences(date, newSearchParams, query, false);
     }
-  };
+  }, [queries, activeQueryId, plotType, apiResponses, fetchOccurrences]);
 
   const handleContextPageChange = (pageIndex) => {
     const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };

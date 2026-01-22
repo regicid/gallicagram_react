@@ -153,10 +153,13 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       if (advancedOptions?.extendYScale) {
         yAxisRange = [0, maxVal * 1.1];
       } else {
-        // Auto-scale minimum, but force max.
-        // We can pass null for auto.
-        yAxisRange = [null, maxVal * 1.1];
+        // Force minimum to 0 for frequency plots
+        yAxisRange = [0, maxVal * 1.1];
       }
+    } else {
+      // If maxVal is 0 (e.g. no data or all zeros), force a sane range like [0, 1]
+      // so it doesn't default to something weird like [-1, 0]
+      yAxisRange = [0, 1];
     }
   }
 
@@ -228,8 +231,18 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       tickfont: { size: 14 },
       ...(plotlyTheme.yaxis || {}),
       domain: showTotalBarplot ? [0.35, 1] : [0, 1],
+      tickfont: { size: 14 },
+      ...(plotlyTheme.yaxis || {}),
+      domain: showTotalBarplot ? [0.35, 1] : [0, 1],
       range: yAxisRange
-    }
+    },
+    // Use uirevision to prevent Plotly from resetting the layout (zoom, pan, margins)
+    // when React re-renders but the underlying data context hasn't fundamentally changed.
+    // We bind this to a known state, or just 'true' to persist user interactions.
+    // However, if we want it to reset when plotType changes, we can use plotType.
+    uirevision: plotType,
+    datarevision: data.length, // Helps Plotly skip diffing if data length is same
+    autosize: true
   };
 
   // Add second y-axis for total barplot
@@ -252,7 +265,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       config={{
         displayModeBar: !isTouchScreen,
         scrollZoom: false
-      }}
+      }
+      }
       useResizeHandler={true}
       className="plot-component"
       style={{ width: '100%', height: '100%' }}
@@ -261,4 +275,4 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
   );
 };
 
-export default PlotComponent;
+export default React.memo(PlotComponent);

@@ -231,9 +231,6 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       tickfont: { size: 14 },
       ...(plotlyTheme.yaxis || {}),
       domain: showTotalBarplot ? [0.35, 1] : [0, 1],
-      tickfont: { size: 14 },
-      ...(plotlyTheme.yaxis || {}),
-      domain: showTotalBarplot ? [0.35, 1] : [0, 1],
       range: yAxisRange
     },
     // Use uirevision to prevent Plotly from resetting the layout (zoom, pan, margins)

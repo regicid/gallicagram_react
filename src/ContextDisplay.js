@@ -124,7 +124,7 @@ const SpecialContextDisplay = ({ record, corpus }) => {
           setData({ type: 'persee', content: results });
 
         } else if (corpus === 'rap') {
-          const searchUrl = `https://shiny.ens-paris-saclay.fr/guni/source_rap?mot=${encodeURIComponent(word)}&year=${year}`;
+          const searchUrl = `https://shiny.ens-paris-saclay.fr/guni/source_rap?mot=${encodeURIComponent(word.replace(/’/g, "'"))}&year=${year}`;
           setExternalUrl({ url: 'https://huggingface.co/datasets/regicid/LRFAF', label: t('Corpus') });
 
           const response = await fetch(searchUrl);

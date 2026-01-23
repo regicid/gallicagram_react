@@ -34,7 +34,7 @@ export const colorblindPalette = [
   '#EE9944', // orange
 ];
 
-const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode }) => {
+const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode, plotRevision }) => {
   const { t } = useTranslation();
 
   let plotData = advancedOptions?.rescale && data.length > 0 && plotType === 'line'
@@ -234,11 +234,10 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       range: yAxisRange
     },
     // Use uirevision to prevent Plotly from resetting the layout (zoom, pan, margins)
-    // when React re-renders but the underlying data context hasn't fundamentally changed.
     // We bind this to a known state, or just 'true' to persist user interactions.
     // However, if we want it to reset when plotType changes, we can use plotType.
     uirevision: plotType,
-    datarevision: data.length // Helps Plotly skip diffing if data length is same
+    datarevision: plotRevision // Use the passed revision key
   };
 
   // Add second y-axis for total barplot

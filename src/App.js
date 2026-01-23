@@ -225,6 +225,7 @@ function App() {
   const [perseeData, setPerseeData] = useState(null);
   const [dateWarnings, setDateWarnings] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
+  const [fetchId, setFetchId] = useState(0); // Track data fetches for graph updates
 
   useEffect(() => {
     // Load corpus periods and configs from TSV
@@ -289,6 +290,7 @@ function App() {
                 const total = results.data.reduce((acc, row) => acc + (row.n || 0), 0);
                 const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery, startDate: 1789, endDate: 1950 }, total };
                 setApiResponses([initialApiResponse]);
+                setFetchId(prev => prev + 1);
                 resolve();
               }
             }
@@ -594,7 +596,7 @@ function App() {
     }
 
     const params = new URLSearchParams({
-      terms: query.word,
+      terms: query.word.replace(/’/g, "'"),
       year: date.getFullYear(),
       limit: searchParams.limit,
       cursor: searchParams.cursor,
@@ -891,13 +893,13 @@ function App() {
     let url;
     if (corpus === 'route à part (query_persee)') {
       const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
-      url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ')}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
+      url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
     } else if (corpus === 'lemonde_rubriques') {
       const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
       const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
-      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
+      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
     } else {
-      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ')}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
+      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     }
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
@@ -965,9 +967,9 @@ function App() {
     if (corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
       let url;
       if (searchMode === 'cooccurrence' || searchMode === 'cooccurrence_article') {
-        url = `https://shiny.ens-paris-saclay.fr/guni/cooccur?mot1=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&mot2=${encodeURIComponent((word2 || '').trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${apiResolution}`;
+        url = `https://shiny.ens-paris-saclay.fr/guni/cooccur?mot1=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&mot2=${encodeURIComponent((word2 || '').trim().replace(/-/g, ' ').replace(/’/g, "'"))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${apiResolution}`;
       } else { // 'article' or 'document' (legacy)
-        url = `https://shiny.ens-paris-saclay.fr/guni/query_article?mot=${encodeURIComponent(word.trim().replace(/-/g, ' '))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${apiResolution}`;
+        url = `https://shiny.ens-paris-saclay.fr/guni/query_article?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&from=${globalStartDate}&to=${globalEndDate}&resolution=${apiResolution}`;
       }
 
       try {
@@ -1099,7 +1101,7 @@ function App() {
       actualCorpus = 'lemonde';
     }
 
-    const url = `https://shiny.ens-paris-saclay.fr/guni/${route}?mot=${word}&corpus=${actualCorpus}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}&length=${length || 2}&stopwords=${stopwords || 500}`;
+    const url = `https://shiny.ens-paris-saclay.fr/guni/${route}?mot=${word.replace(/’/g, "'")}&corpus=${actualCorpus}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}&length=${length || 2}&stopwords=${stopwords || 500}`;
 
     return fetch(url)
       .then(res => res.text())
@@ -1328,6 +1330,7 @@ function App() {
       .then(responses => {
         const flatResponses = responses.flat();
         setApiResponses(flatResponses);
+        setFetchId(prev => prev + 1);
         const total = flatResponses.reduce((acc, res) => acc + (res.total || 0), 0);
         setTotalPlotOccurrences(total);
 
@@ -1917,7 +1920,14 @@ function App() {
                 ) : plotType === 'wordcloud' ? (
                   <WordCloudComponent data={sumsData} darkMode={darkMode} />
                 ) : (
-                  <PlotComponent data={plotData} onPointClick={handlePointClick} advancedOptions={activeQuery.advancedOptions} plotType={plotType} darkMode={darkMode} />
+                  <PlotComponent
+                    data={plotData}
+                    onPointClick={handlePointClick}
+                    advancedOptions={activeQuery.advancedOptions}
+                    plotType={plotType}
+                    darkMode={darkMode}
+                    plotRevision={`${fetchId}-${smoothing}-${plotType}-${JSON.stringify(activeQuery?.advancedOptions)}`}
+                  />
                 )}
               </div>
               <div className="plot-controls">

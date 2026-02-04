@@ -1,7 +1,7 @@
 Titre	Période (conseillée)	Volume (en mots)	Code API	Longueur max	Résolution	Seuils	Date de téléchargement	Gallica_context_filter	Available_modes
 Le Monde	1944-2024	1.5 milliards	lemonde_rubriques	4	Journalière	Aucun	Janvier 2023		article|cooccurrence_article|associated_article|joker|nearby
 Presse de Gallica	1789-1950	57 milliards	presse	3	Mensuelle	"2gram>1;3gram>1"	Mars 2021	source=periodical	document|cooccurrence|joker|nearby
-Livres de Gallica	1600-1940	16 milliards	livres	5	Annuelle	2gram>1, etc	Mars 2021	source=book	document|cooccurrence|joker|nearby
+Livres de Gallica	1700-1940	16 milliards	livres	5	Annuelle	2gram>1, etc	Mars 2021	source=book	document|cooccurrence|joker|nearby
 Deutsches Zeitungsportal (DDB)	1780-1950	39 milliards	ddb	2	Mensuelle	1gram > 1, 2gram>2	Août 2023		
 American Stories	1798-1963	20 milliards	american_stories	3	Annuelle	1gram>1,2gram>2,3gram>3	Octobre 2023		
 Journal de Paris	1777-1827	86 millions	paris	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb327986698	document|cooccurrence
@@ -16,8 +16,9 @@ Le Petit Parisien	1876-1944	631 millions	petit_parisien	2	Journalière	2gram>1	A
 L'Humanité	1904-1952	318 millions	huma	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb327877302	document|cooccurrence
 Opensubtitles (français)	1935-2020	17 millions	subtitles	3	Annuelle	Aucun	Juillet 2023		
 Opensubtitles (anglais)	1930-2020	102 millions	subtitles_en	3	Annuelle	Aucun	Juillet 2023		
-Rap français (Genius)	1989-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024		
-Persée	1789-2023	1 milliard	route à part (query_persee)	2	Annuelle	Aucun	Décembre 2023		
+Rap français (Genius)	1995-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024		
+Persée	~1930-2023	1 milliard	route à part (query_persee)	2	Annuelle	Aucun	Décembre 2023		
 Ouest-France	1899-2025	?	ouest	2	Annuelle	Aucun	Octobre 2025	
 
 Prénoms INSEE	1700-2024	?	prenoms	1	Annuelle	Aucun	2025
+Libération	1998-2025	?	libe	5	Journalière	Aucun	Novembre 2025	

@@ -145,6 +145,23 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
   const availableModes = selectedCorpus?.availableModes || [];
 
+  // Auto-adjust resolution when corpus changes and current resolution is not supported
+  useEffect(() => {
+    if (!selectedCorpus) return;
+
+    // Determine which resolutions are valid for this corpus
+    const supportsMonthly = maxResolution === 'Mensuelle' || maxResolution === 'Journalière';
+    const supportsDaily = maxResolution === 'Journalière';
+
+    // If current resolution is not supported, fall back to a valid one
+    if (resolution === 'jour' && !supportsDaily) {
+      const newResolution = supportsMonthly ? 'mois' : 'annee';
+      onFormChange({ ...formData, resolution: newResolution });
+    } else if (resolution === 'mois' && !supportsMonthly) {
+      onFormChange({ ...formData, resolution: 'annee' });
+    }
+  }, [corpus, selectedCorpus, maxResolution, resolution, formData, onFormChange]);
+
   // Available search modes with descriptions
   const searchModes = [
     { value: 'ngram', label: 'By ngram', description: 'Search mode ngram description' },

@@ -745,18 +745,28 @@ function App() {
     validateDatesAgainstCorpus();
   }, [validateDatesAgainstCorpus]);
 
-  // Auto-adjust dates when corpus changes and current dates fall outside the new corpus's bounds
+  // Track previous corpus to detect actual corpus changes (not just tab switches)
+  const prevCorpusRef = React.useRef(null);
+
+  // Auto-adjust dates when corpus changes within a tab (not when switching tabs)
   useEffect(() => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
     if (!activeQuery || !corpusPeriods[activeQuery.corpus]) return;
 
-    const period = corpusPeriods[activeQuery.corpus];
+    const currentCorpus = activeQuery.corpus;
 
-    // If EITHER date is out of bounds, reset BOTH to the period limits (as requested)
-    if (startDate < period.start || endDate > period.end) {
-      setStartDate(period.start);
-      setEndDate(period.end);
+    // Only adjust dates if the corpus actually changed (not just switching tabs)
+    if (prevCorpusRef.current !== null && prevCorpusRef.current !== currentCorpus) {
+      const period = corpusPeriods[currentCorpus];
+
+      // If EITHER date is out of bounds, reset BOTH to the period limits
+      if (startDate < period.start || endDate > period.end) {
+        setStartDate(period.start);
+        setEndDate(period.end);
+      }
     }
+
+    prevCorpusRef.current = currentCorpus;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queries, activeQueryId, corpusPeriods]);
 
@@ -1312,23 +1322,6 @@ function App() {
     setIsLoading(true);
     setFetchContextAfterPlot(true);
 
-    // Compute adjusted dates synchronously to handle race condition with auto-adjust useEffect
-    const activeQuery = queries.find(q => q.id === activeQueryId);
-    let effectiveStartDate = startDate;
-    let effectiveEndDate = endDate;
-
-    if (activeQuery && corpusPeriods[activeQuery.corpus]) {
-      const period = corpusPeriods[activeQuery.corpus];
-      if (startDate < period.start) effectiveStartDate = period.start;
-      if (endDate > period.end) effectiveEndDate = period.end;
-
-      if (effectiveStartDate !== startDate || effectiveEndDate !== endDate) {
-        // Also update the state to keep UI in sync, but only if changed
-        if (effectiveStartDate !== startDate) setStartDate(effectiveStartDate);
-        if (effectiveEndDate !== endDate) setEndDate(effectiveEndDate);
-      }
-    }
-
     // Expand queries with '&' separator into multiple queries
     const expandedQueries = queries.flatMap(q => {
       if (q.word && q.word.includes('&')) {
@@ -1341,7 +1334,20 @@ function App() {
       return [q];
     });
 
-    const promises = expandedQueries.map(q => fetchDataForQuery(q, effectiveStartDate, effectiveEndDate));
+    // For each query, compute effective dates clamped to its corpus bounds
+    // This allows multiple corpora with different date ranges to be plotted together
+    const promises = expandedQueries.map(q => {
+      let effectiveStartDate = startDate;
+      let effectiveEndDate = endDate;
+
+      if (corpusPeriods[q.corpus]) {
+        const period = corpusPeriods[q.corpus];
+        if (startDate < period.start) effectiveStartDate = period.start;
+        if (endDate > period.end) effectiveEndDate = period.end;
+      }
+
+      return fetchDataForQuery(q, effectiveStartDate, effectiveEndDate);
+    });
 
     Promise.all(promises)
       .then(responses => {

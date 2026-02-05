@@ -51,6 +51,11 @@ function movingAverage(data, windowSize) {
   const smoothed = [];
   const halfWindow = Math.floor(windowSize / 2);
   for (let i = 0; i < data.length; i++) {
+    // Preserve nulls at original gap positions
+    if (data[i] === null || data[i] === undefined) {
+      smoothed.push(null);
+      continue;
+    }
     const start = Math.max(0, i - halfWindow);
     const end = Math.min(data.length - 1, i + halfWindow);
     let sum = 0;
@@ -93,6 +98,11 @@ function loessSmoothing(data, span) {
   };
 
   for (let i = 0; i < n; i++) {
+    // Preserve nulls at original gap positions
+    if (data[i] === null || data[i] === undefined) {
+      smoothed.push(null);
+      continue;
+    }
     // Find the k nearest neighbors
     const distances = [];
     for (let j = 0; j < n; j++) {
@@ -160,6 +170,11 @@ function movingSum(data, windowSize) {
   const smoothed = [];
   const halfWindow = Math.floor(windowSize / 2);
   for (let i = 0; i < data.length; i++) {
+    // Preserve nulls at original gap positions
+    if (data[i] === null || data[i] === undefined) {
+      smoothed.push(null);
+      continue;
+    }
     const start = Math.max(0, i - halfWindow);
     const end = Math.min(data.length - 1, i + halfWindow);
     let sum = 0;
@@ -185,18 +200,15 @@ function App() {
   const { t, i18n } = useTranslation();
 
   useEffect(() => {
-    fetch('https://ipapi.co/json/')
-      .then(response => response.json())
-      .then(data => {
-        console.log('IP Geolocation data:', data);
-        console.log('Is country FR:', data.country_code === 'FR');
-        if (data.country_code === 'FR') {
-          i18n.changeLanguage('fr');
-        } else {
-          i18n.changeLanguage('en');
-        }
-      })
-      .catch(error => console.error('Error fetching IP geolocation:', error));
+    // Detect language from browser settings
+    const browserLang = navigator.language || navigator.userLanguage;
+    const isFrench = browserLang && browserLang.toLowerCase().startsWith('fr');
+
+    if (isFrench) {
+      i18n.changeLanguage('fr');
+    } else {
+      i18n.changeLanguage('en');
+    }
   }, [i18n]);
   const [queries, setQueries] = useState([{ id: 1, ...initialQuery }]);
   const [activeQueryId, setActiveQueryId] = useState(1);
@@ -320,7 +332,7 @@ function App() {
       });
   }, []); // Empty dependency array ensures this runs only once
 
-  const processNgramData = useCallback((apiResponse, allSameCorpus, plotType) => {
+  const processNgramData = useCallback((apiResponse, allSameCorpus, plotType, index) => {
     const { data, query } = apiResponse;
     const { startDate, endDate } = query;
     const start = parseInt(startDate);
@@ -345,15 +357,16 @@ function App() {
           ? (ngramData.ngram || `${t('Query')} ${query.id}`)
           : `${ngramData.ngram || `${t('Query')} ${query.id}`} (${query.corpus})`,
         connectgaps: false,
+        meta: { responseIndex: index }
       };
     });
 
     return traces;
   }, [t]);
 
-  const processData = useCallback((apiResponse, allSameCorpus, plotType, advancedOptions) => {
+  const processData = useCallback((apiResponse, allSameCorpus, plotType, advancedOptions, index) => {
     if (apiResponse.query.corpus === 'google') {
-      return processNgramData(apiResponse, allSameCorpus, plotType);
+      return processNgramData(apiResponse, allSameCorpus, plotType, index);
     }
     const { data, query } = apiResponse;
     const { startDate, endDate, resolution } = query;
@@ -443,6 +456,7 @@ function App() {
         ? (query.word || `${t('Query')} ${query.id}`)
         : `${query.word || `${t('Query')} ${query.id}`} (${query.corpus})`,
       connectgaps: false,
+      meta: { responseIndex: index }
     };
   }, [processNgramData, t]);
 
@@ -478,7 +492,7 @@ function App() {
       const activeQuery = queries.find(q => q.id === activeQueryId);
       const advancedOptions = activeQuery?.advancedOptions || {};
 
-      let traces = apiResponses.flatMap(res => processData(res, allSameCorpus, plotType, advancedOptions));
+      let traces = apiResponses.flatMap((res, index) => processData(res, allSameCorpus, plotType, advancedOptions, index));
 
       // Handle difference calculation for lineplot mode
       if (plotType === 'line' && advancedOptions.difference && traces.length >= 2) {
@@ -596,7 +610,7 @@ function App() {
     }
 
     const params = new URLSearchParams({
-      terms: query.word.replace(/’/g, "'"),
+      terms: query.word.split('+')[0].replace(/’/g, "'"),
       year: date.getFullYear(),
       limit: searchParams.limit,
       cursor: searchParams.cursor,
@@ -845,24 +859,27 @@ function App() {
       const point = data.points[0];
       const curveNumber = point.curveNumber;
 
-      // When confidence intervals are shown, CI traces are prepended to the plot data.
-      // Each original trace gets 2 CI traces (lower and upper bounds), so we need to
-      // calculate the correct index into apiResponses.
-      const activeQuery = queries.find(q => q.id === activeQueryId);
-      const showCI = activeQuery?.advancedOptions?.showConfidenceInterval !== false &&
-        plotType === 'line' &&
-        !activeQuery?.advancedOptions?.rescale;
-
       let responseIndex = curveNumber;
-      if (showCI && apiResponses.length > 0) {
-        // CI traces come first: 2 traces per original trace (lower + upper bounds)
-        const numCITraces = apiResponses.length * 2;
-        if (curveNumber < numCITraces) {
-          // User clicked on a CI trace, ignore or map to corresponding data trace
-          responseIndex = Math.floor(curveNumber / 2);
-        } else {
-          // User clicked on a data trace, subtract the CI traces offset
-          responseIndex = curveNumber - numCITraces;
+
+      // Try to get responseIndex from meta (robust method)
+      if (point.data && point.data.meta && point.data.meta.responseIndex !== undefined) {
+        responseIndex = point.data.meta.responseIndex;
+      } else {
+        // Fallback to legacy index calculation (fragile)
+        const activeQuery = queries.find(q => q.id === activeQueryId);
+        const showCI = activeQuery?.advancedOptions?.showConfidenceInterval !== false &&
+          plotType === 'line' &&
+          !activeQuery?.advancedOptions?.rescale;
+
+        if (showCI && apiResponses.length > 0) {
+          // This fallback logic is likely incorrect with variable CI segments, 
+          // but kept as last resort.
+          const numCITraces = apiResponses.length * 2;
+          if (curveNumber < numCITraces) {
+            responseIndex = Math.floor(curveNumber / 2);
+          } else {
+            responseIndex = curveNumber - numCITraces;
+          }
         }
       }
 

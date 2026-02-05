@@ -63,55 +63,79 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       // Extract alpha or use 0.2 opacity for fill
       const fillColor = color.substring(0, 7) + '33'; // Add 20% opacity
 
-      // Compute CI bounds: frequency ± 1.96 * sqrt(frequency*(1-frequency)/total)
-      const ciUpper = [];
-      const ciLower = [];
-
-      if (trace.y && trace.n && trace.total) {
-        for (let i = 0; i < trace.y.length; i++) {
-          const freq = trace.y[i];
-          const n = trace.n[i];
-          const total = trace.total[i];
-
-          if (n === 0) {
-            // When n=0, upper bound = 3/total
-            ciLower.push(0);
-            ciUpper.push(total > 0 ? 3 / total : 0);
-          } else if (total > 0 && freq !== null && freq !== undefined) {
-            const se = 1.96 * Math.sqrt(freq * (1 - freq) / total);
-            ciLower.push(Math.max(0, freq - se)); // Never below 0
-            ciUpper.push(freq + se);
-          } else {
-            ciLower.push(freq);
-            ciUpper.push(freq);
-          }
-        }
-      } else {
-        // No n/total data available, skip CI for this trace
-        return;
+      if (!trace.y || !trace.n || !trace.total || !trace.x) {
+        return; // Skip if no data available
       }
 
-      // Lower bound trace (invisible, just for fill base)
-      ciTraces.push({
-        x: trace.x,
-        y: ciLower,
-        mode: 'lines',
-        line: { width: 0, shape: 'spline' },
-        showlegend: false,
-        hoverinfo: 'skip',
-        fillcolor: 'transparent'
-      });
+      // Split into segments at gaps (where total is null/0)
+      // Each segment becomes a separate pair of traces
+      let currentSegment = { x: [], lower: [], upper: [] };
+      const segments = [];
 
-      // Upper bound trace with fill to previous
-      ciTraces.push({
-        x: trace.x,
-        y: ciUpper,
-        mode: 'lines',
-        line: { width: 0, shape: 'spline' },
-        fill: 'tonexty',
-        fillcolor: fillColor,
-        showlegend: false,
-        hoverinfo: 'skip'
+      for (let i = 0; i < trace.y.length; i++) {
+        const freq = trace.y[i];
+        const n = trace.n[i];
+        const total = trace.total[i];
+
+        // Check if this is a gap point (no data)
+        const isGap = total === null || total === undefined || total <= 0;
+
+        if (isGap) {
+          // End current segment if it has data
+          if (currentSegment.x.length > 0) {
+            segments.push(currentSegment);
+            currentSegment = { x: [], lower: [], upper: [] };
+          }
+        } else {
+          // Calculate CI bounds
+          let ciLower, ciUpper;
+          if (n === 0) {
+            ciLower = 0;
+            ciUpper = 3 / total;
+          } else if (freq !== null && freq !== undefined) {
+            const se = 1.96 * Math.sqrt(freq * (1 - freq) / total);
+            ciLower = Math.max(0, freq - se);
+            ciUpper = freq + se;
+          } else {
+            ciLower = freq;
+            ciUpper = freq;
+          }
+
+          currentSegment.x.push(trace.x[i]);
+          currentSegment.lower.push(ciLower);
+          currentSegment.upper.push(ciUpper);
+        }
+      }
+
+      // Don't forget the last segment
+      if (currentSegment.x.length > 0) {
+        segments.push(currentSegment);
+      }
+
+      // Create trace pairs for each segment
+      segments.forEach(segment => {
+        // Lower bound trace (invisible, just for fill base)
+        ciTraces.push({
+          x: segment.x,
+          y: segment.lower,
+          mode: 'lines',
+          line: { width: 0, shape: 'spline' },
+          showlegend: false,
+          hoverinfo: 'skip',
+          fillcolor: 'transparent'
+        });
+
+        // Upper bound trace with fill to previous
+        ciTraces.push({
+          x: segment.x,
+          y: segment.upper,
+          mode: 'lines',
+          line: { width: 0, shape: 'spline' },
+          fill: 'tonexty',
+          fillcolor: fillColor,
+          showlegend: false,
+          hoverinfo: 'skip'
+        });
       });
     });
 
@@ -119,47 +143,38 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     finalPlotData = [...ciTraces, ...plotData];
   }
 
-  // Calculate y-axis range to prevent CI from crushing main lines
+  // Calculate y-axis range: default to auto-scale, only cap when CI blows up the plot
   let yAxisRange;
   if (showCI && plotData.length > 0) {
-    let maxVal = 0;
-    let minVal = Infinity;
+    let maxYFromMainLines = 0;
+    let maxYFromCI = 0;
 
+    // Get max Y from main line traces
     plotData.forEach(trace => {
-      // Check both y (main line) and ciUpper/ciLower if available
-      // Actually we just need to ensure the max y value + CI fits
-      // But we iterate over traces.
-      // Wait, finalPlotData includes CI traces which are separate.
-      // But here we iterate 'plotData' which are the semantic traces.
-
-      // Let's check y values
       if (trace.y) {
-        const validYs = trace.y.filter(val => typeof val === 'number');
+        const validYs = trace.y.filter(val => typeof val === 'number' && !isNaN(val));
         if (validYs.length > 0) {
           const m = Math.max(...validYs);
-          const mn = Math.min(...validYs);
-          if (m > maxVal) maxVal = m;
-          if (mn < minVal) minVal = mn;
+          if (m > maxYFromMainLines) maxYFromMainLines = m;
         }
       }
-
-      // Also account for CI upper bounds if we want to be precise, 
-      // but usually scaling to maxVal * 1.1 covers it?
-      // The previous logic only used maxVal from trace.y.
-      // Let's stick to maxVal from trace.y logic, assuming *1.1 handles the CI upper bound.
     });
 
-    if (maxVal > 0) {
-      if (advancedOptions?.extendYScale) {
-        yAxisRange = [0, maxVal * 1.1];
-      } else {
-        // Force minimum to 0 for frequency plots
-        yAxisRange = [0, maxVal * 1.1];
+    // Check the CI upper bounds
+    finalPlotData.forEach(trace => {
+      if (!trace.name && trace.y) {
+        const validYs = trace.y.filter(val => typeof val === 'number' && !isNaN(val));
+        if (validYs.length > 0) {
+          const m = Math.max(...validYs);
+          if (m > maxYFromCI) maxYFromCI = m;
+        }
       }
-    } else {
-      // If maxVal is 0 (e.g. no data or all zeros), force a sane range like [0, 1]
-      // so it doesn't default to something weird like [-1, 0]
-      yAxisRange = [0, 1];
+    });
+
+    // Only cap if CI is blowing up the plot (> 110% of main line max)
+    const threshold = maxYFromMainLines * 1.1;
+    if (maxYFromMainLines > 0 && maxYFromCI > threshold) {
+      yAxisRange = [undefined, threshold];
     }
   }
 

@@ -270,7 +270,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
         </div>
       )}
 
-      {searchMode === 'cooccurrence' && (
+      {(searchMode === 'cooccurrence' || searchMode === 'cooccurrence_article') && (
         <div className="form-group" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <TextField
             label={t('Second Word')}

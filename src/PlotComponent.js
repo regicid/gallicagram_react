@@ -241,7 +241,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     },
     yaxis: {
       title: yAxisTitle,
-      rangemode: plotType === 'area' ? 'tozero' : 'normal',
+      rangemode: (plotType === 'area' || advancedOptions?.extendYScale) ? 'tozero' : 'normal',
       fixedrange: isTouchScreen,
       tickfont: { size: 14 },
       ...(plotlyTheme.yaxis || {}),

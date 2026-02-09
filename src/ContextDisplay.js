@@ -150,7 +150,7 @@ const SpecialContextDisplay = ({ record, corpus }) => {
   }, [record, corpus, t]);
 
   if (isLoading) return <div>{t('Loading...')}</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (error) return <div style={{ color: 'inherit' }}>{error}</div>;
   if (!data) return <div>{t('No data')}</div>;
 
   return (

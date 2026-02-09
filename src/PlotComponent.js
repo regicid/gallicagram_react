@@ -48,7 +48,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     plotData = plotData.map((trace, index) => ({
       ...trace,
       line: trace.line ? { ...trace.line, color: palette[index % palette.length] } : { color: palette[index % palette.length] },
-      marker: trace.marker ? { ...trace.marker, color: palette[index % palette.length] } : { color: palette[index % palette.length] }
+      marker: trace.marker ? { ...trace.marker, color: palette[index % palette.length] } : { color: palette[index % palette.length] },
+      legendgroup: `group${index}`
     }));
   }
 
@@ -122,7 +123,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
           line: { width: 0, shape: 'spline' },
           showlegend: false,
           hoverinfo: 'skip',
-          fillcolor: 'transparent'
+          fillcolor: 'transparent',
+          legendgroup: `group${index}`
         });
 
         // Upper bound trace with fill to previous
@@ -134,7 +136,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
           fill: 'tonexty',
           fillcolor: fillColor,
           showlegend: false,
-          hoverinfo: 'skip'
+          hoverinfo: 'skip',
+          legendgroup: `group${index}`
         });
       });
     });
@@ -143,40 +146,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     finalPlotData = [...ciTraces, ...plotData];
   }
 
-  // Calculate y-axis range: default to auto-scale, only cap when CI blows up the plot
-  let yAxisRange;
-  if (showCI && plotData.length > 0) {
-    let maxYFromMainLines = 0;
-    let maxYFromCI = 0;
 
-    // Get max Y from main line traces
-    plotData.forEach(trace => {
-      if (trace.y) {
-        const validYs = trace.y.filter(val => typeof val === 'number' && !isNaN(val));
-        if (validYs.length > 0) {
-          const m = Math.max(...validYs);
-          if (m > maxYFromMainLines) maxYFromMainLines = m;
-        }
-      }
-    });
-
-    // Check the CI upper bounds
-    finalPlotData.forEach(trace => {
-      if (!trace.name && trace.y) {
-        const validYs = trace.y.filter(val => typeof val === 'number' && !isNaN(val));
-        if (validYs.length > 0) {
-          const m = Math.max(...validYs);
-          if (m > maxYFromCI) maxYFromCI = m;
-        }
-      }
-    });
-
-    // Only cap if CI is blowing up the plot (> 110% of main line max)
-    const threshold = maxYFromMainLines * 1.1;
-    if (maxYFromMainLines > 0 && maxYFromCI > threshold) {
-      yAxisRange = [undefined, threshold];
-    }
-  }
 
   const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? t('Z-score') : t('Frequency in the corpus');
 
@@ -232,6 +202,11 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     autosize: true,
     title: t('Frequency over time'),
     ...plotlyTheme,
+    legend: {
+      font: {
+        size: 16
+      }
+    },
     dragmode: isTouchScreen ? false : 'zoom',
     xaxis: {
       title: showTotalBarplot ? undefined : t('Date'),
@@ -246,7 +221,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       tickfont: { size: 14 },
       ...(plotlyTheme.yaxis || {}),
       domain: showTotalBarplot ? [0.35, 1] : [0, 1],
-      range: yAxisRange
+
     },
     // Use uirevision to prevent Plotly from resetting the layout (zoom, pan, margins)
     // We bind this to a known state, or just 'true' to persist user interactions.

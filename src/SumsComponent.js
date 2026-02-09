@@ -1,20 +1,26 @@
 import React from 'react';
 import Plot from 'react-plotly.js';
 import { useTranslation } from 'react-i18next';
+import { defaultPalette, colorblindPalette } from './PlotComponent';
 
-const SumsComponent = ({ data, darkMode }) => {
+const SumsComponent = ({ data, darkMode, advancedOptions }) => {
   const { t } = useTranslation();
 
   if (!data || data.length === 0) {
     return <div>{t('No data to display')}</div>;
   }
 
-  const plotData = [{
-    x: data.map(d => d.total),
-    y: data.map(d => d.word),
+  // Choose palette
+  const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
+
+  const plotData = data.map((d, index) => ({
+    x: [d.total],
+    y: [d.word],
+    name: d.name || d.word, // Fallback for list modes or legacy data
     type: 'bar',
-    orientation: 'h'
-  }];
+    orientation: 'h',
+    marker: { color: palette[index % palette.length] }
+  }));
 
   // Calculate dynamic font size based on number of items
   // More items = smaller font to prevent overlap

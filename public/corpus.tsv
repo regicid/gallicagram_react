@@ -1,5 +1,5 @@
 Titre	Période (conseillée)	Volume (en mots)	Code API	Longueur max	Résolution	Seuils	Date de téléchargement	Gallica_context_filter	Available_modes
-Le Monde	1944-2024	1.5 milliards	lemonde_rubriques	4	Journalière	Aucun	Janvier 2023		article|cooccurrence_article|associated_article|joker|nearby
+Le Monde	1945-2024	1.5 milliards	lemonde_rubriques	4	Journalière	Aucun	Janvier 2023		article|cooccurrence_article|associated_article|joker|nearby
 Presse de Gallica	1789-1950	57 milliards	presse	3	Mensuelle	"2gram>1;3gram>1"	Mars 2021	source=periodical	document|cooccurrence|joker|nearby
 Livres de Gallica	1700-1940	16 milliards	livres	5	Annuelle	2gram>1, etc	Mars 2021	source=book	document|cooccurrence|joker|nearby
 Deutsches Zeitungsportal (DDB)	1780-1950	39 milliards	ddb	2	Mensuelle	1gram > 1, 2gram>2	Août 2023		

@@ -355,14 +355,14 @@ function App() {
         line: plotType === 'line' || plotType === 'area' ? { shape: 'spline' } : undefined,
         name: allSameCorpus
           ? (ngramData.ngram || `${t('Query')} ${query.id}`)
-          : `${ngramData.ngram || `${t('Query')} ${query.id}`} (${query.corpus})`,
+          : `${ngramData.ngram || `${t('Query')} ${query.id}`} (${corpusPeriods[query.corpus]?.name || query.corpus})`,
         connectgaps: false,
         meta: { responseIndex: index }
       };
     });
 
     return traces;
-  }, [t]);
+  }, [t, corpusPeriods]);
 
   const processData = useCallback((apiResponse, allSameCorpus, plotType, advancedOptions, index) => {
     if (apiResponse.query.corpus === 'google') {
@@ -454,11 +454,11 @@ function App() {
       line: plotType === 'line' || plotType === 'area' ? { shape: 'spline' } : undefined,
       name: allSameCorpus
         ? (query.word || `${t('Query')} ${query.id}`)
-        : `${query.word || `${t('Query')} ${query.id}`} (${query.corpus})`,
+        : `${query.word || `${t('Query')} ${query.id}`} (${corpusPeriods[query.corpus]?.name || query.corpus})`,
       connectgaps: false,
       meta: { responseIndex: index }
     };
-  }, [processNgramData, t]);
+  }, [processNgramData, t, corpusPeriods]);
 
   useEffect(() => {
     if (apiResponses.length === 0) return;
@@ -471,6 +471,9 @@ function App() {
         // Use the data directly
         setSumsData(listModeResponse.data);
       } else {
+        const firstCorpus = queries[0]?.corpus;
+        const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
+
         const data = apiResponses.map(res => {
           let total;
           if (res.query.corpus === 'google') {
@@ -478,8 +481,14 @@ function App() {
           } else {
             total = res.total || 0;
           }
+          const name = allSameCorpus
+            ? (res.query.word || `${t('Query')} ${res.query.id}`)
+            : `${res.query.word || `${t('Query')} ${res.query.id}`} (${corpusPeriods[res.query.corpus]?.name || res.query.corpus})`;
+
           return {
             word: res.query.word || `${t('Query')} ${res.query.id}`,
+            name: name,
+            corpus: res.query.corpus,
             total: total
           };
         });
@@ -537,7 +546,7 @@ function App() {
 
       setRawPlotData(traces);
     }
-  }, [apiResponses, plotType, queries, activeQueryId, processData, t]);
+  }, [apiResponses, plotType, queries, activeQueryId, processData, t, corpusPeriods]);
 
   // Effect to switch to 'sums' view for list modes
   useEffect(() => {
@@ -1939,7 +1948,11 @@ function App() {
                   </div>
                 )}
                 {plotType === 'sums' ? (
-                  <SumsComponent data={sumsData} darkMode={darkMode} />
+                  <SumsComponent
+                    data={sumsData}
+                    darkMode={darkMode}
+                    advancedOptions={activeQuery?.advancedOptions}
+                  />
                 ) : plotType === 'wordcloud' ? (
                   <WordCloudComponent data={sumsData} darkMode={darkMode} />
                 ) : (

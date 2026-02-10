@@ -18,15 +18,6 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Try to fetch from local context first
-      const localResponse = await fetch(`/contexts/${record.ark}.json`);
-      if (localResponse.ok) {
-        const data = await localResponse.json();
-        setContext(data);
-        return;
-      }
-
-      // Fallback to API if local fetch fails
       const terms = ensureMultiWordIsWrapped(record.terms).map(term => term.split('+')[0]);
       const params = new URLSearchParams({
         ark: record.ark,

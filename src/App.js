@@ -846,21 +846,25 @@ function App() {
   const prevCorpusRef = React.useRef(null);
 
   // Auto-adjust dates when corpus changes within a tab (not when switching tabs)
-  // Logic modified to allow users to select dates outside the recommended range
   useEffect(() => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
     if (!activeQuery || !corpusPeriods[activeQuery.corpus]) return;
 
     const currentCorpus = activeQuery.corpus;
 
+    // Detect if the corpus actually changed (not just a tab switch)
     if (prevCorpusRef.current !== null && prevCorpusRef.current !== currentCorpus) {
-      // We used to reset dates here, but now we just let them be.
-      // Warnings are handled elsewhere.
+      const period = corpusPeriods[currentCorpus];
+      // If either start or end date is outside the recommended range, reset to recommended
+      if (startDate < period.start || endDate > period.end) {
+        setStartDate(period.start);
+        setEndDate(period.end);
+      }
     }
 
     prevCorpusRef.current = currentCorpus;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queries, activeQueryId, corpusPeriods]);
+  }, [queries, activeQueryId, corpusPeriods, startDate, endDate]);
+
 
   const [wordCountWarnings, setWordCountWarnings] = useState([]);
 

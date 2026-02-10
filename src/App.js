@@ -1426,19 +1426,10 @@ function App() {
       return [q];
     });
 
-    // For each query, compute effective dates clamped to its corpus bounds
-    // This allows multiple corpora with different date ranges to be plotted together
+    // We used to clamp dates here to the corpus periods, but we now trust the user
+    // (warnings are displayed in the UI if dates are out of bounds)
     const promises = expandedQueries.map(q => {
-      let effectiveStartDate = startDate;
-      let effectiveEndDate = endDate;
-
-      if (corpusPeriods[q.corpus]) {
-        const period = corpusPeriods[q.corpus];
-        if (startDate < period.start) effectiveStartDate = period.start;
-        if (endDate > period.end) effectiveEndDate = period.end;
-      }
-
-      return fetchDataForQuery(q, effectiveStartDate, effectiveEndDate);
+      return fetchDataForQuery(q, startDate, endDate);
     });
 
     Promise.all(promises)

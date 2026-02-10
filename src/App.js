@@ -41,6 +41,7 @@ const initialQuery = {
     showConfidenceInterval: true,
     showTotalBarplot: false,
     extendYScale: false,
+    corpusBundle: false,
   }
 };
 
@@ -543,6 +544,93 @@ function App() {
         };
         traces = [ratioTrace];
       }
+      // Handle corpus bundle calculation
+      else if (plotType === 'line' && advancedOptions.corpusBundle && traces.length >= 2) {
+        // Find all unique X values (dates)
+        const allDates = new Set();
+        traces.forEach(trace => {
+          if (trace.x) {
+            trace.x.forEach(date => allDates.add(date.getTime()));
+          }
+        });
+
+        const sortedDates = Array.from(allDates).sort((a, b) => a - b).map(d => new Date(d));
+
+        // Get unique words to bundle
+        const uniqueWords = [...new Set(traces.map(t => t.meta?.word || t.name.split(' (')[0]))];
+
+        const bundledTraces = uniqueWords.map(word => {
+          const relevantTraces = traces.filter(t => (t.meta?.word || t.name.split(' (')[0]) === word);
+
+          if (relevantTraces.length === 0) return null;
+
+          const yValues = sortedDates.map(date => {
+            let totalN = 0;
+            let totalTotal = 0;
+            let hasData = false;
+
+            relevantTraces.forEach(trace => {
+              const idx = trace.x.findIndex(d => d.getTime() === date.getTime());
+              if (idx !== -1 && trace.n && trace.total && trace.n[idx] !== null && trace.total[idx] !== null) {
+                totalN += trace.n[idx];
+                totalTotal += trace.total[idx];
+                hasData = true;
+              }
+            });
+
+            if (!hasData || totalTotal === 0) return null;
+            return totalN / totalTotal;
+          });
+
+          const nValues = sortedDates.map(date => {
+            let totalN = 0;
+            let hasData = false;
+
+            relevantTraces.forEach(trace => {
+              const idx = trace.x.findIndex(d => d.getTime() === date.getTime());
+              if (idx !== -1 && trace.n && trace.n[idx] !== null) {
+                totalN += trace.n[idx];
+                hasData = true;
+              }
+            });
+
+            if (!hasData) return null;
+            return totalN;
+          });
+          const totalValues = sortedDates.map(date => {
+            let totalTotal = 0;
+            let hasData = false;
+
+            relevantTraces.forEach(trace => {
+              const idx = trace.x.findIndex(d => d.getTime() === date.getTime());
+              if (idx !== -1 && trace.total && trace.total[idx] !== null) {
+                totalTotal += trace.total[idx];
+                hasData = true;
+              }
+            });
+
+            if (!hasData) return null;
+            return totalTotal;
+          });
+
+
+          return {
+            x: sortedDates,
+            y: yValues,
+            n: nValues,
+            total: totalValues,
+            type: 'scatter',
+            mode: relevantTraces[0].mode,
+            line: relevantTraces[0].line,
+            name: `${word} (${t('Corpus bundle')})`,
+            connectgaps: false,
+          };
+        }).filter(t => t !== null);
+
+        if (bundledTraces.length > 0) {
+          traces = bundledTraces;
+        }
+      }
 
       setRawPlotData(traces);
     }
@@ -758,21 +846,16 @@ function App() {
   const prevCorpusRef = React.useRef(null);
 
   // Auto-adjust dates when corpus changes within a tab (not when switching tabs)
+  // Logic modified to allow users to select dates outside the recommended range
   useEffect(() => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
     if (!activeQuery || !corpusPeriods[activeQuery.corpus]) return;
 
     const currentCorpus = activeQuery.corpus;
 
-    // Only adjust dates if the corpus actually changed (not just switching tabs)
     if (prevCorpusRef.current !== null && prevCorpusRef.current !== currentCorpus) {
-      const period = corpusPeriods[currentCorpus];
-
-      // If EITHER date is out of bounds, reset BOTH to the period limits
-      if (startDate < period.start || endDate > period.end) {
-        setStartDate(period.start);
-        setEndDate(period.end);
-      }
+      // We used to reset dates here, but now we just let them be.
+      // Warnings are handled elsewhere.
     }
 
     prevCorpusRef.current = currentCorpus;

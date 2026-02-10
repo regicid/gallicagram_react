@@ -627,6 +627,23 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
             </div>
           }
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.corpusBundle || false}
+              onChange={onAdvancedOptionsChange}
+              name="corpusBundle"
+            />
+          }
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Corpus bundle')}
+              <Tooltip title={t('Corpus bundle help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
+        />
       </AccordionDetails>
     </Accordion>
   );

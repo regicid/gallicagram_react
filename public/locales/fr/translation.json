@@ -137,5 +137,7 @@
   "Long query warning lemonde restricted": "Pour le corpus Le Monde et ce mode de recherche, le nombre maximum de mots est de 1.",
   "Extend Y-scale to 0": "Étendre l'échelle Y à 0",
   "Extend Y-scale to 0 help": "Force l'axe Y à commencer à 0.",
-  "Low data warning": "Ce mot étant rare ({{count}} occurrences), nous vous suggérons humblement de visualiser les résultats avec ce graphique à barres. Vous pouvez re-basculer en graphique linéaire en modifiant l'option, mais ça va vraisemblablement ressembler à rien."
+  "Low data warning": "Ce mot étant rare ({{count}} occurrences), nous vous suggérons humblement de visualiser les résultats avec ce graphique à barres. Vous pouvez re-basculer en graphique linéaire en modifiant l'option, mais ça va vraisemblablement ressembler à rien.",
+  "Corpus bundle": "Bouquet de corpus",
+  "Corpus bundle help": "Somme des fréquences à travers les corpus pour le même mot."
 }

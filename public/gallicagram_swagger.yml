@@ -1,0 +1,386 @@
+openapi: 3.0.3
+
+info:
+  title: Gallicagram API
+  version: "1.2.0"
+  description: |
+    API permettant d’interroger des bases de fréquences lexicales et de cooccurrences
+    construites à partir de grands corpus historiques (Gallica, Le Monde, Persée, etc.).
+
+    ### 📚 Utilisation rapide
+    L'API retourne systématiquement des données au format **CSV**.
+    
+    Exemple R : 
+    ```r
+    read.csv("https://shiny.ens-paris-saclay.fr/guni/query?mot=patate")
+    ```
+
+  contact:
+    name: Documentation de l'API
+    url: https://regicid.github.io/api
+
+servers:
+  - url: https://shiny.ens-paris-saclay.fr/guni
+    description: Serveur principal
+
+paths:
+  /query:
+    get:
+      summary: Fréquence d'un mot ou syntagme
+      description: |
+        Retourne le nombre d’occurrences d’un mot ou groupe de mots sur une période donnée.
+        
+        **Colonnes CSV retournées :** `n` (occurrences), `gram`, `annee`, `mois`, `jour` (selon résolution), `total` (volume total du corpus).
+      parameters:
+        - name: mot
+          in: query
+          description: Mot ou expression à chercher.
+          required: true
+          schema:
+            type: string
+          example: patate
+        - $ref: '#/components/parameters/CorpusParam'
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+
+      responses:
+        "200":
+          description: CSV des fréquences temporelles
+          content:
+            text/csv:
+              schema:
+                type: string
+                example: "n,gram,annee,mois,total\n42,patate,1789,01,1000000"
+
+  /contain:
+    get:
+      summary: N-grams contenant deux mots
+      description: |
+        Compte ou liste les n-grams contenant simultanément `mot1` et `mot2`.
+        Idéal pour les études de stéréotypes.
+      parameters:
+        - $ref: '#/components/parameters/CorpusParam'
+        - name: mot1
+          in: query
+          required: true
+          schema:
+            type: string
+          example: crise
+        - name: mot2
+          in: query
+          required: true
+          schema:
+            type: string
+          example: financière
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+        - name: count
+          in: query
+          description: Si `true`, renvoie les comptages. Si `false`, renvoie les n-grams bruts.
+          schema:
+            type: boolean
+            default: true
+
+      responses:
+        "200":
+          description: CSV des cooccurrences ou n-grams
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /joker:
+    get:
+      summary: Mots apparaissant autour d’un terme (Wildcard)
+      description: |
+        Renvoie les mots les plus fréquents avant ou après un terme pivot.
+        Analogue au "wildcard" de Ngram Viewer (ex: `camarade *`).
+      parameters:
+        - name: mot
+          in: query
+          required: true
+          schema:
+            type: string
+          example: camarade
+        - $ref: '#/components/parameters/CorpusParam'
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+        - name: n_joker
+          in: query
+          description: Nombre de résultats max ou "all".
+          schema:
+            oneOf:
+              - type: integer
+              - type: string
+                enum: [all]
+          example: 50
+        - name: after
+          in: query
+          description: Chercher après le mot (`true`) ou avant (`false`).
+          schema:
+            type: boolean
+            default: true
+        - name: length
+          in: query
+          description: Longueur du n-gram complet (pivot inclus).
+          schema:
+            $ref: '#/components/schemas/GramLength'
+
+      responses:
+        "200":
+          description: CSV des mots contextuels les plus fréquents
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /associated:
+    get:
+      summary: Voisinage lexical (Cooccurrences locales)
+      description: |
+        Renvoie les mots les plus fréquemment associés à un terme dans une fenêtre glissante.
+      parameters:
+        - name: mot
+          in: query
+          required: true
+          schema:
+            type: string
+          example: changement climatique
+        - $ref: '#/components/parameters/CorpusParam'
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+        - name: n_joker
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: length
+          in: query
+          schema:
+            $ref: '#/components/schemas/GramLength'
+        - name: stopwords
+          in: query
+          description: Nombre de mots vides (les plus fréquents) à ignorer.
+          schema:
+            $ref: '#/components/schemas/StopwordsCount'
+
+      responses:
+        "200":
+          description: CSV des associations lexicales
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /associated_article:
+    get:
+      summary: Voisinage sémantique par article (Le Monde)
+      description: |
+        **Corpus Le Monde uniquement.**
+        Explore l'environnement sémantique au niveau de l'article entier plutôt que du n-gram.
+      parameters:
+        - name: mot
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+        - name: n_joker
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: stopwords
+          in: query
+          schema:
+            $ref: '#/components/schemas/StopwordsCount'
+
+      responses:
+        "200":
+          description: CSV des associations par article
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /cooccur:
+    get:
+      summary: Cooccurrences par article (Le Monde)
+      description: |
+        **Corpus Le Monde uniquement.**
+        Compte les articles contenant `mot1` ET `mot2`.
+      parameters:
+        - name: mot1
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: mot2
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+        - name: resolution
+          in: query
+          schema:
+            $ref: '#/components/schemas/Resolution'
+
+      responses:
+        "200":
+          description: CSV des cooccurrences
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /query_article:
+    get:
+      summary: Fréquence par nombre d'articles (Le Monde)
+      description: |
+        **Corpus Le Monde uniquement.**
+        Compte le nombre d'articles contenant le mot (vs nombre d'occurrences).
+      parameters:
+        - name: mot
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+
+      responses:
+        "200":
+          description: CSV du nombre d'articles
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /query_persee:
+    get:
+      summary: Recherche spécifique Corpus Persée
+      description: |
+        Interroge le corpus scientifique Persée avec filtrage par revue possible.
+      parameters:
+        - name: mot
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+        - name: by_revue
+          in: query
+          description: Si `true`, ventile les résultats par revue.
+          schema:
+            type: boolean
+            default: false
+        - name: revue
+          in: query
+          description: "Codes des revues séparés par `+` (ex: `arss+ahess`). Si vide et by_revue=true, cherche partout."
+          schema:
+            type: string
+
+      responses:
+        "200":
+          description: CSV des résultats Persée
+          content:
+            text/csv:
+              schema:
+                type: string
+
+components:
+  parameters:
+    CorpusParam:
+      name: corpus
+      in: query
+      required: false
+      description: "Choix du corpus (défaut: `presse`). Voir Schemas pour les détails."
+      schema:
+        $ref: '#/components/schemas/CorpusCode'
+      example: lemonde
+
+    FromParam:
+      name: from
+      in: query
+      description: Année de début.
+      schema:
+        $ref: '#/components/schemas/Year'
+      example: 1945
+
+    ToParam:
+      name: to
+      in: query
+      description: Année de fin.
+      schema:
+        $ref: '#/components/schemas/Year'
+      example: 2022
+
+  schemas:
+    Year:
+      type: integer
+      minimum: 1600
+      maximum: 2025
+      description: Année (format YYYY)
+
+    StopwordsCount:
+      type: integer
+      minimum: 0
+      maximum: 1000
+      default: 0
+      description: Nombre de mots très fréquents à exclure du calcul.
+
+    GramLength:
+      type: integer
+      minimum: 1
+      maximum: 5
+      description: Taille du n-gram (limité selon le corpus, voir CorpusCode).
+
+    Resolution:
+      type: string
+      enum: [jour, mois, annee]
+      description: Granularité temporelle des résultats.
+
+    CorpusCode:
+      type: string
+      description: |
+        Identifiant du corpus à interroger.
+        
+        | Corpus | Code | Période | N-gram max | Résolution |
+        | :--- | :--- | :--- | :---: | :--- |
+        | **Le Monde** | `lemonde` | 1944–2023 | 4 | Jour |
+        | **Presse Gallica** | `presse` | 1789–1950 | 3 | Mois |
+        | **Livres Gallica** | `livres` | 1600–1940 | 5 | Année |
+        | **Persée** | *(via /query_persee)* | 1789–2023 | 2 | Année |
+        | **Deutsches Zeitungsportal** | `ddb` | 1780–1950 | 2 | Mois |
+        | **American Stories** | `american_stories` | 1798–1963 | 3 | Année |
+        | **Journal de Paris** | `paris` | 1777–1827 | 2 | Jour |
+        | **Journal des Débats** | `journal_des_debats` | 1789–1944 | 1 | Jour |
+        | **L'Humanité** | `huma` | 1904–1952 | 2 | Jour |
+        | **Le Figaro** | `figaro` | 1854–1952 | 2 | Jour |
+        | **Rap (Genius)** | `rap` | 1989–2024 | 5 | Année |
+        | **Subtitles (FR)** | `subtitles` | 1935–2020 | 3 | Année |
+        | **Subtitles (EN)** | `subtitles_en` | 1930–2020 | 3 | Année |
+
+      enum:
+        - lemonde
+        - presse
+        - livres
+        - ddb
+        - american_stories
+        - paris
+        - moniteur
+        - journal_des_debats
+        - la_presse
+        - constitutionnel
+        - figaro
+        - temps
+        - petit_journal
+        - petit_parisien
+        - huma
+        - subtitles
+        - subtitles_en
+        - rap

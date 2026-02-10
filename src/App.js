@@ -14,6 +14,8 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
 import { FingerprintSpinner } from 'react-epic-spinners';
+import { Routes, Route, Link } from "react-router-dom";
+import SwaggerPage from "./SwaggerPage";
 
 const theme = createTheme({
   typography: {
@@ -1915,231 +1917,239 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-      <div className={`App ${darkMode ? 'dark' : ''}`}>
-        <header className="App-header">
-          <img src="/logo.png" className="App-logo" alt="logo" />
-          <div className="header-links">
-            <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
-            <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
-            <a href="https://regicid.github.io/api" target="_blank" rel="noopener noreferrer">{t('API')}</a>
-            <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
-            <a href="https://github.com/regicid/gallicagram_react" target="_blank" rel="noopener noreferrer">{t('Code')}</a>
-            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('en')}>🇬🇧</button>
-            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('fr')}>🇫🇷</button>
-            <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
-              <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
-              <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />
-            </span>
-          </div>
-        </header>
-        <div className="App-body">
-          <div className="form-container">
-            <TabsComponent
-              queries={queries}
-              activeQueryId={activeQueryId}
-              onTabClick={setActiveQueryId}
-              onAddTab={addQuery}
-              onRemoveTab={removeQuery}
-              isOnlyQuery={queries.length === 1}
-            />
-            {activeQuery && (
-              <>
-                <FormComponent
-                  formData={activeQuery}
-                  onFormChange={handleFormChange}
-                  onPlot={handlePlot}
-                  perseeData={perseeData}
-                />
-                <div className="form-group">
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <TextField
-                      name="startDate"
-                      label={t('Start Date')}
-                      type="number"
-                      value={startDate}
-                      onChange={handleDateInputChange}
-                      onKeyDown={handleKeyDown}
-                      inputProps={{ min: 1600, max: 2025 }}
-                    />
-                    <TextField
-                      name="endDate"
-                      label={t('End Date')}
-                      type="number"
-                      value={endDate}
-                      onChange={handleDateInputChange}
-                      onKeyDown={handleKeyDown}
-                      inputProps={{ min: 1600, max: 2025 }}
-                    />
-                  </Box>
-                  <Box sx={{ width: '100%' }}>
-                    <Slider
-                      getAriaLabel={() => t('Date range')}
-                      value={[startDate, endDate]}
-                      onChange={handleSliderChange}
-                      valueLabelDisplay="off"
-                      min={1600}
-                      max={2025}
-                    />
-                  </Box>
-                </div>
-                <AdvancedOptionsComponent
-                  advancedOptions={activeQuery.advancedOptions}
-                  onAdvancedOptionsChange={handleAdvancedOptionsChange}
-                />
-              </>
-            )}
-            <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
-              {isLoading ? t('Loading...') : t('Plot')}
-            </Button>
-            {dateWarnings.length > 0 && (
-              <Box sx={{ marginTop: '1rem', width: '100%' }}>
-                {dateWarnings.map((warning, index) => (
-                  <Alert key={index} severity="warning" sx={{ marginBottom: '0.5rem' }}>
-                    {warning.message}
-                  </Alert>
-                ))}
-              </Box>
-            )}
-            {wordCountWarnings.length > 0 && (
-              <Box sx={{ marginTop: '1rem', width: '100%' }}>
-                {wordCountWarnings.map((warning, index) => (
-                  <Alert key={`word-${index}`} severity="warning" sx={{ marginBottom: '0.5rem' }}>
-                    {warning.message}
-                  </Alert>
-                ))}
-              </Box>
-            )}
-            {totalPlotOccurrences > 0 && (
-              <Typography variant="body1" style={{ marginTop: '1rem' }}>
-                {t('Total Occurrences:')} {totalPlotOccurrences.toLocaleString()}
-              </Typography>
-            )}
-          </div>
-          <div className="plot-container">
-            {error && <div className="error">{error}</div>}
-            <div className="plot-area">
-              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                {isLoading && (
-                  <div className="loading-overlay" style={{ flexDirection: 'column' }}>
+      <Routes>
+        <Route path="/swagger" element={<SwaggerPage />} />
 
-                    <FingerprintSpinner color="#d32f2f" size={100} />
-                  </div>
-                )}
-                {plotType === 'sums' ? (
-                  <SumsComponent
-                    data={sumsData}
-                    darkMode={darkMode}
-                    advancedOptions={activeQuery?.advancedOptions}
-                  />
-                ) : plotType === 'wordcloud' ? (
-                  <WordCloudComponent data={sumsData} darkMode={darkMode} />
-                ) : (
-                  <PlotComponent
-                    data={plotData}
-                    onPointClick={handlePointClick}
-                    advancedOptions={activeQuery.advancedOptions}
-                    plotType={plotType}
-                    darkMode={darkMode}
-                    plotRevision={`${fetchId}-${smoothing}-${plotType}-${JSON.stringify(activeQuery?.advancedOptions)}`}
-                  />
-                )}
-              </div>
-              <div className="plot-controls">
-                <h3>{t('Plot controls')}</h3>
-                <div className="form-group">
-                  <FormControl fullWidth>
-                    <InputLabel id="plot-type-select-label">{t('Visualization:')}</InputLabel>
-                    <Select
-                      labelId="plot-type-select-label"
-                      id="plot-type-select"
-                      value={plotType}
-                      label={t('Visualization:')}
-                      onChange={(e) => setPlotType(e.target.value)}
-                      sx={{ fontFamily: 'serif' }}
-                    >
-                      <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>
-                      <MenuItem value={"area"}>{t('Area Chart (Frequency)')}</MenuItem>
-                      <MenuItem value={"bar"}>{t('Bar Plot (Raw Count)')}</MenuItem>
-                      <MenuItem value={"sums"}>{t('Sums')}</MenuItem>
-                      <MenuItem value={"wordcloud"}>{t('Word Cloud')}</MenuItem>
-                    </Select>
-                  </FormControl>
+        <Route path="*" element={
+          <>
+            <div className={`App ${darkMode ? 'dark' : ''}`}>
+              <header className="App-header">
+                <img src="/logo.png" className="App-logo" alt="logo" />
+                <div className="header-links">
+                  <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
+                  <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
+                  <Link to="/swagger"> {t('API')} </Link>
+                  <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
+                  <a href="https://github.com/regicid/gallicagram_react" target="_blank" rel="noopener noreferrer">{t('Code')}</a>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('en')}>🇬🇧</button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('fr')}>🇫🇷</button>
+                  <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
+                    <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
+                    <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />
+                  </span>
                 </div>
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
-                  <div style={{ flexGrow: 1 }}>
-                    <Typography id="smoothing-slider" gutterBottom>
-                      {activeQuery?.advancedOptions?.loessSmoothing
-                        ? t('Smoothing (Loess Span):')
-                        : t('Smoothing (Moving Average):')}
-                    </Typography>
-                    <Slider
-                      value={smoothing}
-                      onChange={(e, newValue) => setSmoothing(newValue)}
-                      aria-labelledby="smoothing-slider"
-                      valueLabelDisplay="on"
-                      step={1}
-                      marks
-                      min={0}
-                      max={10}
-                      disabled={plotType !== 'line' && plotType !== 'area'}
-                      sx={{ width: '90%' }}
-                    />
-                  </div>
-                  <Tooltip
-                    title={
-                      <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
-                        <strong>{t('Smoothing Help')}</strong>
-                        <br />
-                        <br />
-                        {activeQuery?.advancedOptions?.loessSmoothing
-                          ? t('Loess Smoothing Help')
-                          : t('Moving Average Help')}
+              </header>
+              <div className="App-body">
+                <div className="form-container">
+                  <TabsComponent
+                    queries={queries}
+                    activeQueryId={activeQueryId}
+                    onTabClick={setActiveQueryId}
+                    onAddTab={addQuery}
+                    onRemoveTab={removeQuery}
+                    isOnlyQuery={queries.length === 1}
+                  />
+                  {activeQuery && (
+                    <>
+                      <FormComponent
+                        formData={activeQuery}
+                        onFormChange={handleFormChange}
+                        onPlot={handlePlot}
+                        perseeData={perseeData}
+                      />
+                      <div className="form-group">
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                          <TextField
+                            name="startDate"
+                            label={t('Start Date')}
+                            type="number"
+                            value={startDate}
+                            onChange={handleDateInputChange}
+                            onKeyDown={handleKeyDown}
+                            inputProps={{ min: 1600, max: 2025 }}
+                          />
+                          <TextField
+                            name="endDate"
+                            label={t('End Date')}
+                            type="number"
+                            value={endDate}
+                            onChange={handleDateInputChange}
+                            onKeyDown={handleKeyDown}
+                            inputProps={{ min: 1600, max: 2025 }}
+                          />
+                        </Box>
+                        <Box sx={{ width: '100%' }}>
+                          <Slider
+                            getAriaLabel={() => t('Date range')}
+                            value={[startDate, endDate]}
+                            onChange={handleSliderChange}
+                            valueLabelDisplay="off"
+                            min={1600}
+                            max={2025}
+                          />
+                        </Box>
                       </div>
-                    }
-                    arrow
-                    placement="right"
-                  >
-                    <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
-                      <HelpOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                      <AdvancedOptionsComponent
+                        advancedOptions={activeQuery.advancedOptions}
+                        onAdvancedOptionsChange={handleAdvancedOptionsChange}
+                      />
+                    </>
+                  )}
+                  <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
+                    {isLoading ? t('Loading...') : t('Plot')}
+                  </Button>
+                  {dateWarnings.length > 0 && (
+                    <Box sx={{ marginTop: '1rem', width: '100%' }}>
+                      {dateWarnings.map((warning, index) => (
+                        <Alert key={index} severity="warning" sx={{ marginBottom: '0.5rem' }}>
+                          {warning.message}
+                        </Alert>
+                      ))}
+                    </Box>
+                  )}
+                  {wordCountWarnings.length > 0 && (
+                    <Box sx={{ marginTop: '1rem', width: '100%' }}>
+                      {wordCountWarnings.map((warning, index) => (
+                        <Alert key={`word-${index}`} severity="warning" sx={{ marginBottom: '0.5rem' }}>
+                          {warning.message}
+                        </Alert>
+                      ))}
+                    </Box>
+                  )}
+                  {totalPlotOccurrences > 0 && (
+                    <Typography variant="body1" style={{ marginTop: '1rem' }}>
+                      {t('Total Occurrences:')} {totalPlotOccurrences.toLocaleString()}
+                    </Typography>
+                  )}
                 </div>
-                <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || plotData.length === 0}>
-                  {t('Download Plot')}
-                </Button>
-                <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
-                  {t('Download CSV')}
-                </Button>
+                <div className="plot-container">
+                  {error && <div className="error">{error}</div>}
+                  <div className="plot-area">
+                    <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+                      {isLoading && (
+                        <div className="loading-overlay" style={{ flexDirection: 'column' }}>
+
+                          <FingerprintSpinner color="#d32f2f" size={100} />
+                        </div>
+                      )}
+                      {plotType === 'sums' ? (
+                        <SumsComponent
+                          data={sumsData}
+                          darkMode={darkMode}
+                          advancedOptions={activeQuery?.advancedOptions}
+                        />
+                      ) : plotType === 'wordcloud' ? (
+                        <WordCloudComponent data={sumsData} darkMode={darkMode} />
+                      ) : (
+                        <PlotComponent
+                          data={plotData}
+                          onPointClick={handlePointClick}
+                          advancedOptions={activeQuery.advancedOptions}
+                          plotType={plotType}
+                          darkMode={darkMode}
+                          plotRevision={`${fetchId}-${smoothing}-${plotType}-${JSON.stringify(activeQuery?.advancedOptions)}`}
+                        />
+                      )}
+                    </div>
+                    <div className="plot-controls">
+                      <h3>{t('Plot controls')}</h3>
+                      <div className="form-group">
+                        <FormControl fullWidth>
+                          <InputLabel id="plot-type-select-label">{t('Visualization:')}</InputLabel>
+                          <Select
+                            labelId="plot-type-select-label"
+                            id="plot-type-select"
+                            value={plotType}
+                            label={t('Visualization:')}
+                            onChange={(e) => setPlotType(e.target.value)}
+                            sx={{ fontFamily: 'serif' }}
+                          >
+                            <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>
+                            <MenuItem value={"area"}>{t('Area Chart (Frequency)')}</MenuItem>
+                            <MenuItem value={"bar"}>{t('Bar Plot (Raw Count)')}</MenuItem>
+                            <MenuItem value={"sums"}>{t('Sums')}</MenuItem>
+                            <MenuItem value={"wordcloud"}>{t('Word Cloud')}</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </div>
+                      <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ flexGrow: 1 }}>
+                          <Typography id="smoothing-slider" gutterBottom>
+                            {activeQuery?.advancedOptions?.loessSmoothing
+                              ? t('Smoothing (Loess Span):')
+                              : t('Smoothing (Moving Average):')}
+                          </Typography>
+                          <Slider
+                            value={smoothing}
+                            onChange={(e, newValue) => setSmoothing(newValue)}
+                            aria-labelledby="smoothing-slider"
+                            valueLabelDisplay="on"
+                            step={1}
+                            marks
+                            min={0}
+                            max={10}
+                            disabled={plotType !== 'line' && plotType !== 'area'}
+                            sx={{ width: '90%' }}
+                          />
+                        </div>
+                        <Tooltip
+                          title={
+                            <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+                              <strong>{t('Smoothing Help')}</strong>
+                              <br />
+                              <br />
+                              {activeQuery?.advancedOptions?.loessSmoothing
+                                ? t('Loess Smoothing Help')
+                                : t('Moving Average Help')}
+                            </div>
+                          }
+                          arrow
+                          placement="right"
+                        >
+                          <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
+                            <HelpOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </div>
+                      <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || plotData.length === 0}>
+                        {t('Download Plot')}
+                      </Button>
+                      <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
+                        {t('Download CSV')}
+                      </Button>
+                    </div>
+                  </div>
+                  {(selectedDate || occurrences.length > 0) &&
+                    <div style={{ position: 'relative' }}>
+                      {isContextLoading && (
+                        <div className="loading-overlay">
+                          <FingerprintSpinner color="#d32f2f" size={100} />
+                        </div>
+                      )}
+                      <ContextDisplay
+                        records={occurrences}
+                        totalRecords={totalOccurrences}
+                        onPageChange={handleContextPageChange}
+                        searchParams={contextSearchParams}
+                        isLoading={isContextLoading}
+                        corpus={(selectedQuery || activeQuery)?.corpus}
+                        corpusConfigs={corpusConfigs}
+                        resolution={(selectedQuery || activeQuery)?.resolution}
+                      />
+                    </div>
+                  }
+                </div>
               </div>
             </div>
-            {(selectedDate || occurrences.length > 0) &&
-              <div style={{ position: 'relative' }}>
-                {isContextLoading && (
-                  <div className="loading-overlay">
-                    <FingerprintSpinner color="#d32f2f" size={100} />
-                  </div>
-                )}
-                <ContextDisplay
-                  records={occurrences}
-                  totalRecords={totalOccurrences}
-                  onPageChange={handleContextPageChange}
-                  searchParams={contextSearchParams}
-                  isLoading={isContextLoading}
-                  corpus={(selectedQuery || activeQuery)?.corpus}
-                  corpusConfigs={corpusConfigs}
-                  resolution={(selectedQuery || activeQuery)?.resolution}
-                />
-              </div>
-            }
-          </div>
-        </div>
-      </div>
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={6000}
-        onClose={() => setSnackbarOpen(false)}
-        message={snackbarMessage}
-      />
+            <Snackbar
+              open={snackbarOpen}
+              autoHideDuration={6000}
+              onClose={() => setSnackbarOpen(false)}
+              message={snackbarMessage}
+            />
+         </>
+        } />
+      </Routes>
     </ThemeProvider>
   );
 }

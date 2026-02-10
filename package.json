@@ -27,7 +27,9 @@
     "react-epic-spinners": "^0.5.0",
     "react-i18next": "^15.7.3",
     "react-plotly.js": "^2.6.0",
+    "react-router-dom": "^7.13.0",
     "react-scripts": "5.0.1",
+    "swagger-ui-react": "^5.31.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {

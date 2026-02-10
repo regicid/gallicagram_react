@@ -4,7 +4,7 @@ info:
   title: Gallicagram API
   version: "1.2.0"
   description: |
-    API permettant d’interroger des bases de fréquences lexicales et de cooccurrences
+    API permettant d'interroger des bases de fréquences lexicales et de cooccurrences
     construites à partir de grands corpus historiques (Gallica, Le Monde, Persée, etc.).
 
     ### 📚 Utilisation rapide
@@ -28,9 +28,11 @@ paths:
     get:
       summary: Fréquence d'un mot ou syntagme
       description: |
-        Retourne le nombre d’occurrences d’un mot ou groupe de mots sur une période donnée.
+        Retourne le nombre d'occurrences d'un mot ou groupe de mots sur une période donnée.
         
-        **Colonnes CSV retournées :** `n` (occurrences), `gram`, `annee`, `mois`, `jour` (selon résolution), `total` (volume total du corpus).
+        **Colonnes CSV retournées :** `n` (occurrences), `gram`, `date` ou `annee`, `mois` (si résolution mensuelle/journalière), `jour` (si résolution journalière), `total` (volume total du corpus).
+        
+        **Note :** Pour le corpus `lemonde_rubriques`, vous pouvez filtrer par rubrique et ventiler les résultats par rubrique.
       parameters:
         - name: mot
           in: query
@@ -42,6 +44,25 @@ paths:
         - $ref: '#/components/parameters/CorpusParam'
         - $ref: '#/components/parameters/FromParam'
         - $ref: '#/components/parameters/ToParam'
+        - name: resolution
+          in: query
+          description: Granularité temporelle (jour, mois, annee). Par défaut selon le corpus.
+          required: false
+          schema:
+            $ref: '#/components/schemas/Resolution'
+        - name: rubrique
+          in: query
+          description: "**Corpus lemonde_rubriques uniquement.** Codes des rubriques séparés par `+` (ex: `international+politique`)."
+          required: false
+          schema:
+            type: string
+        - name: by_rubrique
+          in: query
+          description: "**Corpus lemonde_rubriques uniquement.** Si `true`, ventile les résultats par rubrique."
+          required: false
+          schema:
+            type: boolean
+            default: false
 
       responses:
         "200":
@@ -91,10 +112,14 @@ paths:
 
   /joker:
     get:
-      summary: Mots apparaissant autour d’un terme (Wildcard)
+      summary: Mots apparaissant autour d'un terme (Wildcard)
       description: |
         Renvoie les mots les plus fréquents avant ou après un terme pivot.
         Analogue au "wildcard" de Ngram Viewer (ex: `camarade *`).
+        
+        **Limitations par corpus :**
+        - Presse/Livres Gallica : maximum 2 mots en entrée, length max 3
+        - Le Monde : maximum 3 mots en entrée, length max 4
       parameters:
         - name: mot
           in: query
@@ -113,7 +138,7 @@ paths:
               - type: integer
               - type: string
                 enum: [all]
-          example: 50
+          example: 10
         - name: after
           in: query
           description: Chercher après le mot (`true`) ou avant (`false`).
@@ -122,7 +147,7 @@ paths:
             default: true
         - name: length
           in: query
-          description: Longueur du n-gram complet (pivot inclus).
+          description: Longueur du n-gram complet (pivot inclus). Limité selon le corpus.
           schema:
             $ref: '#/components/schemas/GramLength'
 
@@ -139,6 +164,8 @@ paths:
       summary: Voisinage lexical (Cooccurrences locales)
       description: |
         Renvoie les mots les plus fréquemment associés à un terme dans une fenêtre glissante.
+        
+        **Limitation :** `length` maximum de 3 pour les corpus Gallica.
       parameters:
         - name: mot
           in: query
@@ -153,9 +180,10 @@ paths:
           in: query
           schema:
             type: integer
-            default: 100
+            default: 10
         - name: length
           in: query
+          description: Taille de la fenêtre de voisinage (max 3 pour corpus Gallica).
           schema:
             $ref: '#/components/schemas/GramLength'
         - name: stopwords
@@ -163,6 +191,7 @@ paths:
           description: Nombre de mots vides (les plus fréquents) à ignorer.
           schema:
             $ref: '#/components/schemas/StopwordsCount'
+          example: 1000
 
       responses:
         "200":
@@ -174,27 +203,32 @@ paths:
 
   /associated_article:
     get:
-      summary: Voisinage sémantique par article (Le Monde)
+      summary: Voisinage sémantique par article (Le Monde uniquement)
       description: |
         **Corpus Le Monde uniquement.**
         Explore l'environnement sémantique au niveau de l'article entier plutôt que du n-gram.
+        
+        **Limitation :** Fonctionne uniquement avec un mot simple (pas de syntagmes).
       parameters:
         - name: mot
           in: query
           required: true
+          description: Mot simple uniquement (pas de syntagmes multi-mots).
           schema:
             type: string
+          example: climatique
         - $ref: '#/components/parameters/FromParam'
         - $ref: '#/components/parameters/ToParam'
         - name: n_joker
           in: query
           schema:
             type: integer
-            default: 100
+            default: 10
         - name: stopwords
           in: query
           schema:
             $ref: '#/components/schemas/StopwordsCount'
+          example: 1000
 
       responses:
         "200":
@@ -206,21 +240,27 @@ paths:
 
   /cooccur:
     get:
-      summary: Cooccurrences par article (Le Monde)
+      summary: Cooccurrences par article (Le Monde uniquement)
       description: |
         **Corpus Le Monde uniquement.**
         Compte les articles contenant `mot1` ET `mot2`.
+        
+        Les mots peuvent être des collections séparées par `+` (ex: `crise+crises`).
       parameters:
         - name: mot1
           in: query
           required: true
+          description: Mot ou collection de mots séparés par `+`.
           schema:
             type: string
+          example: climatique
         - name: mot2
           in: query
           required: true
+          description: Mot ou collection de mots séparés par `+`.
           schema:
             type: string
+          example: crise+crises
         - $ref: '#/components/parameters/FromParam'
         - $ref: '#/components/parameters/ToParam'
         - name: resolution
@@ -230,7 +270,7 @@ paths:
 
       responses:
         "200":
-          description: CSV des cooccurrences
+          description: CSV des cooccurrences (colonnes `n`, `nb_total_article`, dates selon résolution)
           content:
             text/csv:
               schema:
@@ -238,18 +278,25 @@ paths:
 
   /query_article:
     get:
-      summary: Fréquence par nombre d'articles (Le Monde)
+      summary: Fréquence par nombre d'articles (Le Monde uniquement)
       description: |
         **Corpus Le Monde uniquement.**
         Compte le nombre d'articles contenant le mot (vs nombre d'occurrences).
+        
+        Retourne également `nb_total_article` pour calculer les fréquences.
       parameters:
         - name: mot
           in: query
           required: true
           schema:
             type: string
+          example: délinquance
         - $ref: '#/components/parameters/FromParam'
         - $ref: '#/components/parameters/ToParam'
+        - name: resolution
+          in: query
+          schema:
+            $ref: '#/components/schemas/Resolution'
 
       responses:
         "200":
@@ -264,12 +311,16 @@ paths:
       summary: Recherche spécifique Corpus Persée
       description: |
         Interroge le corpus scientifique Persée avec filtrage par revue possible.
+        
+        **Limitation :** Syntagmes maximum de 2 mots.
       parameters:
         - name: mot
           in: query
           required: true
+          description: Mot ou syntagme (max 2 mots).
           schema:
             type: string
+          example: inégalités
         - $ref: '#/components/parameters/FromParam'
         - $ref: '#/components/parameters/ToParam'
         - name: by_revue
@@ -283,6 +334,7 @@ paths:
           description: "Codes des revues séparés par `+` (ex: `arss+ahess`). Si vide et by_revue=true, cherche partout."
           schema:
             type: string
+          example: arss
 
       responses:
         "200":
@@ -337,7 +389,12 @@ components:
       type: integer
       minimum: 1
       maximum: 5
-      description: Taille du n-gram (limité selon le corpus, voir CorpusCode).
+      description: |
+        Taille du n-gram. **Limitations par corpus :**
+        - Presse Gallica : max 3
+        - Le Monde : max 4
+        - Livres Gallica : max 5
+        - Autres corpus : vérifier la documentation
 
     Resolution:
       type: string
@@ -349,24 +406,32 @@ components:
       description: |
         Identifiant du corpus à interroger.
         
-        | Corpus | Code | Période | N-gram max | Résolution |
+        | Corpus | Code | Période | N-gram max | Résolution minimale |
         | :--- | :--- | :--- | :---: | :--- |
         | **Le Monde** | `lemonde` | 1944–2023 | 4 | Jour |
+        | **Le Monde par rubriques** | `lemonde_rubriques` | 1944–2023 | 4 | Jour |
         | **Presse Gallica** | `presse` | 1789–1950 | 3 | Mois |
         | **Livres Gallica** | `livres` | 1600–1940 | 5 | Année |
         | **Persée** | *(via /query_persee)* | 1789–2023 | 2 | Année |
         | **Deutsches Zeitungsportal** | `ddb` | 1780–1950 | 2 | Mois |
         | **American Stories** | `american_stories` | 1798–1963 | 3 | Année |
         | **Journal de Paris** | `paris` | 1777–1827 | 2 | Jour |
+        | **Moniteur Universel** | `moniteur` | 1789–1869 | 2 | Jour |
         | **Journal des Débats** | `journal_des_debats` | 1789–1944 | 1 | Jour |
-        | **L'Humanité** | `huma` | 1904–1952 | 2 | Jour |
+        | **La Presse** | `la_presse` | 1836–1869 | 2 | Jour |
+        | **Le Constitutionnel** | `constitutionnel` | 1821–1913 | 2 | Jour |
         | **Le Figaro** | `figaro` | 1854–1952 | 2 | Jour |
-        | **Rap (Genius)** | `rap` | 1989–2024 | 5 | Année |
+        | **Le Temps** | `temps` | 1861–1942 | 2 | Jour |
+        | **Le Petit Journal** | `petit_journal` | 1863–1942 | 2 | Jour |
+        | **Le Petit Parisien** | `petit_parisien` | 1876–1944 | 2 | Jour |
+        | **L'Humanité** | `huma` | 1904–1952 | 2 | Jour |
         | **Subtitles (FR)** | `subtitles` | 1935–2020 | 3 | Année |
         | **Subtitles (EN)** | `subtitles_en` | 1930–2020 | 3 | Année |
+        | **Rap (Genius)** | `rap` | 1989–2024 | 5 | Année |
 
       enum:
         - lemonde
+        - lemonde_rubriques
         - presse
         - livres
         - ddb

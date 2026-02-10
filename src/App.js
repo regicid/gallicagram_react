@@ -14,6 +14,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
 import { FingerprintSpinner } from 'react-epic-spinners';
+import { Analytics } from '@vercel/analytics/react';
 
 const theme = createTheme({
   typography: {
@@ -2062,6 +2063,7 @@ function App() {
         onClose={() => setSnackbarOpen(false)}
         message={snackbarMessage}
       />
+      <Analytics />
     </ThemeProvider>
   );
 }

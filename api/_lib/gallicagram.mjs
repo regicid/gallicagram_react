@@ -54,11 +54,11 @@ async function fetchData(mot, corpus, from_year, to_year) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return [];
 
-  // 1. Détection du délimiteur (virgule ou point-virgule)
+  // 1. Détection du délimiteur
   const headerLine = lines[0];
   const delimiter = headerLine.includes(';') ? ';' : ',';
 
-  // 2. Extraction des noms de colonnes (normalisés)
+  // 2. Extraction des noms de colonnes
   const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase());
 
   // 3. Indices des colonnes obligatoires
@@ -82,24 +82,26 @@ async function fetchData(mot, corpus, from_year, to_year) {
     const nRaw = parts[nIdx].trim();
     const totalRaw = parts[totalIdx].trim();
 
-    // Conversion robuste (gère les virgules décimales françaises)
+    // Conversion en entiers
     const annee = parseInt(anneeRaw, 10);
-    const n = parseFloat(nRaw.replace(',', '.'));
-    const total = parseFloat(totalRaw.replace(',', '.'));
+    const n = parseInt(nRaw, 10) || 0; // Si NaN ou vide, on met 0
+    const total = parseInt(totalRaw, 10);
 
-    // Ne garder que les lignes avec année et total positifs
+    // On garde toutes les années valides, même si n = 0
     if (isNaN(annee) || isNaN(total) || total <= 0) continue;
 
     rows.push({
       annee,
-      n: isNaN(n) ? 0 : n,
-      total
+      n: n,
+      total,
+      frequency: n / total // Fréquence relative
     });
   }
 
   rows.sort((a, b) => a.annee - b.annee);
   return rows;
 }
+
 
 // Génération du graphique via QuickChart (style adapté)
 export async function generateChart(mots, corpus, from_year, to_year, smooth) {

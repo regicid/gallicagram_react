@@ -16,6 +16,7 @@ import WordCloudComponent from './WordCloudComponent';
 import { FingerprintSpinner } from 'react-epic-spinners';
 import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
+import MCPPage from "./MCPPage";
 
 const theme = createTheme({
   typography: {
@@ -2147,8 +2148,9 @@ function App() {
               onClose={() => setSnackbarOpen(false)}
               message={snackbarMessage}
             />
-         </>
+          </>
         } />
+        <Route path="/mcp" element={<MCPPage />} />
       </Routes>
     </ThemeProvider>
   );

@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import Papa from 'papaparse';
 
 export const CORPUS_LABELS = {
     "lemonde": "Le Monde (1944-2023)",
@@ -48,16 +49,62 @@ async function fetchData(mot, corpus, from_year, to_year) {
     if (!response.ok) throw new Error('Erreur API Gallicagram');
 
     const text = await response.text();
-    const lines = text.trim().split('\n');
+    if (!text || !text.trim()) return [];
 
-    return lines.slice(1).map(line => {
-        const values = line.split(',');
-        return {
-            annee: parseInt(values[0]),
-            n: parseFloat(values[1]) || 0,
-            total: parseFloat(values[2]) || 0
+    // Parse CSV robustement avec PapaParse
+    // transformation des headers en minuscules et trim pour uniformiser ('annee','n','total')
+    const parsed = Papa.parse(text, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        transformHeader: h => (h || '').toString().trim().toLowerCase()
+    });
+
+    // Si parse produit une seule colonne (mauvais séparateur), retenter avec ';'
+    if (parsed.data.length > 0 && Object.keys(parsed.data[0]).length === 1) {
+        const reparsed = Papa.parse(text, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            delimiter: ';',
+            transformHeader: h => (h || '').toString().trim().toLowerCase()
+        });
+        // si reparsed donne mieux, on l'utilise
+        if (reparsed.data.length > 0 && Object.keys(reparsed.data[0]).length > 1) {
+            parsed.data = reparsed.data;
+        }
+    }
+
+    // Map rows en objets { annee, n, total } en tolérant noms de colonnes variés
+    const rows = parsed.data.map(row => {
+        // row keys are already lowercased and trimmed
+        const keys = Object.keys(row || {});
+        const get = keyCandidates => {
+            for (const k of keyCandidates) {
+                if (k in row && row[k] !== null && row[k] !== undefined && row[k] !== '') return row[k];
+            }
+            return undefined;
         };
-    }).filter(row => row.total > 0);
+
+        const anneeRaw = get(['annee', 'year', 'annee ']);
+        const nRaw = get(['n', 'count', 'nombre']);
+        const totalRaw = get(['total', 'tot', 'sum']);
+
+        const annee = anneeRaw !== undefined ? parseInt(anneeRaw, 10) : NaN;
+        const n = nRaw !== undefined ? parseFloat(String(nRaw).replace(',', '.')) : 0;
+        const total = totalRaw !== undefined ? parseFloat(String(totalRaw).replace(',', '.')) : 0;
+
+        return {
+            annee: isNaN(annee) ? null : annee,
+            n: isNaN(n) ? 0 : n,
+            total: isNaN(total) ? 0 : total
+        };
+    });
+
+    // Filtrer : supprimer lignes sans année ou total <= 0
+    return rows
+        .filter(r => r.annee !== null && Number.isFinite(r.total) && r.total > 0)
+        .sort((a, b) => a.annee - b.annee);
 }
 
 // ⭐ Nouveau renderer QuickChart (remplace chartjs-node-canvas)

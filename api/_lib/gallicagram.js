@@ -1,5 +1,4 @@
 
-import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import fetch from 'node-fetch';
 
 export const CORPUS_LABELS = {
@@ -66,6 +65,7 @@ async function fetchData(mot, corpus, from_year, to_year) {
 export async function generateChart(mots, corpus, from_year, to_year, smooth) {
     const width = 1000;
     const height = 500;
+    const { ChartJSNodeCanvas } = await import('chartjs-node-canvas');
     const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
 
     const datasets = [];

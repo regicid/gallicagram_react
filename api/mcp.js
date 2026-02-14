@@ -1,6 +1,6 @@
 
 import { server } from './_lib/mcp.js';
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp";
 
 // Global transport instance
 // In a serverless environment, if the container is reused, this will persist.

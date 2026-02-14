@@ -10,7 +10,7 @@ function createServer() {
     });
 
     // Register Tools
-    server.tool(
+    server.registerTool(
         "gallicagram_chart",
         {
             description: "Génère un graphique de fréquence lexicale pour un ou plusieurs mots dans un corpus historique",
@@ -41,6 +41,41 @@ function createServer() {
                     }
                 },
                 required: ["mot"]
+            },
+            outputSchema: {
+                type: "object",
+                properties: {
+                    content: {
+                        type: "array",
+                        items: {
+                            oneOf: [
+                                {
+                                    type: "object",
+                                    properties: {
+                                        type: { type: "string", enum: ["image"] },
+                                        data: { type: "string", description: "Image base64 encodée" },
+                                        mimeType: { type: "string", enum: ["image/png"] }
+                                    },
+                                    required: ["type", "data", "mimeType"]
+                                },
+                                {
+                                    type: "object",
+                                    properties: {
+                                        type: { type: "string", enum: ["text"] },
+                                        text: { type: "string", description: "Prompt d'analyse et métadonnées" }
+                                    },
+                                    required: ["type", "text"]
+                                }
+                            ]
+                        },
+                        description: "Graphique PNG + prompt d'analyse pour VLM"
+                    },
+                    isError: {
+                        type: "boolean",
+                        description: "Indique si une erreur s'est produite"
+                    }
+                },
+                required: ["content"]
             }
         },
         async ({ mot, corpus = "presse", from_year, to_year, smooth = true }) => {
@@ -78,7 +113,7 @@ function createServer() {
         }
     );
 
-    server.tool(
+    server.registerTool(
         "list_corpus",
         {
             description: "Liste tous les corpus disponibles pour l'analyse lexicale",
@@ -86,6 +121,24 @@ function createServer() {
                 type: "object",
                 properties: {},
                 required: []
+            },
+            outputSchema: {
+                type: "object",
+                properties: {
+                    content: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                type: { type: "string", enum: ["text"] },
+                                text: { type: "string", description: "Liste formatée des corpus disponibles" }
+                            },
+                            required: ["type", "text"]
+                        },
+                        description: "Liste des corpus avec leurs codes et labels"
+                    }
+                },
+                required: ["content"]
             }
         },
         async () => {

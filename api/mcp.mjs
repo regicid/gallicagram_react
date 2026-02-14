@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
 import { generateChart, generateAnalysisPrompt, CORPUS_LABELS } from './_lib/gallicagram.mjs';
 
 // Factory function to create a new server instance
@@ -14,69 +15,29 @@ function createServer() {
         "gallicagram_chart",
         {
             description: "Génère un graphique de fréquence lexicale pour un ou plusieurs mots dans un corpus historique",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    mot: { 
-                        type: "string", 
-                        description: "Mot(s) à analyser, séparés par des virgules (ex: 'révolution,liberté')" 
-                    },
-                    corpus: { 
-                        type: "string", 
-                        description: "Code du corpus (ex: presse, lemonde, livres)",
-                        default: "presse"
-                    },
-                    from_year: { 
-                        type: "number", 
-                        description: "Année de début (optionnel)" 
-                    },
-                    to_year: { 
-                        type: "number", 
-                        description: "Année de fin (optionnel)" 
-                    },
-                    smooth: { 
-                        type: "boolean", 
-                        description: "Appliquer un lissage des courbes",
-                        default: true 
-                    }
-                },
-                required: ["mot"]
-            },
-            outputSchema: {
-                type: "object",
-                properties: {
-                    content: {
-                        type: "array",
-                        items: {
-                            oneOf: [
-                                {
-                                    type: "object",
-                                    properties: {
-                                        type: { type: "string", enum: ["image"] },
-                                        data: { type: "string", description: "Image base64 encodée" },
-                                        mimeType: { type: "string", enum: ["image/png"] }
-                                    },
-                                    required: ["type", "data", "mimeType"]
-                                },
-                                {
-                                    type: "object",
-                                    properties: {
-                                        type: { type: "string", enum: ["text"] },
-                                        text: { type: "string", description: "Prompt d'analyse et métadonnées" }
-                                    },
-                                    required: ["type", "text"]
-                                }
-                            ]
-                        },
-                        description: "Graphique PNG + prompt d'analyse pour VLM"
-                    },
-                    isError: {
-                        type: "boolean",
-                        description: "Indique si une erreur s'est produite"
-                    }
-                },
-                required: ["content"]
-            }
+            inputSchema: z.object({
+                mot: z.string().describe("Mot(s) à analyser, séparés par des virgules (ex: 'révolution,liberté')"),
+                corpus: z.string().default("presse").describe("Code du corpus (ex: presse, lemonde, livres)"),
+                from_year: z.number().optional().describe("Année de début (optionnel)"),
+                to_year: z.number().optional().describe("Année de fin (optionnel)"),
+                smooth: z.boolean().default(true).describe("Appliquer un lissage des courbes")
+            }),
+            outputSchema: z.object({
+                content: z.array(
+                    z.union([
+                        z.object({
+                            type: z.literal("image"),
+                            data: z.string().describe("Image base64 encodée"),
+                            mimeType: z.literal("image/png")
+                        }),
+                        z.object({
+                            type: z.literal("text"),
+                            text: z.string().describe("Prompt d'analyse et métadonnées")
+                        })
+                    ])
+                ).describe("Graphique PNG + prompt d'analyse pour VLM"),
+                isError: z.boolean().optional().describe("Indique si une erreur s'est produite")
+            })
         },
         async ({ mot, corpus = "presse", from_year, to_year, smooth = true }) => {
             try {
@@ -117,29 +78,15 @@ function createServer() {
         "list_corpus",
         {
             description: "Liste tous les corpus disponibles pour l'analyse lexicale",
-            inputSchema: {
-                type: "object",
-                properties: {},
-                required: []
-            },
-            outputSchema: {
-                type: "object",
-                properties: {
-                    content: {
-                        type: "array",
-                        items: {
-                            type: "object",
-                            properties: {
-                                type: { type: "string", enum: ["text"] },
-                                text: { type: "string", description: "Liste formatée des corpus disponibles" }
-                            },
-                            required: ["type", "text"]
-                        },
-                        description: "Liste des corpus avec leurs codes et labels"
-                    }
-                },
-                required: ["content"]
-            }
+            inputSchema: z.object({}),
+            outputSchema: z.object({
+                content: z.array(
+                    z.object({
+                        type: z.literal("text"),
+                        text: z.string().describe("Liste formatée des corpus disponibles")
+                    })
+                ).describe("Liste des corpus avec leurs codes et labels")
+            })
         },
         async () => {
             const list = Object.entries(CORPUS_LABELS)

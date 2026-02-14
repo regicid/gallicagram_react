@@ -1,4 +1,4 @@
-import { server } from './mcp_server.mjs';
+import { server } from './_lib/mcp_server.mjs';
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
 // Global transport instance

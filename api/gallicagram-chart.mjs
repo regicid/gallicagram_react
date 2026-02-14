@@ -3,7 +3,7 @@
  * Génère des graphiques de fréquence lexicale + prompt d'analyse pour VLM
  */
 
-import { generateChart, generateAnalysisPrompt, CORPUS_LABELS } from './_lib/gallicagram.js';
+import { generateChart, generateAnalysisPrompt, CORPUS_LABELS } from './_lib/gallicagram.mjs';
 
 // API Handler
 export default async function handler(req, res) {
@@ -60,4 +60,3 @@ export default async function handler(req, res) {
         });
     }
 }
-

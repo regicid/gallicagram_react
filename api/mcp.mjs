@@ -12,34 +12,36 @@ function createServer() {
     // Register Tools
     server.tool(
         "gallicagram_chart",
-        "Génère un graphique de fréquence lexicale pour un ou plusieurs mots dans un corpus historique",
         {
-            type: "object",
-            properties: {
-                mot: { 
-                    type: "string", 
-                    description: "Mot(s) à analyser, séparés par des virgules (ex: 'révolution,liberté')" 
+            description: "Génère un graphique de fréquence lexicale pour un ou plusieurs mots dans un corpus historique",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    mot: { 
+                        type: "string", 
+                        description: "Mot(s) à analyser, séparés par des virgules (ex: 'révolution,liberté')" 
+                    },
+                    corpus: { 
+                        type: "string", 
+                        description: "Code du corpus (ex: presse, lemonde, livres)",
+                        default: "presse"
+                    },
+                    from_year: { 
+                        type: "number", 
+                        description: "Année de début (optionnel)" 
+                    },
+                    to_year: { 
+                        type: "number", 
+                        description: "Année de fin (optionnel)" 
+                    },
+                    smooth: { 
+                        type: "boolean", 
+                        description: "Appliquer un lissage des courbes",
+                        default: true 
+                    }
                 },
-                corpus: { 
-                    type: "string", 
-                    description: "Code du corpus (ex: presse, lemonde, livres)",
-                    default: "presse"
-                },
-                from_year: { 
-                    type: "number", 
-                    description: "Année de début (optionnel)" 
-                },
-                to_year: { 
-                    type: "number", 
-                    description: "Année de fin (optionnel)" 
-                },
-                smooth: { 
-                    type: "boolean", 
-                    description: "Appliquer un lissage des courbes",
-                    default: true 
-                }
-            },
-            required: ["mot"]
+                required: ["mot"]
+            }
         },
         async ({ mot, corpus = "presse", from_year, to_year, smooth = true }) => {
             try {
@@ -78,11 +80,13 @@ function createServer() {
 
     server.tool(
         "list_corpus",
-        "Liste tous les corpus disponibles pour l'analyse lexicale",
         {
-            type: "object",
-            properties: {},
-            required: []
+            description: "Liste tous les corpus disponibles pour l'analyse lexicale",
+            inputSchema: {
+                type: "object",
+                properties: {},
+                required: []
+            }
         },
         async () => {
             const list = Object.entries(CORPUS_LABELS)

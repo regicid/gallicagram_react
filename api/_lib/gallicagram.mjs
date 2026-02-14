@@ -60,12 +60,22 @@ async function fetchData(mot, corpus, from_year, to_year) {
     }).filter(row => row.total > 0);
 }
 
+// ⭐ Nouveau renderer QuickChart (remplace chartjs-node-canvas)
+async function renderChart(configuration, width = 1000, height = 500) {
+    const encoded = encodeURIComponent(JSON.stringify(configuration));
+    const url = `https://quickchart.io/chart?c=${encoded}&width=${width}&height=${height}&format=png`;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Erreur génération graphique');
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return buffer.toString('base64');
+}
+
 // Génération du graphique
 export async function generateChart(mots, corpus, from_year, to_year, smooth) {
     const width = 1000;
     const height = 500;
-    const { ChartJSNodeCanvas } = await import('chartjs-node-canvas');
-    const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
 
     const datasets = [];
     const colors = [
@@ -127,7 +137,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
             scales: {
                 x: {
                     type: 'linear',
-                    title: { display: false },
                     grid: { display: false }
                 },
                 y: {
@@ -139,8 +148,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
         }
     };
 
-    const buffer = await chartJSNodeCanvas.renderToBuffer(configuration);
-    return buffer.toString('base64');
+    return await renderChart(configuration, width, height);
 }
 
 export function generateAnalysisPrompt(mots, corpus, from, to) {

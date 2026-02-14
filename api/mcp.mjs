@@ -40,18 +40,47 @@ function createServer() {
             })
         },
         async ({ mot, corpus = "presse", from_year, to_year, smooth = true }) => {
+            // Toujours retourner un objet conforme à l'outputSchema.
             try {
-                if (!mot) {
+                if (!mot || String(mot).trim() === "") {
                     return {
                         content: [{ type: "text", text: "Erreur: Le paramètre 'mot' est requis" }],
                         isError: true
                     };
                 }
 
-                const mots = mot.split(',').map(m => m.trim()).filter(Boolean);
-                const imageBase64 = await generateChart(mots, corpus, from_year, to_year, smooth);
+                const mots = String(mot).split(',').map(m => m.trim()).filter(Boolean);
+                if (mots.length === 0) {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Aucun mot valide fourni après parsing" }],
+                        isError: true
+                    };
+                }
+
+                // Appel au générateur de graphique
+                let imageBase64;
+                try {
+                    imageBase64 = await generateChart(mots, corpus, from_year, to_year, smooth);
+                } catch (genErr) {
+                    // generateChart peut lever une erreur (ex: pas de données) — renvoyer une réponse structurée
+                    const msg = genErr && genErr.message ? genErr.message : String(genErr);
+                    return {
+                        content: [{ type: "text", text: `Erreur génération graphique: ${msg}` }],
+                        isError: true
+                    };
+                }
+
+                // Si aucun buffer/image n'a été renvoyé (null/undefined/""), renvoyer message d'erreur structuré
+                if (!imageBase64 || typeof imageBase64 !== 'string' || imageBase64.trim() === '') {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Aucune image générée (pas de données disponibles pour ces mots)" }],
+                        isError: true
+                    };
+                }
+
                 const analysisPrompt = generateAnalysisPrompt(mots, corpus, from_year, to_year);
 
+                // Retour conforme au schema : d'abord l'image, puis le texte explicatif
                 return {
                     content: [
                         {
@@ -61,13 +90,16 @@ function createServer() {
                         },
                         {
                             type: "text",
-                            text: `📊 Graphique généré pour ${mot}\n\n${analysisPrompt}`
+                            text: `📊 Graphique généré pour ${mots.join(', ')}\n\n${analysisPrompt}`
                         }
                     ]
                 };
             } catch (error) {
+                // Catch ultime : s'assurer d'un format valide même en cas d'erreur d'exécution inattendue
+                const msg = error && error.message ? error.message : String(error);
+                console.error('gallicagram_chart unexpected error:', error);
                 return {
-                    content: [{ type: "text", text: `Erreur: ${error.message}` }],
+                    content: [{ type: "text", text: `Erreur interne: ${msg}` }],
                     isError: true
                 };
             }

@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { generateChart, generateAnalysisPrompt, CORPUS_LABELS } from './gallicagram.js';
+import { generateChart, generateAnalysisPrompt, CORPUS_LABELS } from './gallicagram.mjs';
 
 // Singleton server instance
 export const server = new McpServer({

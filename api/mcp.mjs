@@ -21,22 +21,6 @@ function createServer() {
                 from_year: z.number().optional().describe("Année de début (optionnel)"),
                 to_year: z.number().optional().describe("Année de fin (optionnel)"),
                 smooth: z.boolean().default(true).describe("Appliquer un lissage des courbes")
-            }),
-            outputSchema: z.object({
-                content: z.array(
-                    z.union([
-                        z.object({
-                            type: z.literal("image"),
-                            data: z.string().describe("Image base64 encodée"),
-                            mimeType: z.literal("image/png")
-                        }),
-                        z.object({
-                            type: z.literal("text"),
-                            text: z.string().describe("Prompt d'analyse et métadonnées")
-                        })
-                    ])
-                ).describe("Graphique PNG + prompt d'analyse pour VLM"),
-                isError: z.boolean().optional().describe("Indique si une erreur s'est produite")
             })
         },
         async ({ mot, corpus = "presse", from_year, to_year, smooth = true }) => {
@@ -110,15 +94,7 @@ function createServer() {
         "list_corpus",
         {
             description: "Liste tous les corpus disponibles pour l'analyse lexicale",
-            inputSchema: z.object({}),
-            outputSchema: z.object({
-                content: z.array(
-                    z.object({
-                        type: z.literal("text"),
-                        text: z.string().describe("Liste formatée des corpus disponibles")
-                    })
-                ).describe("Liste des corpus avec leurs codes et labels")
-            })
+            inputSchema: z.object({})
         },
         async () => {
             const list = Object.entries(CORPUS_LABELS)

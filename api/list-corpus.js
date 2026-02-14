@@ -24,7 +24,6 @@ const CORPUS_LABELS = {
     "rap": "Rap (Genius) (1989-2024)"
 };
 
-
 export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
 

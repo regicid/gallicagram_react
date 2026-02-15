@@ -94,7 +94,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         if (data.length === 0) continue;
 
         const color = COLORS[i % COLORS.length];
-        const rawFrequencies = data.map(d => d.frequency * 1e6); // ppm (parts per million)
+        const rawFrequencies = data.map(d => d.frequency * 1e6); // ppm
 
         // 1. DATASET LIGNE (Tendance lissée)
         let lineFrequencies = [...rawFrequencies];
@@ -114,13 +114,14 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             showLine: true
         });
 
-        // 2. DATASET POINTS (Données brutes - masqué de la légende)
+        // 2. DATASET POINTS (Données brutes)
+        // On garde le préfixe __hidden__ pour le repérer
         allDatasets.push({
-            label: `__hidden__${mot}_pts`,
+            label: `__hidden__${mot}`, 
             data: data.map((d, idx) => ({ x: d.annee, y: parseFloat(rawFrequencies[idx].toFixed(4)) })),
             borderColor: 'transparent',
-            backgroundColor: color + '66', // semi-transparent
-            pointRadius: 3,
+            backgroundColor: color + '80', // 80 = 50% d'opacité
+            pointRadius: 2.5, // Points légèrement plus petits
             pointBackgroundColor: color,
             showLine: false,
             fill: false
@@ -137,24 +138,23 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                 display: true,
                 text: `Gallicagram : ${CORPUS_LABELS[corpus] || corpus}`,
                 fontSize: 18,
-                fontStyle: 'bold'
+                fontColor: '#555'
             },
             legend: {
                 position: 'bottom',
                 labels: {
-                    // Filtre pour ne pas afficher les datasets de points dans la légende
-                    filter: (item) => !item.text.startsWith('__hidden__'),
                     usePointStyle: true,
-                    padding: 20
+                    padding: 20,
+                    // ASTUCE : On met un placeholder pour le filtre
+                    filter: "REPLACE_ME_FILTER_FUNCTION"
                 }
             },
             scales: {
                 xAxes: [{
                     type: 'linear',
                     position: 'bottom',
-                    scaleLabel: { display: true, labelString: 'Année' },
                     gridLines: { display: false },
-                    ticks: { callback: (val) => val.toString() }
+                    ticks: { callback: "REPLACE_ME_TICK_FUNCTION" }
                 }],
                 yAxes: [{
                     scaleLabel: { display: true, labelString: 'Fréquence (ppm)' },
@@ -164,7 +164,22 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         }
     };
 
-    const encoded = encodeURIComponent(JSON.stringify(configuration));
+    // Conversion en JSON puis injection manuelle des fonctions JS
+    let configStr = JSON.stringify(configuration);
+    
+    // Injection de la fonction de filtrage de la légende
+    configStr = configStr.replace(
+        '"REPLACE_ME_FILTER_FUNCTION"',
+        'function(item) { return !item.text.includes("__hidden__"); }'
+    );
+    
+    // Injection de la fonction de formatage des années (pour enlever les virgules ex: 1,850 -> 1850)
+    configStr = configStr.replace(
+        '"REPLACE_ME_TICK_FUNCTION"',
+        'function(val) { return val.toString(); }'
+    );
+
+    const encoded = encodeURIComponent(configStr);
     const url = `https://quickchart.io/chart?c=${encoded}&width=1000&height=500&backgroundColor=white&version=2.9.4`;
     
     const response = await fetch(url);

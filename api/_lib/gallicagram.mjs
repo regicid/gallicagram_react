@@ -1,242 +1,182 @@
-// api/_lib/gallicagram.mjs (version avec corrections d'affichage)
-
+// api/_lib/gallicagram.mjs
 import fetch from 'node-fetch';
 
 export const CORPUS_LABELS = {
-  "lemonde": "Le Monde (1944-2023)",
-  "presse": "Presse Gallica (1789-1950)",
-  "livres": "Livres Gallica (1600-1940)",
-  "persee": "Persée (1789-2023)",
-  "ddb": "Deutsches Zeitungsportal (1780-1950)",
-  "american_stories": "American Stories (1798-1963)",
-  "paris": "Journal de Paris (1777-1827)",
-  "moniteur": "Moniteur Universel (1789-1869)",
-  "journal_des_debats": "Journal des Débats (1789-1944)",
-  "la_presse": "La Presse (1836-1869)",
-  "constitutionnel": "Le Constitutionnel (1821-1913)",
-  "figaro": "Le Figaro (1854-1952)",
-  "temps": "Le Temps (1861-1942)",
-  "petit_journal": "Le Petit Journal (1863-1942)",
-  "petit_parisien": "Le Petit Parisien (1876-1944)",
-  "huma": "L'Humanité (1904-1952)",
-  "subtitles": "Sous-titres (FR) (1935-2020)",
-  "subtitles_en": "Subtitles (EN) (1930-2020)",
-  "rap": "Rap (Genius) (1989-2024)"
+    "lemonde": "Le Monde (1944-2023)",
+    "presse": "Presse Gallica (1789-1950)",
+    "livres": "Livres Gallica (1600-1940)",
+    "persee": "Persée (1789-2023)",
+    "ddb": "Deutsches Zeitungsportal (1780-1950)",
+    "american_stories": "American Stories (1798-1963)",
+    "paris": "Journal de Paris (1777-1827)",
+    "moniteur": "Moniteur Universel (1789-1869)",
+    "journal_des_debats": "Journal des Débats (1789-1944)",
+    "la_presse": "La Presse (1836-1869)",
+    "constitutionnel": "Le Constitutionnel (1821-1913)",
+    "figaro": "Le Figaro (1854-1952)",
+    "temps": "Le Temps (1861-1942)",
+    "petit_journal": "Le Petit Journal (1863-1942)",
+    "petit_parisien": "Le Petit Parisien (1876-1944)",
+    "huma": "L'Humanité (1904-1952)",
+    "subtitles": "Sous-titres (FR) (1935-2020)",
+    "subtitles_en": "Subtitles (EN) (1930-2020)",
+    "rap": "Rap (Genius) (1989-2024)"
 };
 
-function movingAverage(data, windowSize = 3) {
-  const result = [];
-  for (let i = 0; i < data.length; i++) {
-    const start = Math.max(0, i - Math.floor(windowSize / 2));
-    const end = Math.min(data.length, i + Math.ceil(windowSize / 2));
-    const sum = data.slice(start, end).reduce((a, b) => a + b, 0);
-    result.push(sum / (end - start));
-  }
-  return result;
+const COLORS = [
+    '#E63946', '#457B9D', '#2A9D8F', '#F4A261', '#E76F51',
+    '#6A4C93', '#1982C4', '#8AC926', '#FFCA3A', '#FF595E'
+];
+
+function movingAverage(data, windowSize = 5) {
+    const result = [];
+    for (let i = 0; i < data.length; i++) {
+        const start = Math.max(0, i - Math.floor(windowSize / 2));
+        const end = Math.min(data.length, i + Math.ceil(windowSize / 2));
+        const sum = data.slice(start, end).reduce((a, b) => a + b, 0);
+        result.push(sum / (end - start));
+    }
+    return result;
 }
 
 async function fetchData(mot, corpus, from_year, to_year) {
-  const params = new URLSearchParams({
-    mot,
-    corpus,
-    resolution: 'annee'
-  });
-  if (from_year) params.append('from', from_year);
-  if (to_year) params.append('to', to_year);
+    const params = new URLSearchParams({ mot, corpus, resolution: 'annee' });
+    if (from_year) params.append('from', from_year);
+    if (to_year) params.append('to', to_year);
 
-  const response = await fetch(`https://shiny.ens-paris-saclay.fr/guni/query?${params}`);
-  if (!response.ok) throw new Error(`Erreur API Gallicagram : ${response.status}`);
-  const text = await response.text();
-  if (!text.trim()) return [];
+    const response = await fetch(`https://shiny.ens-paris-saclay.fr/guni/query?${params}`);
+    if (!response.ok) throw new Error(`Erreur API Gallicagram : ${response.status}`);
+    const text = await response.text();
+    if (!text.trim()) return [];
 
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return [];
+    const lines = text.trim().split('\n');
+    const headerLine = lines[0];
+    const delimiter = headerLine.includes(';') ? ';' : ',';
+    const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase());
 
-  // 1. Détection du délimiteur
-  const headerLine = lines[0];
-  const delimiter = headerLine.includes(';') ? ';' : ',';
+    const yearIdx = headers.findIndex(h => ['annee', 'year', 'année'].includes(h));
+    const nIdx = headers.findIndex(h => ['n', 'count', 'nombre'].includes(h));
+    const totalIdx = headers.findIndex(h => ['total', 'tot', 'sum'].includes(h));
 
-  // 2. Extraction des noms de colonnes
-  const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase());
-
-  // 3. Indices des colonnes obligatoires
-  const yearIdx = headers.findIndex(h => ['annee', 'year'].includes(h));
-  const nIdx = headers.findIndex(h => ['n', 'count', 'nombre'].includes(h));
-  const totalIdx = headers.findIndex(h => ['total', 'tot', 'sum'].includes(h));
-
-  if (yearIdx === -1 || nIdx === -1 || totalIdx === -1) {
-    throw new Error('Colonnes requises (annee, n, total) introuvables dans le CSV');
-  }
-
-  // 4. Parser toutes les lignes du CSV
-  const csvRows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const parts = line.split(delimiter);
-    if (parts.length <= Math.max(yearIdx, nIdx, totalIdx)) continue;
-
-    const annee = parseInt(parts[yearIdx].trim(), 10);
-    const n = parseInt(parts[nIdx].trim(), 10) || 0;
-    const total = parseInt(parts[totalIdx].trim(), 10);
-
-    if (isNaN(annee) || isNaN(total) || total <= 0) continue;
-
-    csvRows.push({
-      annee,
-      n: n,
-      total,
-      frequency: n / total
-    });
-  }
-
-  if (csvRows.length === 0) return [];
-
-  // 5. Créer un Map pour accès rapide par année
-  const dataMap = new Map(csvRows.map(r => [r.annee, r]));
-
-  // 6. Déterminer la plage complète d'années
-  const minYear = from_year || Math.min(...csvRows.map(r => r.annee));
-  const maxYear = to_year || Math.max(...csvRows.map(r => r.annee));
-
-  // 7. COMBLER TOUTES LES ANNÉES MANQUANTES avec fréquence = 0
-  const completeData = [];
-  for (let year = minYear; year <= maxYear; year++) {
-    if (dataMap.has(year)) {
-      completeData.push(dataMap.get(year));
-    } else {
-      completeData.push({
-        annee: year,
-        n: 0,
-        total: 1, // Évite division par zéro
-        frequency: 0
-      });
+    const csvRows = [];
+    for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(delimiter);
+        if (parts.length <= Math.max(yearIdx, nIdx, totalIdx)) continue;
+        const annee = parseInt(parts[yearIdx]);
+        const n = parseFloat(parts[nIdx]) || 0;
+        const total = parseFloat(parts[totalIdx]);
+        if (!isNaN(annee) && total > 0) {
+            csvRows.push({ annee, frequency: n / total });
+        }
     }
-  }
 
-  return completeData;
+    // Tri et complétion des années manquantes
+    csvRows.sort((a, b) => a.annee - b.annee);
+    if (csvRows.length === 0) return [];
+
+    const minYear = from_year || csvRows[0].annee;
+    const maxYear = to_year || csvRows[csvRows.length - 1].annee;
+    const dataMap = new Map(csvRows.map(r => [r.annee, r.frequency]));
+    
+    const completeData = [];
+    for (let y = minYear; y <= maxYear; y++) {
+        completeData.push({ annee: y, frequency: dataMap.get(y) || 0 });
+    }
+    return completeData;
 }
 
-export async function generateChart(mots, corpus, from_year, to_year, smooth) {
-  const width = 1000;
-  const height = 500;
+export async function generateChart(mots, corpus, from_year, to_year, smooth = true) {
+    const allDatasets = [];
 
-  const datasets = [];
-  const colors = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-  ];
+    for (let i = 0; i < mots.length; i++) {
+        const mot = mots[i].trim();
+        const data = await fetchData(mot, corpus, from_year, to_year);
+        if (data.length === 0) continue;
 
-  for (let i = 0; i < mots.length; i++) {
-    const mot = mots[i].trim();
-    try {
-      const data = await fetchData(mot, corpus, from_year, to_year);
-      if (data.length === 0) continue;
+        const color = COLORS[i % COLORS.length];
+        const rawFrequencies = data.map(d => d.frequency * 1e6); // ppm (parts per million)
 
-      const years = data.map(d => d.annee);
-      let frequencies = data.map(d => d.frequency);
-
-      if (smooth && frequencies.length > 5) {
-        frequencies = movingAverage(frequencies, 3);
-      }
-
-      datasets.push({
-        label: mot,
-        data: years.map((year, idx) => ({ x: year, y: frequencies[idx] })),
-        borderColor: colors[i % colors.length],
-        backgroundColor: colors[i % colors.length] + '33',
-        borderWidth: 2.5,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        pointBackgroundColor: colors[i % colors.length],
-        pointBorderColor: 'white',
-        pointBorderWidth: 1,
-        fill: false,
-        tension: smooth ? 0.2 : 0,
-        showLine: true,
-        spanGaps: false // Ne pas relier les trous (mais il n'y en a pas)
-      });
-    } catch (err) {
-      console.error(`Erreur pour "${mot}":`, err.message);
-    }
-  }
-
-  if (datasets.length === 0) {
-    throw new Error('Aucune donnée disponible pour ces mots');
-  }
-
-  const configuration = {
-    type: 'line',
-    data: { datasets },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: CORPUS_LABELS[corpus] || corpus,
-          align: 'end',
-          color: '#666',
-          font: { size: 11, style: 'italic' }
-        },
-        legend: {
-          display: true,
-          position: 'top',
-          labels: { usePointStyle: true, boxWidth: 6 }
+        // 1. DATASET LIGNE (Tendance lissée)
+        let lineFrequencies = [...rawFrequencies];
+        if (smooth && lineFrequencies.length > 5) {
+            lineFrequencies = movingAverage(lineFrequencies, 5);
         }
-      },
-      scales: {
-        x: {
-          type: 'linear',
-          grid: { display: false },               // Pas de grille verticale
-          title: { display: false },
-          ticks: {
-            autoSkip: true,
-            maxRotation: 45,
-            minRotation: 0,
-            // Affiche un maximum de ticks pour que les années soient lisibles
-            maxTicksLimit: 12
-          }
-        },
-        y: {
-          title: { display: true, text: 'Fréquence relative' },
-          ticks: { display: false },               // Pas d'étiquettes sur l'axe Y
-          grid: { display: false },                 // Supprime les lignes horizontales
-          beginAtZero: false
-        }
-      },
-      elements: {
-        line: { borderJoinStyle: 'round' }
-      },
-      layout: {
-        padding: { top: 20, bottom: 10 }
-      }
+
+        allDatasets.push({
+            label: mot,
+            data: data.map((d, idx) => ({ x: d.annee, y: parseFloat(lineFrequencies[idx].toFixed(4)) })),
+            borderColor: color,
+            backgroundColor: 'transparent',
+            borderWidth: 3,
+            pointRadius: 0,
+            fill: false,
+            tension: smooth ? 0.4 : 0,
+            showLine: true
+        });
+
+        // 2. DATASET POINTS (Données brutes - masqué de la légende)
+        allDatasets.push({
+            label: `__hidden__${mot}_pts`,
+            data: data.map((d, idx) => ({ x: d.annee, y: parseFloat(rawFrequencies[idx].toFixed(4)) })),
+            borderColor: 'transparent',
+            backgroundColor: color + '66', // semi-transparent
+            pointRadius: 3,
+            pointBackgroundColor: color,
+            showLine: false,
+            fill: false
+        });
     }
-  };
 
-  const encoded = encodeURIComponent(JSON.stringify(configuration));
-  const url = `https://quickchart.io/chart?c=${encoded}&width=${width}&height=${height}&format=png&backgroundColor=white`;
-  console.log('QuickChart URL:', url);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Erreur génération graphique QuickChart');
+    if (allDatasets.length === 0) throw new Error('Aucune donnée trouvée');
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return buffer.toString('base64');
+    const configuration = {
+        type: 'line',
+        data: { datasets: allDatasets },
+        options: {
+            title: {
+                display: true,
+                text: `Gallicagram : ${CORPUS_LABELS[corpus] || corpus}`,
+                fontSize: 18,
+                fontStyle: 'bold'
+            },
+            legend: {
+                position: 'bottom',
+                labels: {
+                    // Filtre pour ne pas afficher les datasets de points dans la légende
+                    filter: (item) => !item.text.startsWith('__hidden__'),
+                    usePointStyle: true,
+                    padding: 20
+                }
+            },
+            scales: {
+                xAxes: [{
+                    type: 'linear',
+                    position: 'bottom',
+                    scaleLabel: { display: true, labelString: 'Année' },
+                    gridLines: { display: false },
+                    ticks: { callback: (val) => val.toString() }
+                }],
+                yAxes: [{
+                    scaleLabel: { display: true, labelString: 'Fréquence (ppm)' },
+                    ticks: { beginAtZero: true }
+                }]
+            }
+        }
+    };
+
+    const encoded = encodeURIComponent(JSON.stringify(configuration));
+    const url = `https://quickchart.io/chart?c=${encoded}&width=1000&height=500&backgroundColor=white&version=2.9.4`;
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Erreur QuickChart');
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return buffer.toString('base64');
 }
 
 export function generateAnalysisPrompt(mots, corpus, from, to) {
-  return `Analyse ce graphique de fréquence lexicale.
-
-Instructions :
-- Décris les tendances principales visibles sur le graphique
-- Identifie les pics historiques significatifs et leur période
-- Compare l'évolution des différents mots entre eux
-- Propose une interprétation historique ou culturelle des variations observées
-
-Contexte :
-- Corpus : ${CORPUS_LABELS[corpus] || corpus}
-- Mots analysés : ${mots.join(', ')}
-- Période : ${from || 'début'} - ${to || 'fin'}
-
-Note : Les graphiques montrent la fréquence relative (proportion par rapport au total des mots du corpus).`;
+    return `Agis en tant qu'historien expert. Analyse l'évolution de la fréquence de "${mots.join(', ')}" dans le corpus "${CORPUS_LABELS[corpus] || corpus}" entre ${from || 'le début'} et ${to || 'la fin'}. 
+    
+Sur le graphique, les points représentent les données annuelles brutes et la ligne représente la tendance lissée. 
+Identifie les événements historiques, culturels ou sociaux qui pourraient expliquer les pics ou les déclins observés.`;
 }

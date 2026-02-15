@@ -1,4 +1,4 @@
-// api/_lib/gallicagram.mjs (version corrigée)
+// api/_lib/gallicagram.mjs (version qui comble TOUTES les années manquantes avec fréquence=0)
 
 import fetch from 'node-fetch';
 
@@ -24,7 +24,6 @@ export const CORPUS_LABELS = {
   "rap": "Rap (Genius) (1989-2024)"
 };
 
-// Lissage moyenne mobile (identique à l'original)
 function movingAverage(data, windowSize = 11) {
   const result = [];
   for (let i = 0; i < data.length; i++) {
@@ -36,7 +35,6 @@ function movingAverage(data, windowSize = 11) {
   return result;
 }
 
-// NOUVELLE FONCTION fetchData : parsing manuel robuste
 async function fetchData(mot, corpus, from_year, to_year) {
   const params = new URLSearchParams({
     mot,
@@ -70,7 +68,8 @@ async function fetchData(mot, corpus, from_year, to_year) {
     throw new Error('Colonnes requises (annee, n, total) introuvables dans le CSV');
   }
 
-  const rows = [];
+  // 4. Parser toutes les lignes du CSV
+  const csvRows = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
@@ -78,38 +77,54 @@ async function fetchData(mot, corpus, from_year, to_year) {
     const parts = line.split(delimiter);
     if (parts.length <= Math.max(yearIdx, nIdx, totalIdx)) continue;
 
-    const anneeRaw = parts[yearIdx].trim();
-    const nRaw = parts[nIdx].trim();
-    const totalRaw = parts[totalIdx].trim();
+    const annee = parseInt(parts[yearIdx].trim(), 10);
+    const n = parseInt(parts[nIdx].trim(), 10) || 0;
+    const total = parseInt(parts[totalIdx].trim(), 10);
 
-    // Conversion en entiers
-    const annee = parseInt(anneeRaw, 10);
-    const n = parseInt(nRaw, 10) || 0; // Si NaN ou vide, on met 0
-    const total = parseInt(totalRaw, 10);
-
-    // On garde toutes les années valides, même si n = 0
     if (isNaN(annee) || isNaN(total) || total <= 0) continue;
 
-    rows.push({
+    csvRows.push({
       annee,
       n: n,
       total,
-      frequency: n / total // Fréquence relative
+      frequency: n / total
     });
   }
 
-  rows.sort((a, b) => a.annee - b.annee);
-  return rows;
+  if (csvRows.length === 0) return [];
+
+  // 5. CRITICAL: Créer un Map pour accès rapide par année
+  const dataMap = new Map(csvRows.map(r => [r.annee, r]));
+
+  // 6. Déterminer la plage complète d'années
+  const minYear = from_year || Math.min(...csvRows.map(r => r.annee));
+  const maxYear = to_year || Math.max(...csvRows.map(r => r.annee));
+
+  // 7. COMBLER TOUTES LES ANNÉES MANQUANTES avec fréquence = 0
+  const completeData = [];
+  for (let year = minYear; year <= maxYear; year++) {
+    if (dataMap.has(year)) {
+      // Année présente dans le CSV
+      completeData.push(dataMap.get(year));
+    } else {
+      // Année MANQUANTE dans le CSV → fréquence = 0
+      completeData.push({
+        annee: year,
+        n: 0,
+        total: 1, // On met 1 pour éviter division par 0
+        frequency: 0
+      });
+    }
+  }
+
+  return completeData;
 }
 
-
-// Génération du graphique via QuickChart (style adapté)
 export async function generateChart(mots, corpus, from_year, to_year, smooth) {
   const width = 1000;
   const height = 500;
 
   const datasets = [];
-  // Palette tab10 (identique à matplotlib)
   const colors = [
     '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
     '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
@@ -122,18 +137,17 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
       if (data.length === 0) continue;
 
       const years = data.map(d => d.annee);
-      let frequencies = data.map(d => d.n / d.total);
+      let frequencies = data.map(d => d.frequency); // Utilise directement .frequency
 
       if (smooth && frequencies.length > 5) {
         frequencies = movingAverage(frequencies, 11);
       }
 
-      // Style : points semi-transparents + ligne pleine
       datasets.push({
         label: mot,
         data: years.map((year, idx) => ({ x: year, y: frequencies[idx] })),
         borderColor: colors[i % colors.length],
-        backgroundColor: colors[i % colors.length] + '33', // transparence 20%
+        backgroundColor: colors[i % colors.length] + '33',
         borderWidth: 2.5,
         pointRadius: 2,
         pointHoverRadius: 5,
@@ -141,8 +155,9 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
         pointBorderColor: 'white',
         pointBorderWidth: 1,
         fill: false,
-        tension: smooth ? 0.2 : 0,  // léger lissage de la ligne
-        showLine: true
+        tension: smooth ? 0.2 : 0,
+        showLine: true,
+        spanGaps: false // Important: ne pas sauter les 0
       });
     } catch (err) {
       console.error(`Erreur pour "${mot}":`, err.message);
@@ -153,7 +168,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
     throw new Error('Aucune donnée disponible pour ces mots');
   }
 
-  // Configuration QuickChart (proche du rendu matplotlib)
   const configuration = {
     type: 'line',
     data: { datasets },
@@ -181,7 +195,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
         },
         y: {
           title: { display: true, text: 'Fréquence relative' },
-          ticks: { display: false },        // pas de chiffres sur l'axe Y
+          ticks: { display: false },
           grid: { color: '#e0e0e0', drawBorder: false },
           beginAtZero: true
         }
@@ -195,7 +209,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
     }
   };
 
-  // Encodage et appel à QuickChart
   const encoded = encodeURIComponent(JSON.stringify(configuration));
   const url = `https://quickchart.io/chart?c=${encoded}&width=${width}&height=${height}&format=png&backgroundColor=white`;
 
@@ -206,7 +219,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
   return buffer.toString('base64');
 }
 
-// Prompt d'analyse (inchangé)
 export function generateAnalysisPrompt(mots, corpus, from, to) {
   return `Analyse ce graphique de fréquence lexicale.
 

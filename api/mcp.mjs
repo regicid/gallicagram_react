@@ -89,6 +89,11 @@ function createServer() {
                                 `📅 Période : ${from_year || 'début'} - ${to_year || 'fin'}\n\n` +
                                 `![Graphique Gallicagram](${imageUrl})\n\n` +
                                 `${analysisPrompt}`
+                        },
+                        {
+                            type: "image",
+                            data: imageBuffer.toString('base64'),
+                            mimeType: "image/png"
                         }
                     ]
                 };

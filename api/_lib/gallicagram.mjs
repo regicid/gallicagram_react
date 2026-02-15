@@ -197,7 +197,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
           title: { display: true, text: 'Fréquence relative' },
           ticks: { display: false },
           grid: { color: '#e0e0e0', drawBorder: false },
-          beginAtZero: true
+          beginAtZero: false
         }
       },
       elements: {

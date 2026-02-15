@@ -83,11 +83,6 @@ function createServer() {
                 return {
                     content: [
                         {
-                            type: "image",
-                            data: imageUrl,
-                            mimeType: "image/png"
-                        },
-                        {
                             type: "text",
                             text: `📊 Graphique Gallicagram pour : ${mots.join(', ')}\n` +
                                 `📚 Corpus : ${CORPUS_LABELS[corpus] || corpus}\n` +

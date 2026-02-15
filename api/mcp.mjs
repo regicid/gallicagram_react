@@ -77,16 +77,14 @@ function createServer() {
                     };
                 }
 
-                const base64Image = imageBuffer.toString('base64');
-
                 const analysisPrompt = generateAnalysisPrompt(mots, corpus, from_year, to_year);
 
-                // Retourner l'image en base64
+                // Retour conforme au schema : image + prompt d'analyse
                 return {
                     content: [
                         {
                             type: "image",
-                            data: base64Image,
+                            data: imageUrl,
                             mimeType: "image/png"
                         },
                         {
@@ -94,6 +92,7 @@ function createServer() {
                             text: `📊 Graphique Gallicagram pour : ${mots.join(', ')}\n` +
                                 `📚 Corpus : ${CORPUS_LABELS[corpus] || corpus}\n` +
                                 `📅 Période : ${from_year || 'début'} - ${to_year || 'fin'}\n\n` +
+                                `![Graphique Gallicagram](${imageUrl})\n\n` +
                                 `${analysisPrompt}`
                         }
                     ]

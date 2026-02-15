@@ -24,7 +24,7 @@ export const CORPUS_LABELS = {
   "rap": "Rap (Genius) (1989-2024)"
 };
 
-function movingAverage(data, windowSize = 11) {
+function movingAverage(data, windowSize = 3) {
   const result = [];
   for (let i = 0; i < data.length; i++) {
     const start = Math.max(0, i - Math.floor(windowSize / 2));
@@ -137,7 +137,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
       if (data.length === 0) continue;
 
       const years = data.map(d => d.annee);
-      let frequencies = data.map(d => d.frequency); // Utilise directement .frequency
+      let frequencies = data.map(d => d.frequency * 1e9)
 
       if (smooth && frequencies.length > 5) {
         frequencies = movingAverage(frequencies, 11);

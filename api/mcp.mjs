@@ -79,12 +79,20 @@ function createServer() {
 
                 const analysisPrompt = generateAnalysisPrompt(mots, corpus, from_year, to_year);
 
-                // Retour conforme au schema : l'image URL dans le texte
+                // Retour conforme au schema : image + prompt d'analyse
                 return {
                     content: [
                         {
+                            type: "image",
+                            data: imageUrl,
+                            mimeType: "image/png"
+                        },
+                        {
                             type: "text",
-                            text: `🖼️ Image du graphique : ${imageUrl}\n\n📊 Graphique généré pour ${mots.join(', ')}\n\n${analysisPrompt}`
+                            text: `📊 Graphique Gallicagram pour : ${mots.join(', ')}\n` +
+                                `📚 Corpus : ${CORPUS_LABELS[corpus] || corpus}\n` +
+                                `📅 Période : ${from_year || 'début'} - ${to_year || 'fin'}\n\n` +
+                                `${analysisPrompt}`
                         }
                     ]
                 };

@@ -77,14 +77,16 @@ function createServer() {
                     };
                 }
 
+                const base64Image = imageBuffer.toString('base64');
+
                 const analysisPrompt = generateAnalysisPrompt(mots, corpus, from_year, to_year);
 
-                // Retour conforme au schema : image + prompt d'analyse
+                // Retourner l'image en base64
                 return {
                     content: [
                         {
                             type: "image",
-                            data: imageUrl,
+                            data: base64Image,
                             mimeType: "image/png"
                         },
                         {
@@ -96,6 +98,7 @@ function createServer() {
                         }
                     ]
                 };
+
             } catch (error) {
                 // Catch ultime : s'assurer d'un format valide même en cas d'erreur d'exécution inattendue
                 const msg = error && error.message ? error.message : String(error);

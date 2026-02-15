@@ -211,7 +211,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth) {
 
   const encoded = encodeURIComponent(JSON.stringify(configuration));
   const url = `https://quickchart.io/chart?c=${encoded}&width=${width}&height=${height}&format=png&backgroundColor=white`;
-
+  console.log('QuickChart URL:', url);
   const response = await fetch(url);
   if (!response.ok) throw new Error('Erreur génération graphique QuickChart');
 

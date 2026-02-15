@@ -77,7 +77,7 @@ async function fetchData(mot, corpus, from_year, to_year) {
     const minYear = from_year || csvRows[0].annee;
     const maxYear = to_year || csvRows[csvRows.length - 1].annee;
     const dataMap = new Map(csvRows.map(r => [r.annee, r.frequency]));
-    
+
     const completeData = [];
     for (let y = minYear; y <= maxYear; y++) {
         completeData.push({ annee: y, frequency: dataMap.get(y) || 0 });
@@ -117,7 +117,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         // 2. DATASET POINTS (Données brutes)
         // On garde le préfixe __hidden__ pour le repérer
         allDatasets.push({
-            label: `__hidden__${mot}`, 
+            label: `__hidden__${mot}`,
             data: data.map((d, idx) => ({ x: d.annee, y: parseFloat(rawFrequencies[idx].toFixed(4)) })),
             borderColor: 'transparent',
             backgroundColor: color + '80', // 80 = 50% d'opacité
@@ -166,13 +166,13 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     // Conversion en JSON puis injection manuelle des fonctions JS
     let configStr = JSON.stringify(configuration);
-    
+
     // Injection de la fonction de filtrage de la légende
     configStr = configStr.replace(
         '"REPLACE_ME_FILTER_FUNCTION"',
         'function(item) { return !item.text.includes("__hidden__"); }'
     );
-    
+
     // Injection de la fonction de formatage des années (pour enlever les virgules ex: 1,850 -> 1850)
     configStr = configStr.replace(
         '"REPLACE_ME_TICK_FUNCTION"',
@@ -181,12 +181,12 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     const encoded = encodeURIComponent(configStr);
     const url = `https://quickchart.io/chart?c=${encoded}&width=1000&height=500&backgroundColor=white&version=2.9.4`;
-    
+
     const response = await fetch(url);
     if (!response.ok) throw new Error('Erreur QuickChart');
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    return buffer.toString('base64');
+    return buffer;
 }
 
 export function generateAnalysisPrompt(mots, corpus, from, to) {

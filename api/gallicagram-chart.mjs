@@ -4,6 +4,7 @@
  */
 
 import { generateChart, generateAnalysisPrompt, CORPUS_LABELS } from './_lib/gallicagram.mjs';
+import { uploadToS3 } from './_lib/s3.mjs';
 
 // API Handler
 export default async function handler(req, res) {
@@ -29,17 +30,20 @@ export default async function handler(req, res) {
         const to = to_year ? parseInt(to_year) : null;
 
         // Générer le graphique
-        const imageBase64 = await generateChart(mots, corpus, from, to, shouldSmooth);
+        const imageBuffer = await generateChart(mots, corpus, from, to, shouldSmooth);
+
+        // Upload vers S3
+        const filename = `chart_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
+        const imageUrl = await uploadToS3(imageBuffer, filename, "image/png");
 
         // Générer le prompt d'analyse
         const analysisPrompt = generateAnalysisPrompt(mots, corpus, from, to);
 
-        // Retourner la réponse MCP-compatible
+        // Retourner la réponse MCP-compatible avec l'URL S3
         return res.status(200).json({
             success: true,
             data: {
-                image_base64: imageBase64,
-                image_data_url: `data:image/png;base64,${imageBase64}`,
+                image_url: imageUrl,
                 analysis_prompt: analysisPrompt,
                 metadata: {
                     words: mots,

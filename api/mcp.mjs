@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { generateChart, generateAnalysisPrompt, CORPUS_LABELS } from './_lib/gallicagram.mjs';
+import { uploadToS3 } from './_lib/s3.mjs';
 
 // Factory function to create a new server instance
 function createServer() {
@@ -42,9 +43,9 @@ function createServer() {
                 }
 
                 // Appel au générateur de graphique
-                let imageBase64;
+                let imageBuffer;
                 try {
-                    imageBase64 = await generateChart(mots, corpus, from_year, to_year, smooth);
+                    imageBuffer = await generateChart(mots, corpus, from_year, to_year, smooth);
                 } catch (genErr) {
                     // generateChart peut lever une erreur (ex: pas de données) — renvoyer une réponse structurée
                     const msg = genErr && genErr.message ? genErr.message : String(genErr);
@@ -55,26 +56,35 @@ function createServer() {
                 }
 
                 // Si aucun buffer/image n'a été renvoyé (null/undefined/""), renvoyer message d'erreur structuré
-                if (!imageBase64 || typeof imageBase64 !== 'string' || imageBase64.trim() === '') {
+                if (!imageBuffer) {
                     return {
                         content: [{ type: "text", text: "Erreur: Aucune image générée (pas de données disponibles pour ces mots)" }],
                         isError: true
                     };
                 }
 
+                // Upload vers S3
+                let imageUrl;
+                try {
+                    const filename = `chart_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
+                    imageUrl = await uploadToS3(imageBuffer, filename, "image/png");
+                } catch (s3Err) {
+                    console.error('S3 upload error:', s3Err);
+                    const msg = s3Err && s3Err.message ? s3Err.message : String(s3Err);
+                    return {
+                        content: [{ type: "text", text: `Erreur upload S3: ${msg}` }],
+                        isError: true
+                    };
+                }
+
                 const analysisPrompt = generateAnalysisPrompt(mots, corpus, from_year, to_year);
 
-                // Retour conforme au schema : d'abord l'image, puis le texte explicatif
+                // Retour conforme au schema : l'image URL dans le texte
                 return {
                     content: [
                         {
-                            type: "image",
-                            data: imageBase64,
-                            mimeType: "image/png"
-                        },
-                        {
                             type: "text",
-                            text: `📊 Graphique généré pour ${mots.join(', ')}\n\n${analysisPrompt}`
+                            text: `🖼️ Image du graphique : ${imageUrl}\n\n📊 Graphique généré pour ${mots.join(', ')}\n\n${analysisPrompt}`
                         }
                     ]
                 };
@@ -134,7 +144,7 @@ export default async function handler(req, res) {
 
     } catch (error) {
         console.error('MCP handler error:', error);
-        
+
         // Ensure cleanup on error
         try {
             transport.close();

@@ -175,6 +175,11 @@ async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
             });
         }
     }
+        csvRows.sort((a, b) => {
+        if (a.annee !== b.annee) return a.annee - b.annee;
+        if (a.mois !== b.mois) return (a.mois || 0) - (b.mois || 0);
+        return 0;
+    });
 
     return { data: csvRows, resolution: finalResolution };
 }

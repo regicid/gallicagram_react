@@ -206,7 +206,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         allDatasets.push({
             label: mot,
             data: data.map((d, idx) => ({ 
-                x: d.date,
+                x: usedResolution === "mois" ? d.date : parseInt(d.date),  // Nombre pour linear axis
                 y: parseFloat(lineFrequencies[idx].toFixed(4))
             })),
             borderColor: color,
@@ -225,7 +225,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         allDatasets.push({
             label: mot + ' (données brutes)',
             data: data.map((d, idx) => ({ 
-                x: d.date,
+                x: usedResolution === "mois" ? d.date : parseInt(d.date),  // Nombre pour linear axis
                 y: parseFloat(rawFrequencies[idx].toFixed(4))
             })),
             borderColor: 'transparent',
@@ -245,14 +245,14 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     // Configuration avec axes adaptés à la résolution
     const xAxisConfig = {
-        type: usedResolution === "mois" ? 'time' : 'category',  // CORRECTION: category au lieu de linear
+        type: usedResolution === "mois" ? 'time' : 'linear',
         position: 'bottom',
         gridLines: { display: false },
         ticks: {}
     };
 
     if (usedResolution === "mois") {
-        // CORRECTION : Configuration time axis pour format ISO
+        // Configuration time axis pour format ISO
         xAxisConfig.time = {
             parser: 'YYYY-MM',
             unit: 'month',
@@ -262,10 +262,9 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             tooltipFormat: 'MMM YYYY'
         };
     } else {
-        // Pour l'axe category, on limite le nombre de ticks affichés
+        // Pour l'axe linear avec années
         xAxisConfig.ticks = {
-            maxTicksLimit: 20,
-            autoSkip: true
+            callback: "REPLACE_ME_TICK_FUNCTION"
         };
     }
 
@@ -312,6 +311,14 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         '"REPLACE_ME_FILTER_FUNCTION"',
         'function(item) { return !item.text.includes("(données brutes)"); }'
     );
+
+    // Callback pour formater les années sur l'axe X
+    if (usedResolution !== "mois") {
+        configStr = configStr.replace(
+            '"REPLACE_ME_TICK_FUNCTION"',
+            'function(val) { return Math.round(val).toString(); }'
+        );
+    }
 
     // Tooltip personnalisé pour afficher les données brutes
     configStr = configStr.replace(

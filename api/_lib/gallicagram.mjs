@@ -106,12 +106,25 @@ function getOptimalSmoothWindow(dataLength) {
 }
 
 /**
- * Formate une date selon la résolution
+ * Formate une date selon la résolution - VERSION CORRIGÉE
+ * Pour la résolution mois, retourne un format ISO compatible avec Chart.js time axis
  */
 function formatDate(annee, mois = null, resolution = "annee") {
     if (resolution === "annee") return annee.toString();
     if (resolution === "mois" && mois) {
-        // Format plus lisible : "Jan 1944" au lieu de "1944-01"
+        // Format ISO pour Chart.js : "1944-01" au lieu de "Jan 1944"
+        const moisStr = mois.toString().padStart(2, '0');
+        return `${annee}-${moisStr}`;
+    }
+    return annee.toString();
+}
+
+/**
+ * Formate une date pour l'affichage dans les tooltips
+ */
+function formatDateDisplay(annee, mois = null, resolution = "annee") {
+    if (resolution === "annee") return annee.toString();
+    if (resolution === "mois" && mois) {
         const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
         return `${monthNames[mois - 1]} ${annee}`;
     }
@@ -157,7 +170,8 @@ async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
                 mois,
                 n,
                 frequency: n / total,
-                date: formatDate(annee, mois, finalResolution)
+                date: formatDate(annee, mois, finalResolution),
+                dateDisplay: formatDateDisplay(annee, mois, finalResolution)
             });
         }
     }
@@ -182,40 +196,47 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         // Calcul de la fenêtre de lissage adaptative
         const smoothWindow = getOptimalSmoothWindow(data.length);
 
-        // 1. DATASET LIGNE (Tendance lissée)
+        // Lissage des fréquences si demandé
         let lineFrequencies = [...rawFrequencies];
         if (smooth && lineFrequencies.length > smoothWindow) {
             lineFrequencies = movingAverage(lineFrequencies, smoothWindow);
         }
 
+        // 1. DATASET LIGNE LISSÉE (sans points)
         allDatasets.push({
             label: mot,
             data: data.map((d, idx) => ({ 
                 x: d.date,
-                y: parseFloat(lineFrequencies[idx].toFixed(4)) 
+                y: parseFloat(lineFrequencies[idx].toFixed(4))
             })),
             borderColor: color,
             backgroundColor: 'transparent',
             borderWidth: 3,
-            pointRadius: 0,
+            pointRadius: 0,  // Pas de points sur la ligne
+            pointHoverRadius: 0,
             fill: false,
             tension: smooth ? 0.4 : 0,
-            showLine: true
+            showLine: true,
+            order: 2  // Ligne en arrière-plan
         });
 
-        // 2. DATASET POINTS (Données brutes)
+        // 2. DATASET POINTS BRUTS (sans ligne)
         allDatasets.push({
-            label: `__hidden__${mot}`,
+            label: mot + ' (données brutes)',
             data: data.map((d, idx) => ({ 
                 x: d.date,
-                y: parseFloat(rawFrequencies[idx].toFixed(4)) 
+                y: parseFloat(rawFrequencies[idx].toFixed(4))
             })),
             borderColor: 'transparent',
-            backgroundColor: color + '80',
+            backgroundColor: color + '80',  // Semi-transparent
             pointRadius: 2.5,
+            pointHoverRadius: 5,
             pointBackgroundColor: color,
-            showLine: false,
-            fill: false
+            pointBorderColor: color,
+            pointBorderWidth: 1,
+            showLine: false,  // Pas de ligne, seulement des points
+            fill: false,
+            order: 1  // Points au premier plan
         });
     }
 
@@ -230,12 +251,14 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
     };
 
     if (usedResolution === "mois") {
+        // CORRECTION : Configuration time axis pour format ISO
         xAxisConfig.time = {
             parser: 'YYYY-MM',
             unit: 'month',
             displayFormats: {
                 month: 'MMM YYYY'
-            }
+            },
+            tooltipFormat: 'MMM YYYY'
         };
     } else {
         xAxisConfig.ticks.callback = "REPLACE_ME_TICK_FUNCTION";
@@ -259,6 +282,12 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                     filter: "REPLACE_ME_FILTER_FUNCTION"
                 }
             },
+            tooltips: {
+                callbacks: {
+                    // Afficher la valeur brute dans le tooltip
+                    label: "REPLACE_ME_TOOLTIP_FUNCTION"
+                }
+            },
             scales: {
                 xAxes: [xAxisConfig],
                 yAxes: [{
@@ -272,17 +301,34 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
     let configStr = JSON.stringify(configuration);
 
     // Injection des fonctions JS
+    
+    // Filtre pour cacher les datasets "données brutes" de la légende
     configStr = configStr.replace(
         '"REPLACE_ME_FILTER_FUNCTION"',
-        'function(item) { return !item.text.includes("__hidden__"); }'
+        'function(item) { return !item.text.includes("(données brutes)"); }'
     );
-
+    
     if (usedResolution !== "mois") {
         configStr = configStr.replace(
             '"REPLACE_ME_TICK_FUNCTION"',
             'function(val) { return val.toString(); }'
         );
     }
+
+    // Tooltip personnalisé pour afficher les données brutes
+    configStr = configStr.replace(
+        '"REPLACE_ME_TOOLTIP_FUNCTION"',
+        `function(tooltipItem, data) {
+            var dataset = data.datasets[tooltipItem.datasetIndex];
+            var label = dataset.label || '';
+            var value = tooltipItem.yLabel;
+            // Nettoyer le label pour la légende
+            if (label.includes('(données brutes)')) {
+                label = label.replace(' (données brutes)', '');
+            }
+            return label + ': ' + value.toFixed(2) + ' ppm';
+        }`
+    );
 
     const encoded = encodeURIComponent(configStr);
     const url = `https://quickchart.io/chart?c=${encoded}&width=1000&height=500&backgroundColor=white&version=2.9.4`;
@@ -311,13 +357,13 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
         
         // Collecte les labels (dates) dans l'ordre
         data.forEach(d => {
-            if (!allDates.has(d.date)) {
-                allDates.set(d.date, true);
+            if (!allDates.has(d.dateDisplay)) {
+                allDates.set(d.dateDisplay, true);
             }
         });
         
         // Crée un map pour accès rapide
-        const dataMap = new Map(data.map(d => [d.date, d.n]));
+        const dataMap = new Map(data.map(d => [d.dateDisplay, d.n]));
         
         datasets.push({
             label: mot,

@@ -88,7 +88,7 @@ function getOptimalResolution(corpus, from_year, to_year) {
  * Calcule la taille de fenêtre de lissage optimale
  */
 function getOptimalSmoothWindow(dataLength) {
-    if (dataLength <= 5) return 1;
+    if (dataLength <= 5) return 1;  // Pas de lissage pour très petites séries
     if (dataLength <= 10) return 3;  // Très petites séries
     if (dataLength <= 30) return 4;  // Petites séries
     return 5;  // Séries normales (max 5)
@@ -100,7 +100,9 @@ function getOptimalSmoothWindow(dataLength) {
 function formatDate(annee, mois = null, resolution = "annee") {
     if (resolution === "annee") return annee.toString();
     if (resolution === "mois" && mois) {
-        return `${annee}-${String(mois).padStart(2, '0')}`;
+        // Format plus lisible : "Jan 1944" au lieu de "1944-01"
+        const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+        return `${monthNames[mois - 1]} ${annee}`;
     }
     return annee.toString();
 }
@@ -209,21 +211,19 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
     if (allDatasets.length === 0) throw new Error('Aucune donnée trouvée');
 
     // Configuration avec axes adaptés à la résolution
+    // Pour la résolution mensuelle, on utilise category au lieu de time pour éviter les problèmes
     const xAxisConfig = {
-        type: usedResolution === "mois" ? 'time' : 'linear',
+        type: usedResolution === "mois" ? 'category' : 'linear',
         position: 'bottom',
         gridLines: { display: false },
         ticks: {}
     };
 
     if (usedResolution === "mois") {
-        xAxisConfig.time = {
-            parser: 'YYYY-MM',
-            unit: 'month',
-            displayFormats: {
-                month: 'MMM YYYY'
-            }
-        };
+        // On garde les labels tels quels (format YYYY-MM déjà correct)
+        // QuickChart affichera directement les valeurs x des datasets
+        xAxisConfig.ticks.maxTicksLimit = 20; // Limite le nombre de labels pour lisibilité
+        xAxisConfig.ticks.autoSkip = true;
     } else {
         xAxisConfig.ticks.callback = "REPLACE_ME_TICK_FUNCTION";
     }
@@ -234,7 +234,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         options: {
             title: {
                 display: true,
-                text: `Gallicagram : ${CORPUS_LABELS[corpus] || corpus}`,
+                text: `${CORPUS_LABELS[corpus] || corpus}`,
                 fontSize: 18,
                 fontColor: '#555'
             },
@@ -249,7 +249,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             scales: {
                 xAxes: [xAxisConfig],
                 yAxes: [{
-                    scaleLabel: { display: true, labelString: 'Fréquence (ppm)' },
+                    scaleLabel: { display: true, labelString: 'Fréquence \n par million de mots' },
                     ticks: { beginAtZero: true }
                 }]
             }
@@ -283,7 +283,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
 export async function generateHistogram(mots, corpus, from_year, to_year) {
     const datasets = [];
-    let allLabels = new Set();
+    let allDates = new Map(); // Map pour garder l'ordre
     let usedResolution = "annee";
 
     // Collecte des données pour tous les mots
@@ -296,12 +296,19 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
 
         const color = COLORS[i % COLORS.length];
         
-        // Collecte les labels (dates)
-        data.forEach(d => allLabels.add(d.date));
+        // Collecte les labels (dates) dans l'ordre
+        data.forEach(d => {
+            if (!allDates.has(d.date)) {
+                allDates.set(d.date, true);
+            }
+        });
+        
+        // Crée un map pour accès rapide
+        const dataMap = new Map(data.map(d => [d.date, d.n]));
         
         datasets.push({
             label: mot,
-            data: data.map(d => ({ x: d.date, y: d.n })),
+            data: Array.from(allDates.keys()).map(date => dataMap.get(date) || 0),
             backgroundColor: color,
             borderColor: color,
             borderWidth: 1
@@ -310,7 +317,7 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
 
     if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
 
-    const labels = Array.from(allLabels).sort();
+    const labels = Array.from(allDates.keys());
 
     const configuration = {
         type: 'bar',
@@ -321,7 +328,7 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
         options: {
             title: {
                 display: true,
-                text: `Gallicagram (Occurrences) : ${CORPUS_LABELS[corpus] || corpus}`,
+                text: `${CORPUS_LABELS[corpus] || corpus}`,
                 fontSize: 18,
                 fontColor: '#555'
             },
@@ -335,11 +342,15 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
             scales: {
                 xAxes: [{
                     stacked: false,
-                    gridLines: { display: false }
+                    gridLines: { display: false },
+                    ticks: {
+                        maxTicksLimit: 20,
+                        autoSkip: true
+                    }
                 }],
                 yAxes: [{
                     stacked: false,
-                    scaleLabel: { display: true, labelString: 'Nombre d\'occurrences (n)' },
+                    scaleLabel: { display: true, labelString: 'Nombre d\'occurrences' },
                     ticks: { beginAtZero: true }
                 }]
             }
@@ -395,7 +406,7 @@ export async function generateTotalsChart(mots, corpus, from_year, to_year) {
         options: {
             title: {
                 display: true,
-                text: `Gallicagram (Totaux) : ${CORPUS_LABELS[corpus] || corpus}`,
+                text: `${CORPUS_LABELS[corpus] || corpus}`,
                 fontSize: 18,
                 fontColor: '#555'
             },

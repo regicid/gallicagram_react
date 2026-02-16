@@ -23,6 +23,29 @@ export const CORPUS_LABELS = {
     "rap": "Rap (Genius) (1989-2024)"
 };
 
+// Correspondance corpus -> résolution minimale (d'après le swagger)
+const CORPUS_MIN_RESOLUTION = {
+    "lemonde": "jour",
+    "lemonde_rubriques": "jour",
+    "presse": "mois",
+    "livres": "annee",
+    "ddb": "mois",
+    "american_stories": "annee",
+    "paris": "jour",
+    "moniteur": "jour",
+    "journal_des_debats": "jour",
+    "la_presse": "jour",
+    "constitutionnel": "jour",
+    "figaro": "jour",
+    "temps": "jour",
+    "petit_journal": "jour",
+    "petit_parisien": "jour",
+    "huma": "jour",
+    "subtitles": "annee",
+    "subtitles_en": "annee",
+    "rap": "annee"
+};
+
 const COLORS = [
     '#E63946', '#457B9D', '#2A9D8F', '#F4A261', '#E76F51',
     '#6A4C93', '#1982C4', '#8AC926', '#FFCA3A', '#FF595E'
@@ -39,8 +62,54 @@ function movingAverage(data, windowSize = 5) {
     return result;
 }
 
-async function fetchData(mot, corpus, from_year, to_year) {
-    const params = new URLSearchParams({ mot, corpus, resolution: 'annee' });
+/**
+ * Détermine la meilleure résolution selon la période et le corpus
+ */
+function getOptimalResolution(corpus, from_year, to_year) {
+    const minRes = CORPUS_MIN_RESOLUTION[corpus] || "annee";
+    
+    // Si le corpus ne supporte que l'année, on reste sur année
+    if (minRes === "annee") return "annee";
+    
+    // Si pas de période définie, on utilise année par défaut
+    if (!from_year || !to_year) return "annee";
+    
+    const span = to_year - from_year;
+    
+    // Pour les petites périodes (< 10 ans), on privilégie le mois si disponible
+    if (span < 10 && (minRes === "jour" || minRes === "mois")) {
+        return "mois";
+    }
+    
+    return "annee";
+}
+
+/**
+ * Calcule la taille de fenêtre de lissage optimale
+ */
+function getOptimalSmoothWindow(dataLength) {
+    if (dataLength <= 5) return 1;
+    if (dataLength <= 10) return 3;  // Très petites séries
+    if (dataLength <= 30) return 4;  // Petites séries
+    return 5;  // Séries normales (max 5)
+}
+
+/**
+ * Formate une date selon la résolution
+ */
+function formatDate(annee, mois = null, resolution = "annee") {
+    if (resolution === "annee") return annee.toString();
+    if (resolution === "mois" && mois) {
+        return `${annee}-${String(mois).padStart(2, '0')}`;
+    }
+    return annee.toString();
+}
+
+async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
+    // Détermine la résolution optimale si non spécifiée
+    const finalResolution = resolution || getOptimalResolution(corpus, from_year, to_year);
+    
+    const params = new URLSearchParams({ mot, corpus, resolution: finalResolution });
     if (from_year) params.append('from', from_year);
     if (to_year) params.append('to', to_year);
 
@@ -55,6 +124,7 @@ async function fetchData(mot, corpus, from_year, to_year) {
     const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase());
 
     const yearIdx = headers.findIndex(h => ['annee', 'year', 'année'].includes(h));
+    const monthIdx = headers.findIndex(h => ['mois', 'month'].includes(h));
     const nIdx = headers.findIndex(h => ['n', 'count', 'nombre'].includes(h));
     const totalIdx = headers.findIndex(h => ['total', 'tot', 'sum'].includes(h));
 
@@ -62,49 +132,55 @@ async function fetchData(mot, corpus, from_year, to_year) {
     for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(delimiter);
         if (parts.length <= Math.max(yearIdx, nIdx, totalIdx)) continue;
+        
         const annee = parseInt(parts[yearIdx]);
+        const mois = monthIdx >= 0 ? parseInt(parts[monthIdx]) : null;
         const n = parseFloat(parts[nIdx]) || 0;
         const total = parseFloat(parts[totalIdx]);
+        
         if (!isNaN(annee) && total > 0) {
-            csvRows.push({ annee, frequency: n / total });
+            csvRows.push({ 
+                annee, 
+                mois,
+                n,
+                frequency: n / total,
+                date: formatDate(annee, mois, finalResolution)
+            });
         }
     }
 
-    // Tri et complétion des années manquantes
-    csvRows.sort((a, b) => a.annee - b.annee);
-    if (csvRows.length === 0) return [];
-
-    const minYear = from_year || csvRows[0].annee;
-    const maxYear = to_year || csvRows[csvRows.length - 1].annee;
-    const dataMap = new Map(csvRows.map(r => [r.annee, r.frequency]));
-
-    const completeData = [];
-    for (let y = minYear; y <= maxYear; y++) {
-        completeData.push({ annee: y, frequency: dataMap.get(y) || 0 });
-    }
-    return completeData;
+    return { data: csvRows, resolution: finalResolution };
 }
 
 export async function generateChart(mots, corpus, from_year, to_year, smooth = true) {
     const allDatasets = [];
+    let usedResolution = "annee";
 
     for (let i = 0; i < mots.length; i++) {
         const mot = mots[i].trim();
-        const data = await fetchData(mot, corpus, from_year, to_year);
+        const { data, resolution } = await fetchData(mot, corpus, from_year, to_year);
+        usedResolution = resolution; // On garde trace de la résolution utilisée
+        
         if (data.length === 0) continue;
 
         const color = COLORS[i % COLORS.length];
         const rawFrequencies = data.map(d => d.frequency * 1e6); // ppm
 
+        // Calcul de la fenêtre de lissage adaptative
+        const smoothWindow = getOptimalSmoothWindow(data.length);
+
         // 1. DATASET LIGNE (Tendance lissée)
         let lineFrequencies = [...rawFrequencies];
-        if (smooth && lineFrequencies.length > 5) {
-            lineFrequencies = movingAverage(lineFrequencies, 5);
+        if (smooth && lineFrequencies.length > smoothWindow) {
+            lineFrequencies = movingAverage(lineFrequencies, smoothWindow);
         }
 
         allDatasets.push({
             label: mot,
-            data: data.map((d, idx) => ({ x: d.annee, y: parseFloat(lineFrequencies[idx].toFixed(4)) })),
+            data: data.map((d, idx) => ({ 
+                x: d.date,
+                y: parseFloat(lineFrequencies[idx].toFixed(4)) 
+            })),
             borderColor: color,
             backgroundColor: 'transparent',
             borderWidth: 3,
@@ -115,13 +191,15 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         });
 
         // 2. DATASET POINTS (Données brutes)
-        // On garde le préfixe __hidden__ pour le repérer
         allDatasets.push({
             label: `__hidden__${mot}`,
-            data: data.map((d, idx) => ({ x: d.annee, y: parseFloat(rawFrequencies[idx].toFixed(4)) })),
+            data: data.map((d, idx) => ({ 
+                x: d.date,
+                y: parseFloat(rawFrequencies[idx].toFixed(4)) 
+            })),
             borderColor: 'transparent',
-            backgroundColor: color + '80', // 80 = 50% d'opacité
-            pointRadius: 2.5, // Points légèrement plus petits
+            backgroundColor: color + '80',
+            pointRadius: 2.5,
             pointBackgroundColor: color,
             showLine: false,
             fill: false
@@ -129,6 +207,26 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
     }
 
     if (allDatasets.length === 0) throw new Error('Aucune donnée trouvée');
+
+    // Configuration avec axes adaptés à la résolution
+    const xAxisConfig = {
+        type: usedResolution === "mois" ? 'time' : 'linear',
+        position: 'bottom',
+        gridLines: { display: false },
+        ticks: {}
+    };
+
+    if (usedResolution === "mois") {
+        xAxisConfig.time = {
+            parser: 'YYYY-MM',
+            unit: 'month',
+            displayFormats: {
+                month: 'MMM YYYY'
+            }
+        };
+    } else {
+        xAxisConfig.ticks.callback = "REPLACE_ME_TICK_FUNCTION";
+    }
 
     const configuration = {
         type: 'line',
@@ -145,17 +243,11 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                 labels: {
                     usePointStyle: true,
                     padding: 20,
-                    // ASTUCE : On met un placeholder pour le filtre
                     filter: "REPLACE_ME_FILTER_FUNCTION"
                 }
             },
             scales: {
-                xAxes: [{
-                    type: 'linear',
-                    position: 'bottom',
-                    gridLines: { display: false },
-                    ticks: { callback: "REPLACE_ME_TICK_FUNCTION" }
-                }],
+                xAxes: [xAxisConfig],
                 yAxes: [{
                     scaleLabel: { display: true, labelString: 'Fréquence (ppm)' },
                     ticks: { beginAtZero: true }
@@ -164,20 +256,20 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         }
     };
 
-    // Conversion en JSON puis injection manuelle des fonctions JS
     let configStr = JSON.stringify(configuration);
 
-    // Injection de la fonction de filtrage de la légende
+    // Injection des fonctions JS
     configStr = configStr.replace(
         '"REPLACE_ME_FILTER_FUNCTION"',
         'function(item) { return !item.text.includes("__hidden__"); }'
     );
 
-    // Injection de la fonction de formatage des années (pour enlever les virgules ex: 1,850 -> 1850)
-    configStr = configStr.replace(
-        '"REPLACE_ME_TICK_FUNCTION"',
-        'function(val) { return val.toString(); }'
-    );
+    if (usedResolution !== "mois") {
+        configStr = configStr.replace(
+            '"REPLACE_ME_TICK_FUNCTION"',
+            'function(val) { return val.toString(); }'
+        );
+    }
 
     const encoded = encodeURIComponent(configStr);
     const url = `https://quickchart.io/chart?c=${encoded}&width=1000&height=500&backgroundColor=white&version=2.9.4`;
@@ -187,6 +279,151 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     const buffer = Buffer.from(await response.arrayBuffer());
     return buffer;
+}
+
+export async function generateHistogram(mots, corpus, from_year, to_year) {
+    const datasets = [];
+    let allLabels = new Set();
+    let usedResolution = "annee";
+
+    // Collecte des données pour tous les mots
+    for (let i = 0; i < mots.length; i++) {
+        const mot = mots[i].trim();
+        const { data, resolution } = await fetchData(mot, corpus, from_year, to_year);
+        usedResolution = resolution;
+        
+        if (data.length === 0) continue;
+
+        const color = COLORS[i % COLORS.length];
+        
+        // Collecte les labels (dates)
+        data.forEach(d => allLabels.add(d.date));
+        
+        datasets.push({
+            label: mot,
+            data: data.map(d => ({ x: d.date, y: d.n })),
+            backgroundColor: color,
+            borderColor: color,
+            borderWidth: 1
+        });
+    }
+
+    if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
+
+    const labels = Array.from(allLabels).sort();
+
+    const configuration = {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            title: {
+                display: true,
+                text: `Gallicagram (Occurrences) : ${CORPUS_LABELS[corpus] || corpus}`,
+                fontSize: 18,
+                fontColor: '#555'
+            },
+            legend: {
+                position: 'bottom',
+                labels: {
+                    usePointStyle: true,
+                    padding: 20
+                }
+            },
+            scales: {
+                xAxes: [{
+                    stacked: false,
+                    gridLines: { display: false }
+                }],
+                yAxes: [{
+                    stacked: false,
+                    scaleLabel: { display: true, labelString: 'Nombre d\'occurrences (n)' },
+                    ticks: { beginAtZero: true }
+                }]
+            }
+        }
+    };
+
+    const encoded = encodeURIComponent(JSON.stringify(configuration));
+    const url = `https://quickchart.io/chart?c=${encoded}&width=1000&height=500&backgroundColor=white&version=2.9.4`;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Erreur QuickChart');
+
+    return Buffer.from(await response.arrayBuffer());
+}
+
+export async function generateTotalsChart(mots, corpus, from_year, to_year) {
+    const totals = [];
+
+    // Collecte des totaux pour chaque mot
+    for (let i = 0; i < mots.length; i++) {
+        const mot = mots[i].trim();
+        const { data } = await fetchData(mot, corpus, from_year, to_year);
+        
+        if (data.length === 0) continue;
+
+        const totalOccurrences = data.reduce((sum, d) => sum + d.n, 0);
+        const color = COLORS[i % COLORS.length];
+        
+        totals.push({
+            mot,
+            total: totalOccurrences,
+            color
+        });
+    }
+
+    if (totals.length === 0) throw new Error('Aucune donnée trouvée');
+
+    // Trier par total décroissant
+    totals.sort((a, b) => b.total - a.total);
+
+    const configuration = {
+        type: 'horizontalBar',
+        data: {
+            labels: totals.map(t => t.mot),
+            datasets: [{
+                label: 'Occurrences totales',
+                data: totals.map(t => t.total),
+                backgroundColor: totals.map(t => t.color),
+                borderColor: totals.map(t => t.color),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            title: {
+                display: true,
+                text: `Gallicagram (Totaux) : ${CORPUS_LABELS[corpus] || corpus}`,
+                fontSize: 18,
+                fontColor: '#555'
+            },
+            legend: {
+                display: false
+            },
+            scales: {
+                xAxes: [{
+                    scaleLabel: { 
+                        display: true, 
+                        labelString: 'Nombre total d\'occurrences' 
+                    },
+                    ticks: { beginAtZero: true }
+                }],
+                yAxes: [{
+                    gridLines: { display: false }
+                }]
+            }
+        }
+    };
+
+    const encoded = encodeURIComponent(JSON.stringify(configuration));
+    const url = `https://quickchart.io/chart?c=${encoded}&width=1000&height=600&backgroundColor=white&version=2.9.4`;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Erreur QuickChart');
+
+    return Buffer.from(await response.arrayBuffer());
 }
 
 export function generateAnalysisPrompt(mots, corpus, from, to) {

@@ -18,8 +18,8 @@ export const CORPUS_LABELS = {
     "petit_journal": "Le Petit Journal (1863-1942)",
     "petit_parisien": "Le Petit Parisien (1876-1944)",
     "huma": "L'Humanité (1904-1952)",
-    "subtitles": "Sous-titres (FR) (1935-2020)",
-    "subtitles_en": "Subtitles (EN) (1930-2020)",
+    "subtitles": "Sous-titres de films (FR) (1935-2020)",
+    "subtitles_en": "Subtitles de films (EN) (1930-2020)",
     "rap": "Rap (Genius) (1989-2024)"
 };
 
@@ -52,12 +52,23 @@ const COLORS = [
 ];
 
 function movingAverage(data, windowSize = 5) {
+    if (windowSize <= 1) return [...data];
+    
     const result = [];
+    const halfWindow = Math.floor(windowSize / 2);
+    
     for (let i = 0; i < data.length; i++) {
-        const start = Math.max(0, i - Math.floor(windowSize / 2));
-        const end = Math.min(data.length, i + Math.ceil(windowSize / 2));
-        const sum = data.slice(start, end).reduce((a, b) => a + b, 0);
-        result.push(sum / (end - start));
+        // Pour éviter les artefacts de bord, on utilise une fenêtre centrée stricte
+        // et on garde les valeurs originales sur les bords
+        if (i < halfWindow || i >= data.length - halfWindow) {
+            result.push(data[i]);
+        } else {
+            const start = i - halfWindow;
+            const end = i + halfWindow + 1;
+            const window = data.slice(start, end);
+            const sum = window.reduce((a, b) => a + b, 0);
+            result.push(sum / window.length);
+        }
     }
     return result;
 }
@@ -211,19 +222,21 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
     if (allDatasets.length === 0) throw new Error('Aucune donnée trouvée');
 
     // Configuration avec axes adaptés à la résolution
-    // Pour la résolution mensuelle, on utilise category au lieu de time pour éviter les problèmes
     const xAxisConfig = {
-        type: usedResolution === "mois" ? 'category' : 'linear',
+        type: usedResolution === "mois" ? 'time' : 'linear',
         position: 'bottom',
         gridLines: { display: false },
         ticks: {}
     };
 
     if (usedResolution === "mois") {
-        // On garde les labels tels quels (format YYYY-MM déjà correct)
-        // QuickChart affichera directement les valeurs x des datasets
-        xAxisConfig.ticks.maxTicksLimit = 20; // Limite le nombre de labels pour lisibilité
-        xAxisConfig.ticks.autoSkip = true;
+        xAxisConfig.time = {
+            parser: 'YYYY-MM',
+            unit: 'month',
+            displayFormats: {
+                month: 'MMM YYYY'
+            }
+        };
     } else {
         xAxisConfig.ticks.callback = "REPLACE_ME_TICK_FUNCTION";
     }
@@ -249,7 +262,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             scales: {
                 xAxes: [xAxisConfig],
                 yAxes: [{
-                    scaleLabel: { display: true, labelString: 'Fréquence \n par million de mots' },
+                    scaleLabel: { display: true, labelString: 'Fréquence en mots\npar million de mots' },
                     ticks: { beginAtZero: true }
                 }]
             }
@@ -350,7 +363,7 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
                 }],
                 yAxes: [{
                     stacked: false,
-                    scaleLabel: { display: true, labelString: 'Nombre d\'occurrences' },
+                    scaleLabel: { display: true, labelString: 'Nombre d\'occurrences (n)' },
                     ticks: { beginAtZero: true }
                 }]
             }

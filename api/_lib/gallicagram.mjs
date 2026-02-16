@@ -132,7 +132,6 @@ function formatDateDisplay(annee, mois = null, resolution = "annee") {
 }
 
 async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
-    // Détermine la résolution optimale si non spécifiée
     const finalResolution = resolution || getOptimalResolution(corpus, from_year, to_year);
     
     const params = new URLSearchParams({ mot, corpus, resolution: finalResolution });
@@ -154,7 +153,8 @@ async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
     const nIdx = headers.findIndex(h => ['n', 'count', 'nombre'].includes(h));
     const totalIdx = headers.findIndex(h => ['total', 'tot', 'sum'].includes(h));
 
-    const csvRows = [];
+    const aggregatedData = new Map();
+
     for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(delimiter);
         if (parts.length <= Math.max(yearIdx, nIdx, totalIdx)) continue;
@@ -162,20 +162,31 @@ async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
         const annee = parseInt(parts[yearIdx]);
         const mois = monthIdx >= 0 ? parseInt(parts[monthIdx]) : null;
         const n = parseFloat(parts[nIdx]) || 0;
-        const total = parseFloat(parts[totalIdx]);
+        const total = parseFloat(parts[totalIdx]) || 0;
         
         if (!isNaN(annee) && total > 0) {
-            csvRows.push({ 
-                annee, 
-                mois,
-                n,
-                frequency: n / total,
-                date: formatDate(annee, mois, finalResolution),
-                dateDisplay: formatDateDisplay(annee, mois, finalResolution)
-            });
+            const dateKey = formatDate(annee, mois, finalResolution);
+            
+            if (!aggregatedData.has(dateKey)) {
+                aggregatedData.set(dateKey, { 
+                    annee, 
+                    mois,
+                    n: 0,
+                    total: total,
+                    date: dateKey,
+                    dateDisplay: formatDateDisplay(annee, mois, finalResolution)
+                });
+            }
+            aggregatedData.get(dateKey).n += n;
         }
     }
-        csvRows.sort((a, b) => {
+
+    const csvRows = Array.from(aggregatedData.values()).map(row => ({
+        ...row,
+        frequency: row.n / row.total
+    }));
+
+    csvRows.sort((a, b) => {
         if (a.annee !== b.annee) return a.annee - b.annee;
         if (a.mois !== b.mois) return (a.mois || 0) - (b.mois || 0);
         return 0;

@@ -19,7 +19,7 @@ export const CORPUS_LABELS = {
     "petit_parisien": "Le Petit Parisien (1876-1944)",
     "huma": "L'Humanité (1904-1952)",
     "subtitles": "Sous-titres de films (FR) (1935-2020)",
-    "subtitles_en": "Subtitles de films (EN) (1930-2020)",
+    "subtitles_en": "Sous-titres de films (EN) (1930-2020)",
     "rap": "Rap (Genius) (1989-2024)"
 };
 
@@ -217,6 +217,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             fill: false,
             tension: smooth ? 0.4 : 0,
             showLine: true,
+            spanGaps: false,  // Ne pas relier les gaps (évite les boucles)
             order: 2  // Ligne en arrière-plan
         });
 
@@ -244,7 +245,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     // Configuration avec axes adaptés à la résolution
     const xAxisConfig = {
-        type: usedResolution === "mois" ? 'time' : 'linear',
+        type: usedResolution === "mois" ? 'time' : 'category',  // CORRECTION: category au lieu de linear
         position: 'bottom',
         gridLines: { display: false },
         ticks: {}
@@ -261,7 +262,11 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             tooltipFormat: 'MMM YYYY'
         };
     } else {
-        xAxisConfig.ticks.callback = "REPLACE_ME_TICK_FUNCTION";
+        // Pour l'axe category, on limite le nombre de ticks affichés
+        xAxisConfig.ticks = {
+            maxTicksLimit: 20,
+            autoSkip: true
+        };
     }
 
     const configuration = {
@@ -307,13 +312,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         '"REPLACE_ME_FILTER_FUNCTION"',
         'function(item) { return !item.text.includes("(données brutes)"); }'
     );
-    
-    if (usedResolution !== "mois") {
-        configStr = configStr.replace(
-            '"REPLACE_ME_TICK_FUNCTION"',
-            'function(val) { return val.toString(); }'
-        );
-    }
 
     // Tooltip personnalisé pour afficher les données brutes
     configStr = configStr.replace(
@@ -342,8 +340,8 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
 export async function generateHistogram(mots, corpus, from_year, to_year) {
     const datasets = [];
-    let allDates = new Map(); // Map pour garder l'ordre
     let usedResolution = "annee";
+    let allDataPoints = new Map(); // Stocke toutes les données brutes par mot
 
     // Collecte des données pour tous les mots
     for (let i = 0; i < mots.length; i++) {
@@ -353,30 +351,63 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
         
         if (data.length === 0) continue;
 
-        const color = COLORS[i % COLORS.length];
-        
-        // Collecte les labels (dates) dans l'ordre
-        data.forEach(d => {
-            if (!allDates.has(d.dateDisplay)) {
-                allDates.set(d.dateDisplay, true);
-            }
+        allDataPoints.set(mot, {
+            data: data,
+            color: COLORS[i % COLORS.length]
         });
-        
-        // Crée un map pour accès rapide
-        const dataMap = new Map(data.map(d => [d.dateDisplay, d.n]));
+    }
+
+    if (allDataPoints.size === 0) throw new Error('Aucune donnée trouvée');
+
+    // Détermine la gamme complète de dates (min à max)
+    let minYear = Infinity, maxYear = -Infinity;
+    let minMonth = null, maxMonth = null;
+    
+    for (const [mot, info] of allDataPoints) {
+        for (const d of info.data) {
+            if (d.annee < minYear) {
+                minYear = d.annee;
+                minMonth = d.mois;
+            }
+            if (d.annee > maxYear) {
+                maxYear = d.annee;
+                maxMonth = d.mois;
+            }
+        }
+    }
+
+    // Crée la liste complète des labels chronologiques
+    const allLabels = [];
+    if (usedResolution === "mois") {
+        // Générer tous les mois entre min et max
+        for (let y = minYear; y <= maxYear; y++) {
+            const startMonth = (y === minYear) ? (minMonth || 1) : 1;
+            const endMonth = (y === maxYear) ? (maxMonth || 12) : 12;
+            for (let m = startMonth; m <= endMonth; m++) {
+                allLabels.push(formatDateDisplay(y, m, "mois"));
+            }
+        }
+    } else {
+        // Générer toutes les années entre min et max
+        for (let y = minYear; y <= maxYear; y++) {
+            allLabels.push(y.toString());
+        }
+    }
+
+    // Créer les datasets avec toutes les dates
+    for (const [mot, info] of allDataPoints) {
+        const dataMap = new Map(info.data.map(d => [d.dateDisplay, d.n]));
         
         datasets.push({
             label: mot,
-            data: Array.from(allDates.keys()).map(date => dataMap.get(date) || 0),
-            backgroundColor: color,
-            borderColor: color,
+            data: allLabels.map(date => dataMap.get(date) || 0),
+            backgroundColor: info.color,
+            borderColor: info.color,
             borderWidth: 1
         });
     }
 
-    if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
-
-    const labels = Array.from(allDates.keys());
+    const labels = allLabels;
 
     const configuration = {
         type: 'bar',

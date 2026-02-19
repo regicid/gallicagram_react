@@ -47,9 +47,14 @@ const CORPUS_MIN_RESOLUTION = {
 };
 
 const COLORS = [
-    '#E63946', '#457B9D', '#2A9D8F', '#F4A261', '#E76F51',
-    '#6A4C93', '#1982C4', '#8AC926', '#FFCA3A', '#FF595E'
+    '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+    '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080',
+    '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3',
+    '#808000', '#ffd8b1', '#000075', '#808080', '#000000',
+    '#ff6f61', '#6b5b95', '#88b04b', '#f7cac9', '#92a8d1',
+    '#955251', '#b565a7', '#009b77', '#dd4124', '#45b8ac'
 ];
+
 
 function movingAverage(data, windowSize = 5) {
     if (windowSize <= 1) return [...data];
@@ -263,9 +268,14 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
     const xAxisConfig = {
         type: usedResolution === "mois" ? 'time' : 'linear',
         position: 'bottom',
-        gridLines: { display: false },
+        gridLines: {
+            display: true,
+            drawBorder: true,
+            color: '#eee'
+        },
         ticks: {}
     };
+
 
     if (usedResolution === "mois") {
         // Configuration time axis pour format ISO
@@ -312,8 +322,12 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                 xAxes: [xAxisConfig],
                 yAxes: [{
                     scaleLabel: { display: true, labelString: 'Fréquence en mots\npar million de mots' },
-                    ticks: { beginAtZero: true }
+                    ticks: { beginAtZero: true },
+                    gridLines: {
+                        display: false
+                    }
                 }]
+
             }
         }
     };

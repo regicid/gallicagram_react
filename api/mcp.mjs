@@ -157,9 +157,8 @@ function createServer() {
                 return {
                     content: [
                         {
-                            type: "image",
-                            url: imageUrl,
-                            mimeType: "image/png"
+                            type: "text",
+                            text: imageUrl
                         }
                     ]
                 };

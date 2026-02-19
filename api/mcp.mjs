@@ -11,6 +11,8 @@ function createServer() {
         version: "1.0.0"
     });
 
+    // Register Tools
+    
     // 1. TOOL PRINCIPAL : Graphique ligne/points avec fréquences (DEFAULT)
     server.registerTool(
         "gallicagram_chart",
@@ -72,13 +74,13 @@ function createServer() {
                     };
                 }
 
-                generateAnalysisPrompt(mots, corpus, from_year, to_year);
+                const analysisPrompt = generateAnalysisPrompt(mots, corpus, from_year, to_year);
 
                 return {
                     content: [
                         {
                             type: "text",
-                            url: imageUrl
+                            text: imageUrl
                         }
                     ]
                 };
@@ -94,117 +96,208 @@ function createServer() {
         }
     );
 
-    // 2. Histogramme
+    // 2. NOUVEAU TOOL : Histogramme vertical des occurrences (n)
     server.registerTool(
         "gallicagram_histogram",
         {
-            description: "Génère un histogramme vertical montrant le nombre d'occurrences (n).",
+            description: "Génère un histogramme vertical montrant le nombre d'occurrences (n) plutôt que les fréquences. Utile pour les mots rares où les fréquences relatives sont peu significatives. À utiliser uniquement si explicitement demandé par l'utilisateur.",
             inputSchema: z.object({
                 mot: z.string().describe("Mot(s) à analyser, séparés par des virgules"),
-                corpus: z.string().default("presse"),
-                from_year: z.number().optional(),
-                to_year: z.number().optional()
+                corpus: z.string().default("presse").describe("Code du corpus"),
+                from_year: z.number().optional().describe("Année de début"),
+                to_year: z.number().optional().describe("Année de fin")
             })
         },
         async ({ mot, corpus = "presse", from_year, to_year }) => {
             try {
+                if (!mot || String(mot).trim() === "") {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Le paramètre 'mot' est requis" }],
+                        isError: true
+                    };
+                }
+
                 const mots = String(mot).split(',').map(m => m.trim()).filter(Boolean);
-                const imageBuffer = await generateHistogram(mots, corpus, from_year, to_year);
-                const filename = `histogram_${Date.now()}.png`;
+                if (mots.length === 0) {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Aucun mot valide" }],
+                        isError: true
+                    };
+                }
+
+                let imageBuffer;
+                try {
+                    imageBuffer = await generateHistogram(mots, corpus, from_year, to_year);
+                } catch (genErr) {
+                    const msg = genErr && genErr.message ? genErr.message : String(genErr);
+                    return {
+                        content: [{ type: "text", text: `Erreur génération histogramme: ${msg}` }],
+                        isError: true
+                    };
+                }
+
+                if (!imageBuffer) {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Aucune donnée disponible" }],
+                        isError: true
+                    };
+                }
+
+                const filename = `histogram_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
                 const imageUrl = await uploadToS3(imageBuffer, filename, "image/png");
 
                 return {
-                    content: [{ type: "image", url: imageUrl }]
+                    content: [
+                        {
+                            type: "text",
+                            text: imageUrl
+                        }
+                    ]
                 };
-            } catch (e) {
-                return { content: [{ type: "text", text: e.message }], isError: true };
+
+            } catch (error) {
+                const msg = error && error.message ? error.message : String(error);
+                console.error('gallicagram_histogram error:', error);
+                return {
+                    content: [{ type: "text", text: `Erreur interne: ${msg}` }],
+                    isError: true
+                };
             }
         }
     );
 
-    // 3. Totaux
+    // 3. NOUVEAU TOOL : Barres horizontales des totaux
     server.registerTool(
         "gallicagram_totals",
         {
-            description: "Graphique à barres horizontales des totaux.",
+            description: "Génère un graphique à barres horizontales montrant la somme totale des occurrences de chaque mot sur toute la période. Utile pour comparer rapidement la fréquence globale de plusieurs mots. À utiliser uniquement si explicitement demandé par l'utilisateur.",
             inputSchema: z.object({
-                mot: z.string(),
-                corpus: z.string().default("presse"),
-                from_year: z.number().optional(),
-                to_year: z.number().optional()
+                mot: z.string().describe("Mot(s) à comparer, séparés par des virgules"),
+                corpus: z.string().default("presse").describe("Code du corpus"),
+                from_year: z.number().optional().describe("Année de début"),
+                to_year: z.number().optional().describe("Année de fin")
             })
         },
         async ({ mot, corpus = "presse", from_year, to_year }) => {
             try {
+                if (!mot || String(mot).trim() === "") {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Le paramètre 'mot' est requis" }],
+                        isError: true
+                    };
+                }
+
                 const mots = String(mot).split(',').map(m => m.trim()).filter(Boolean);
-                const imageBuffer = await generateTotalsChart(mots, corpus, from_year, to_year);
-                const filename = `totals_${Date.now()}.png`;
+                if (mots.length === 0) {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Aucun mot valide" }],
+                        isError: true
+                    };
+                }
+
+                let imageBuffer;
+                try {
+                    imageBuffer = await generateTotalsChart(mots, corpus, from_year, to_year);
+                } catch (genErr) {
+                    const msg = genErr && genErr.message ? genErr.message : String(genErr);
+                    return {
+                        content: [{ type: "text", text: `Erreur génération graphique totaux: ${msg}` }],
+                        isError: true
+                    };
+                }
+
+                if (!imageBuffer) {
+                    return {
+                        content: [{ type: "text", text: "Erreur: Aucune donnée disponible" }],
+                        isError: true
+                    };
+                }
+
+                const filename = `totals_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
                 const imageUrl = await uploadToS3(imageBuffer, filename, "image/png");
 
                 return {
-                    content: [{ type: "image", url: imageUrl }]
+                    content: [
+                        {
+                            type: "text",
+                            text: imageUrl
+                        }
+                    ]
                 };
-            } catch (e) {
-                return { content: [{ type: "text", text: e.message }], isError: true };
+
+            } catch (error) {
+                const msg = error && error.message ? error.message : String(error);
+                console.error('gallicagram_totals error:', error);
+                return {
+                    content: [{ type: "text", text: `Erreur interne: ${msg}` }],
+                    isError: true
+                };
             }
         }
     );
 
-    // 4. Liste corpus
-    server.registerTool("list_corpus", {
-        description: "Liste tous les corpus disponibles",
-        inputSchema: z.object({})
-    }, async () => {
-        const list = Object.entries(CORPUS_LABELS)
-            .map(([code, label]) => `• ${code}: ${label}`)
-            .join('\n');
-        return { content: [{ type: "text", text: `Corpus disponibles:\n\n${list}` }] };
-    });
+    // 4. TOOL : Liste des corpus
+    server.registerTool(
+        "list_corpus",
+        {
+            description: "Liste tous les corpus disponibles pour l'analyse lexicale",
+            inputSchema: z.object({})
+        },
+        async () => {
+            const list = Object.entries(CORPUS_LABELS)
+                .map(([code, label]) => `• ${code}: ${label}`)
+                .join('\n');
+            return {
+                content: [{ type: "text", text: `Corpus disponibles:\n\n${list}` }]
+            };
+        }
+    );
 
     return server;
 }
 
+// Vercel serverless function handler
 export default async function handler(req, res) {
     console.log(`${req.method} ${req.url}`);
 
-    // --- CORS + Accept headers (FIX MCP) ---
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
-
-    if (req.method === "OPTIONS") {
-        res.status(200).end();
-        return;
-    }
-
-    
-
+    // CRITICAL: Create fresh instances for EACH request (stateless mode)
+    // This prevents request ID collisions and ensures proper isolation
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true
+        sessionIdGenerator: undefined  // undefined = stateless mode
     });
 
     try {
-        res.on("close", () => {
+        // Clean up when the request closes
+        res.on('close', () => {
+            console.log('Request closed, cleaning up...');
             transport.close();
             server.close();
         });
 
+        // Connect and handle the request
         await server.connect(transport);
-        await transport.handleRequest(req, res);
-    } catch (error) {
-        console.error("MCP handler error:", error);
+        await transport.handleRequest(req, res, req.body);
 
+    } catch (error) {
+        console.error('MCP handler error:', error);
+
+        // Ensure cleanup on error
         try {
             transport.close();
             server.close();
-        } catch {}
+        } catch (cleanupError) {
+            console.error('Cleanup error:', cleanupError);
+        }
 
+        // Send error response if headers not sent
         if (!res.headersSent) {
             res.status(500).json({
-                jsonrpc: "2.0",
-                error: { code: -32603, message: "Internal server error" },
+                jsonrpc: '2.0',
+                error: {
+                    code: -32603,
+                    message: 'Internal server error'
+                },
                 id: null
             });
         }

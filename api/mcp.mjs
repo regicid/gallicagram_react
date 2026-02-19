@@ -177,22 +177,12 @@ export default async function handler(req, res) {
         return;
     }
 
-    const accept = req.headers.accept || "";
-    if (!accept.includes("application/json") || !accept.includes("text/event-stream")) {
-        res.status(406).json({
-            jsonrpc: "2.0",
-            error: {
-                code: -32000,
-                message: "Not Acceptable: Client must accept both application/json and text/event-stream"
-            },
-            id: null
-        });
-        return;
-    }
+    
 
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true
     });
 
     try {

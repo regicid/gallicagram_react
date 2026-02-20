@@ -16,6 +16,7 @@ import WordCloudComponent from './WordCloudComponent';
 import { FingerprintSpinner } from 'react-epic-spinners';
 import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
+import AboutPage from "./AboutPage";
 import MCPPage from "./MCPPage";
 
 const theme = createTheme({
@@ -1947,6 +1948,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <Routes>
         <Route path="/swagger" element={<SwaggerPage />} />
+        <Route path="/about_us" element={<AboutPage />} />
 
         <Route path="*" element={
           <>
@@ -1954,6 +1956,7 @@ function App() {
               <header className="App-header">
                 <img src="/logo.png" className="App-logo" alt="logo" />
                 <div className="header-links">
+                  <Link to="/about_us">{t('Who are we?')}</Link>
                   <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
                   <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
                   <Link to="/swagger"> {t('API')} </Link>

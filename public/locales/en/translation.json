@@ -142,5 +142,7 @@
   "Corpus bundle help": "Sum frequencies across corpora for the same word.",
   "Base 100": "Base 100",
   "Base 100 help": "Normalizes all curves so that they equal 1 in the specified year.",
-  "Base year": "Base year"
+  "Base year": "Base year",
+  "Who are we?": "Who are we?",
+  "Back to Gallicagram": "Back to Gallicagram"
 }

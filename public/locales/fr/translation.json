@@ -142,5 +142,7 @@
   "Corpus bundle help": "Somme des fréquences à travers les corpus pour le même mot.",
   "Base 100": "Base 100",
   "Base 100 help": "Normalise toutes les courbes de sorte qu'elles valent 1 à l'année spécifiée.",
-  "Base year": "Année de base"
+  "Base year": "Année de base",
+  "Who are we?": "Qui sommes-nous ?",
+  "Back to Gallicagram": "Retour à Gallicagram"
 }

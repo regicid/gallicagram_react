@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton, Switch, Snackbar } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import MenuIcon from '@mui/icons-material/Menu';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
 import { FingerprintSpinner } from 'react-epic-spinners';
@@ -244,6 +245,7 @@ function App() {
   const [perseeData, setPerseeData] = useState(null);
   const [dateWarnings, setDateWarnings] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [fetchId, setFetchId] = useState(0); // Track data fetches for graph updates
 
   useEffect(() => {
@@ -1954,16 +1956,25 @@ function App() {
           <>
             <div className={`App ${darkMode ? 'dark' : ''}`}>
               <header className="App-header">
-                <img src="/logo.png" className="App-logo" alt="logo" />
-                <div className="header-links">
-                  <Link to="/about_us">{t('Who are we?')}</Link>
+                <div className="header-topline">
+                  <img src="/logo.png" className="App-logo" alt="logo" />
+                  <IconButton
+                    className="mobile-menu-btn"
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    sx={{ '@media (min-width:769px)': { display: 'none' }, color: darkMode ? '#eaeaea' : 'inherit' }}
+                  >
+                    <MenuIcon />
+                  </IconButton>
+                </div>
+                <div className={`header-links ${isMobileMenuOpen ? 'open' : ''}`}>
+                  <Link to="/about_us" onClick={() => setIsMobileMenuOpen(false)}>{t('Who are we?')}</Link>
                   <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
                   <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
-                  <Link to="/swagger"> {t('API')} </Link>
+                  <Link to="/swagger" onClick={() => setIsMobileMenuOpen(false)}> {t('API')} </Link>
                   <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
                   <a href="https://github.com/regicid/gallicagram_react" target="_blank" rel="noopener noreferrer">{t('Code')}</a>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('en')}>🇬🇧</button>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => changeLanguage('fr')}>🇫🇷</button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => { changeLanguage('en'); setIsMobileMenuOpen(false); }}>🇬🇧</button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => { changeLanguage('fr'); setIsMobileMenuOpen(false); }}>🇫🇷</button>
                   <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
                     <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
                     <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />

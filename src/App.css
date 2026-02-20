@@ -8,6 +8,18 @@
   align-items: center;
   padding: 10px 20px;
   border-bottom: 1px solid #eee;
+  flex-wrap: wrap;
+}
+
+.header-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-links {
+  display: flex;
+  align-items: center;
 }
 
 .App-logo {
@@ -197,6 +209,34 @@ button:hover {
 }
 
 @media (max-width: 768px) {
+  .App-header {
+    flex-direction: column;
+    padding: 10px;
+  }
+
+  .header-topline {
+    width: 100%;
+  }
+
+  .header-links {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    align-items: flex-start;
+    margin-top: 10px;
+  }
+
+  .header-links.open {
+    display: flex;
+  }
+
+  .header-links a,
+  .header-links button,
+  .header-links span {
+    margin-left: 0;
+    margin-bottom: 10px;
+  }
+
   .App-body {
     flex-direction: column;
   }

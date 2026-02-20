@@ -45,6 +45,8 @@ const initialQuery = {
     showTotalBarplot: false,
     extendYScale: false,
     corpusBundle: false,
+    base100: false,
+    base100Year: null,
   }
 };
 
@@ -933,10 +935,24 @@ function App() {
 
   const handleAdvancedOptionsChange = (event) => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
-    const newAdvancedOptions = {
-      ...activeQuery.advancedOptions,
-      [event.target.name]: event.target.checked,
-    };
+    let newAdvancedOptions;
+    if (event.target.name === 'base100Year') {
+      newAdvancedOptions = {
+        ...activeQuery.advancedOptions,
+        base100Year: event.target.value === '' ? null : parseInt(event.target.value, 10),
+      };
+    } else if (event.target.name === 'base100') {
+      newAdvancedOptions = {
+        ...activeQuery.advancedOptions,
+        base100: event.target.checked,
+        base100Year: event.target.checked ? (activeQuery.advancedOptions.base100Year || startDate) : activeQuery.advancedOptions.base100Year,
+      };
+    } else {
+      newAdvancedOptions = {
+        ...activeQuery.advancedOptions,
+        [event.target.name]: event.target.checked,
+      };
+    }
     const updatedQuery = { ...activeQuery, advancedOptions: newAdvancedOptions };
     handleFormChange(updatedQuery);
   };
@@ -1583,11 +1599,22 @@ function App() {
       } else {
         // Line, Area, Bar
         const effectiveIsRescaled = advancedOptions.rescale && plotType === 'line';
+        const effectiveIsBase100 = advancedOptions.base100 && advancedOptions.base100Year && plotType === 'line';
 
         const processTrace = (trace) => {
           let y = trace.y;
           if (effectiveIsRescaled) {
             y = zscore(y);
+          } else if (effectiveIsBase100) {
+            const baseYear = advancedOptions.base100Year;
+            const baseIndex = trace.x ? trace.x.findIndex(d => {
+              const date = new Date(d);
+              return date.getFullYear() === baseYear;
+            }) : -1;
+            if (baseIndex !== -1 && y[baseIndex] !== null && y[baseIndex] !== undefined && y[baseIndex] !== 0) {
+              const baseValue = y[baseIndex];
+              y = y.map(v => v !== null && v !== undefined ? v / baseValue : null);
+            }
           } else if (plotType !== 'bar') {
             y = y.map(v => v !== null && v !== undefined ? v * 1000 : v);
           }
@@ -1993,6 +2020,7 @@ function App() {
                       <AdvancedOptionsComponent
                         advancedOptions={activeQuery.advancedOptions}
                         onAdvancedOptionsChange={handleAdvancedOptionsChange}
+                        startDate={startDate}
                       />
                     </>
                   )}

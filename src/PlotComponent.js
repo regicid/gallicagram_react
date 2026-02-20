@@ -39,7 +39,21 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
 
   let plotData = advancedOptions?.rescale && data.length > 0 && plotType === 'line'
     ? data.map(trace => ({ ...trace, y: zscore(trace.y) }))
-    : data;
+    : advancedOptions?.base100 && advancedOptions?.base100Year && data.length > 0 && plotType === 'line'
+      ? data.map(trace => {
+        const baseYear = advancedOptions.base100Year;
+        // Find the index where the year matches base100Year
+        const baseIndex = trace.x ? trace.x.findIndex(d => {
+          const date = new Date(d);
+          return date.getFullYear() === baseYear;
+        }) : -1;
+        if (baseIndex !== -1 && trace.y[baseIndex] !== null && trace.y[baseIndex] !== undefined && trace.y[baseIndex] !== 0) {
+          const baseValue = trace.y[baseIndex];
+          return { ...trace, y: trace.y.map(v => v !== null && v !== undefined ? v / baseValue : null) };
+        }
+        return trace;
+      })
+      : data;
 
   // Apply color palette (colorblind or default)
   const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
@@ -54,7 +68,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
   }
 
   // Add confidence interval traces for line plots
-  const showCI = advancedOptions?.showConfidenceInterval !== false && plotType === 'line' && !advancedOptions?.rescale;
+  const showCI = advancedOptions?.showConfidenceInterval !== false && plotType === 'line' && !advancedOptions?.rescale && !advancedOptions?.base100;
   let finalPlotData = plotData;
 
   if (showCI && plotData.length > 0) {
@@ -148,7 +162,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
 
 
 
-  const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? t('Z-score') : t('Frequency in the corpus');
+  const yAxisTitle = advancedOptions?.rescale && plotType === 'line' ? t('Z-score') : advancedOptions?.base100 && plotType === 'line' ? t('Base 100') : t('Frequency in the corpus');
 
   const isTouchScreen = (('ontouchstart' in window) ||
     (navigator.maxTouchPoints > 0) ||

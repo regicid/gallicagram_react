@@ -495,7 +495,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
   );
 };
 
-export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsChange }) => {
+export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsChange, startDate }) => {
   const { t } = useTranslation();
 
   return (
@@ -644,6 +644,36 @@ export const AdvancedOptionsComponent = ({ advancedOptions, onAdvancedOptionsCha
             </div>
           }
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={advancedOptions.base100 || false}
+              onChange={onAdvancedOptionsChange}
+              name="base100"
+            />
+          }
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {t('Base 100')}
+              <Tooltip title={t('Base 100 help')} arrow placement="right">
+                <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+              </Tooltip>
+            </div>
+          }
+        />
+        {advancedOptions.base100 && (
+          <Box sx={{ ml: 4, mt: 1, mb: 1 }}>
+            <TextField
+              label={t('Base year')}
+              name="base100Year"
+              type="number"
+              value={advancedOptions.base100Year ?? startDate}
+              onChange={onAdvancedOptionsChange}
+              size="small"
+              sx={{ width: '120px' }}
+            />
+          </Box>
+        )}
       </AccordionDetails>
     </Accordion>
   );

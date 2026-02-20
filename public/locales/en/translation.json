@@ -139,5 +139,8 @@
   "Extend Y-scale to 0 help": "Forces the Y-axis to start at 0.",
   "Low data warning": "Since this word is rare ({{count}} occurrences), we humbly suggest visualizing the results with this bar chart. You can switch back to the line chart by changing the option, but it will likely look like nothing.",
   "Corpus bundle": "Corpus bundle",
-  "Corpus bundle help": "Sum frequencies across corpora for the same word."
+  "Corpus bundle help": "Sum frequencies across corpora for the same word.",
+  "Base 100": "Base 100",
+  "Base 100 help": "Normalizes all curves so that they equal 1 in the specified year.",
+  "Base year": "Base year"
 }

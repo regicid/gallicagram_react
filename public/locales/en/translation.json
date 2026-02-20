@@ -144,5 +144,21 @@
   "Base 100 help": "Normalizes all curves so that they equal 1 in the specified year.",
   "Base year": "Base year",
   "Who are we?": "Who are we?",
-  "Back to Gallicagram": "Back to Gallicagram"
+  "Back to Gallicagram": "Back to Gallicagram",
+  "about_benoit": "is a social science researcher, currently a postdoc at the London School of Economics.",
+  "about_benjamin": "Benjamin Azoulay is a senior civil servant and maritime affairs administrator. He is currently seconded as a senior data scientist at the Ministry of Finance.",
+  "The project?": "The project?",
+  "about_project_p1": "Gallicagram is a lockdown project that got out of hand. In 2021, Benjamin showed Benoît, a vague acquaintance, a snippet of code he wrote to plot (ugly) frequency curves of phrases in the French National Library's corpora. Benoît, whose coding skills were barely any better back then, exclaimed that it would be a brilliant idea to wrap this code in a Shiny app so that a computer-illiterate historian could plot curves too. Fast forward 5 years and a few thousand hours of work later, Benjamin and Benoît are now friends and slightly less incompetent. The project has expanded significantly, comprising several facets:",
+  "about_project_li1": "Corpora that we scrape, a list of which you can find",
+  "here": "here",
+  "about_project_li2_1": "Large databases tallying the frequency of words and phrases in these corpora. Unlike the corpora themselves, these databases are copyright-free and freely accessible via an open API, documented",
+  "about_project_li2_2": ". These databases are stored in sqlite3 format on a server graciously provided by ENS Paris-Saclay.",
+  "about_project_li3_1": "A graphical user interface to explore these databases, generate plots, and export them. The current GUI is coded in React and hosted on Vercel. Its source code is available",
+  "about_project_li4": "Research projects using our corpora, such as",
+  "this one": "this one",
+  "Acknowledgments?": "Acknowledgments?",
+  "about_ack_p1": "First and foremost to ENS Paris-Saclay and Frédéric Lebaron for their hosting and unwavering support.",
+  "about_ack_p2": "Thanks also to the Maison des Sciences de l'Homme and Sébastien Oliveau, who provided us with a second server for scraping and \"cold\" data storage.",
+  "about_ack_p3": "Thanks to Vincent Bagilet and Will Gleason, who respectively helped us to improve the API and Gallica's context.",
+  "about_ack_p4": "Thanks to the many researchers who help us spread the word about this tool and improve it with their ideas and technical advice. Off the top of our heads, a few names: Olivier Ritz, Baptiste Coulmont, Guillaume Plique, Benjamin Ooghe-Tabanou."
 }

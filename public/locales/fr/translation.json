@@ -144,5 +144,21 @@
   "Base 100 help": "Normalise toutes les courbes de sorte qu'elles valent 1 à l'année spécifiée.",
   "Base year": "Année de base",
   "Who are we?": "Qui sommes-nous ?",
-  "Back to Gallicagram": "Retour à Gallicagram"
+  "Back to Gallicagram": "Retour à Gallicagram",
+  "about_benoit": "est chercheur en sciences sociales, post-doctorant à la London School of Economics.",
+  "about_benjamin": "Benjamin Azoulay est haut fonctionnaire, administrateur des affaires maritime. Il est actuellement détaché en tant que senior data scientist au ministère des Finances.",
+  "The project?": "Le projet ?",
+  "about_project_p1": "Gallicagram est un projet de confinement qui a dérapé. En 2021, Benjamin montre à Benoît, une vague connaissance, un bout de code qu’il a écrit pour tracer des courbes (moches) de fréquence d’un syntagme dans les corpus de la Bibliothèque nationale de France. Benoît, qui à l’époque se débrouille à peine mieux en code, s’écrie qu’il conviendrait d’insérer ce code dans une application shiny, pour qu’un historien rétif à l’informatique puisse tracer sa courbe. Passent 5 ans et quelques milliers d’heures de travail, Benjamin et Benoît sont désormais amis et un peu moins incompétents. Le projet s’est considérablement développé, avec plusieurs pendants :",
+  "about_project_li1": "Des corpus que nous scrapons, dont vous pouvez voir la liste",
+  "here": "ici",
+  "about_project_li2_1": "De grandes bases de données, qui recensent la fréquence des mots et syntagmes dans ces corpus. Contrairement aux corpus, ces bases de données sont libres de droit, et elles sont librement accessibles par une API ouverte, documentée",
+  "about_project_li2_2": ". Ces bases de données sont stockées sous format sqlite3, sur un serveur fourni par l’ENS Paris-Saclay.",
+  "about_project_li3_1": "Une interface graphique, pour explorer ces bases de données, produire des graphiques et les exporter. La présente interface graphique est codée en react et hébergée sur vercel. Son code source est disponible",
+  "about_project_li4": "Des projets de recherche sur nos corpus, par exemple",
+  "this one": "celui-ci",
+  "Acknowledgments?": "Des remerciements ?",
+  "about_ack_p1": "D’abord à l’ENS Paris-Saclay et à Frédéric Lebaron pour l’hébergement et le soutien sans faille.",
+  "about_ack_p2": "Merci aussi à la Maison des Sciences de l’Homme et à Sébastien Oliveau, qui nous ont mis à disposition un second serveur pour le scraping et le stockage de données “froides”.",
+  "about_ack_p3": "Merci à Vincent Bagilet et Will Gleason, qui nous ont respectivement aidé à perfectionner l'API et la gestion du contexte Gallica.",
+  "about_ack_p4": "Merci aux nombreux chercheurs qui nous aident à diffuser l’outil et à l’améliorer, grâce à leurs idées et leurs conseils techniques. De tête, plusieurs noms nous viennent : Olivier Ritz, Baptiste Coulmont, Guillaume Plique, Benjamin Ooghe-Tabanou."
 }

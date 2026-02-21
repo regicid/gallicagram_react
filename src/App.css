@@ -270,7 +270,8 @@ button:hover {
   }
 
   .plot-component {
-    min-height: 70vh;
+    min-height: 90vh;
+    /* Increased from 70vh by ~28.5% */
   }
 }
 

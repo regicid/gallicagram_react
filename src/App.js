@@ -215,6 +215,8 @@ function App() {
     const start = searchParams.get('start');
     const end = searchParams.get('end');
     const mode = searchParams.get('mode');
+    const smoothingParam = searchParams.get('smoothing');
+    const plotTypeParam = searchParams.get('plotType');
 
     if (word && corpus && start && end && mode) {
       return {
@@ -222,7 +224,9 @@ function App() {
         corpus,
         start: parseInt(start, 10),
         end: parseInt(end, 10),
-        mode
+        mode,
+        smoothing: smoothingParam ? parseInt(smoothingParam, 10) : 0,
+        plotType: plotTypeParam || 'line'
       };
     }
     return null;
@@ -255,8 +259,8 @@ function App() {
   const [sumsData, setSumsData] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [smoothing, setSmoothing] = useState(0);
-  const [plotType, setPlotType] = useState('line');
+  const [smoothing, setSmoothing] = useState(initialUrlState ? initialUrlState.smoothing : 0);
+  const [plotType, setPlotType] = useState(initialUrlState ? initialUrlState.plotType : 'line');
   const [occurrences, setOccurrences] = useState([]);
   const [totalOccurrences, setTotalOccurrences] = useState(0);
   const [totalPlotOccurrences, setTotalPlotOccurrences] = useState(0);
@@ -1496,6 +1500,8 @@ function App() {
         newUrl.searchParams.set('start', startDate);
         newUrl.searchParams.set('end', endDate);
         newUrl.searchParams.set('mode', firstQuery.searchMode || 'ngram');
+        newUrl.searchParams.set('smoothing', smoothing);
+        newUrl.searchParams.set('plotType', plotType);
         window.history.pushState({}, '', newUrl);
       }
     }

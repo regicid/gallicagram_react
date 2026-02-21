@@ -217,6 +217,9 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
   const baseLayout = {
     autosize: true,
     title: t('Frequency over time'),
+    ...(isMobile ? {
+      margin: { l: 45, r: 0, t: 40, b: 50 } // Reduce margins on mobile to use full width
+    } : {}),
     ...plotlyTheme,
     legend: {
       font: {

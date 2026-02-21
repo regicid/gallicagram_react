@@ -168,6 +168,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     (navigator.maxTouchPoints > 0) ||
     (navigator.msMaxTouchPoints > 0));
 
+  const isMobile = isTouchScreen || window.innerWidth <= 768;
+
   // Dark mode styling for Plotly
   const plotlyTheme = darkMode ? {
     paper_bgcolor: '#1a1a2e',
@@ -219,7 +221,14 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
     legend: {
       font: {
         size: 16
-      }
+      },
+      ...(isMobile && plotType === 'line' ? {
+        orientation: 'h',
+        yanchor: 'top',
+        y: -0.2,
+        xanchor: 'center',
+        x: 0.5
+      } : {})
     },
     dragmode: isTouchScreen ? false : 'zoom',
     xaxis: {

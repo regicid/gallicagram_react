@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './App.css';
 import FormComponent, { AdvancedOptionsComponent } from './FormComponent';
 import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './PlotComponent';
@@ -207,6 +207,27 @@ const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 function App() {
   const { t, i18n } = useTranslation();
 
+  const initialUrlState = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const searchParams = new URLSearchParams(window.location.search);
+    const word = searchParams.get('word');
+    const corpus = searchParams.get('corpus');
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+    const mode = searchParams.get('mode');
+
+    if (word && corpus && start && end && mode) {
+      return {
+        word,
+        corpus,
+        start: parseInt(start, 10),
+        end: parseInt(end, 10),
+        mode
+      };
+    }
+    return null;
+  }, []);
+
   useEffect(() => {
     // Detect language from browser settings
     const browserLang = navigator.language || navigator.userLanguage;
@@ -218,10 +239,16 @@ function App() {
       i18n.changeLanguage('en');
     }
   }, [i18n]);
-  const [queries, setQueries] = useState([{ id: 1, ...initialQuery }]);
+  const [queries, setQueries] = useState(initialUrlState ? [{
+    id: 1,
+    ...initialQuery,
+    word: initialUrlState.word,
+    corpus: initialUrlState.corpus,
+    searchMode: initialUrlState.mode
+  }] : [{ id: 1, ...initialQuery }]);
   const [activeQueryId, setActiveQueryId] = useState(1);
-  const [startDate, setStartDate] = useState(1789);
-  const [endDate, setEndDate] = useState(1950);
+  const [startDate, setStartDate] = useState(initialUrlState ? initialUrlState.start : 1789);
+  const [endDate, setEndDate] = useState(initialUrlState ? initialUrlState.end : 1950);
   const [apiResponses, setApiResponses] = useState([]);
   const [rawPlotData, setRawPlotData] = useState([]);
   const [plotData, setPlotData] = useState([]);
@@ -290,56 +317,75 @@ function App() {
     // Initial data load
     setIsLoading(true);
 
-    const csvPromise = fetch('/liberte_data.csv')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error("Could not load initial data file.");
-        }
-        return response.text();
-      })
-      .then(csvText => {
-        return new Promise((resolve, reject) => {
-          Papa.parse(csvText, {
-            header: true,
-            dynamicTyping: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-              if (results.errors.length) {
-                console.error("Error parsing initial CSV:", results.errors);
-                reject(new Error("Error parsing initial data file."));
-              } else {
-                const total = results.data.reduce((acc, row) => acc + (row.n || 0), 0);
-                const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery, startDate: 1789, endDate: 1950 }, total };
-                setApiResponses([initialApiResponse]);
-                setFetchId(prev => prev + 1);
-                resolve();
+    if (initialUrlState) {
+      // Data will be fetched by the auto-plot effect
+      setIsLoading(false);
+    } else {
+      const csvPromise = fetch('/liberte_data.csv')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Could not load initial data file.");
+          }
+          return response.text();
+        })
+        .then(csvText => {
+          return new Promise((resolve, reject) => {
+            Papa.parse(csvText, {
+              header: true,
+              dynamicTyping: true,
+              skipEmptyLines: true,
+              complete: (results) => {
+                if (results.errors.length) {
+                  console.error("Error parsing initial CSV:", results.errors);
+                  reject(new Error("Error parsing initial data file."));
+                } else {
+                  const total = results.data.reduce((acc, row) => acc + (row.n || 0), 0);
+                  const initialApiResponse = { data: results.data, query: { id: 1, ...initialQuery, startDate: 1789, endDate: 1950 }, total };
+                  setApiResponses([initialApiResponse]);
+                  setFetchId(prev => prev + 1);
+                  resolve();
+                }
               }
-            }
+            });
           });
         });
-      });
 
-    const occurrencesPromise = fetch('/occurrences_exemple.json')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error("Could not load example occurrences file.");
-        }
-        return response.json();
-      })
-      .then(data => {
-        setOccurrences(data.records);
-        setTotalOccurrences(data.total_records || data.records.length);
-      });
+      const occurrencesPromise = fetch('/occurrences_exemple.json')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Could not load example occurrences file.");
+          }
+          return response.json();
+        })
+        .then(data => {
+          setOccurrences(data.records);
+          setTotalOccurrences(data.total_records || data.records.length);
+        });
 
-    Promise.all([csvPromise, occurrencesPromise])
-      .catch(err => {
-        setError(err.message);
-        console.error(err);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, []); // Empty dependency array ensures this runs only once
+      Promise.all([csvPromise, occurrencesPromise])
+        .catch(err => {
+          setError(err.message);
+          console.error(err);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [initialUrlState]); // Add dependency to be safe that it only reads latest definition
+
+  const hasAutoPlotted = useRef(false);
+
+  useEffect(() => {
+    // Only auto-plot after corpusPeriods loads (to ensure plot names are correct)
+    if (initialUrlState && !hasAutoPlotted.current && Object.keys(corpusPeriods).length > 0) {
+      hasAutoPlotted.current = true;
+      // Use a timeout to ensure state settles before handlePlot uses it
+      setTimeout(() => {
+        handlePlot();
+      }, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [corpusPeriods]);
 
   const processNgramData = useCallback((apiResponse, allSameCorpus, plotType, index) => {
     const { data, query } = apiResponse;
@@ -1439,6 +1485,20 @@ function App() {
     setSelectedDate(null);
     setIsLoading(true);
     setFetchContextAfterPlot(true);
+
+    // Update URL with first query parameters
+    if (queries.length > 0) {
+      const firstQuery = queries[0];
+      if (firstQuery && firstQuery.word && firstQuery.corpus) {
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('word', firstQuery.word);
+        newUrl.searchParams.set('corpus', firstQuery.corpus);
+        newUrl.searchParams.set('start', startDate);
+        newUrl.searchParams.set('end', endDate);
+        newUrl.searchParams.set('mode', firstQuery.searchMode || 'ngram');
+        window.history.pushState({}, '', newUrl);
+      }
+    }
 
     // Expand queries with '&' separator into multiple queries
     const expandedQueries = queries.flatMap(q => {

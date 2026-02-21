@@ -1951,6 +1951,7 @@ function App() {
       <Routes>
         <Route path="/swagger" element={<SwaggerPage />} />
         <Route path="/about_us" element={<AboutPage />} />
+        <Route path="/mcp" element={<MCPPage />} />
 
         <Route path="*" element={
           <>
@@ -1971,6 +1972,7 @@ function App() {
                   <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
                   <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
                   <Link to="/swagger" onClick={() => setIsMobileMenuOpen(false)}> {t('API')} </Link>
+                  <Link to="/mcp" onClick={() => setIsMobileMenuOpen(false)}> {t('MCP')} </Link>
                   <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
                   <a href="https://github.com/regicid/gallicagram_react" target="_blank" rel="noopener noreferrer">{t('Code')}</a>
                   <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => { changeLanguage('en'); setIsMobileMenuOpen(false); }}>🇬🇧</button>
@@ -2192,7 +2194,6 @@ function App() {
             />
           </>
         } />
-        <Route path="/mcp" element={<MCPPage />} />
       </Routes>
     </ThemeProvider>
   );

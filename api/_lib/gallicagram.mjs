@@ -3,19 +3,15 @@ import fetch from 'node-fetch';
 import { createCanvas, registerFont } from 'canvas';
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { Chart, registerables } from 'chart.js';
-import 'chartjs-adapter-date-fns';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 Chart.register(...registerables);
 
 // ─── Polices embarquées ──────────────────────────────────────────────────────
-// Les fichiers .ttf DOIVENT être commités dans api/_lib/fonts/
-// (Poppins-Regular.ttf + Poppins-Bold.ttf ou DejaVuSans.ttf + DejaVuSans-Bold.ttf)
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FONTS_DIR = join(__dirname, 'fonts');
 
-// Enregistrement des polices — silencieux si le fichier est absent
 function tryRegisterFont(file, family, options = {}) {
     try {
         registerFont(join(FONTS_DIR, file), { family, ...options });
@@ -27,21 +23,57 @@ function tryRegisterFont(file, family, options = {}) {
 tryRegisterFont('Poppins-Regular.ttf', 'Poppins');
 tryRegisterFont('Poppins-Bold.ttf',    'Poppins', { weight: 'bold' });
 
-// Police globale à utiliser dans toutes les configs Chart.js
 const FONT_FAMILY = 'Poppins';
 
-// ─── Configuration des renderers ────────────────────────────────────────────
+// ─── Configuration des renderers ─────────────────────────────────────────────
+// FIX: L'adaptateur de dates DOIT être enregistré via chartCallback,
+// car ChartJSNodeCanvas crée une instance Chart.js isolée.
+// L'import global `import 'chartjs-adapter-date-fns'` n'atteint PAS cette instance.
 const CHART_DEFAULTS = {
     backgroundColour: 'white',
     chartCallback: (ChartJS) => {
+        // Enregistrement de l'adaptateur date-fns dans l'instance isolée de ChartJSNodeCanvas
+        const { _adapters } = ChartJS;
+        if (_adapters && _adapters._date) {
+            // Importer et enregistrer l'adaptateur manuellement
+            import('chartjs-adapter-date-fns').then((adapter) => {
+                // L'adaptateur s'auto-enregistre à l'import, mais sur l'instance globale.
+                // On copie l'adaptateur sur cette instance isolée.
+                if (adapter.default && adapter.default._id) {
+                    ChartJS._adapters._date.override(adapter.default);
+                }
+            }).catch(() => {});
+        }
+
         ChartJS.defaults.font.family = FONT_FAMILY;
-        ChartJS.defaults.font.size   = 13;
+        ChartJS.defaults.font.size   = 24;
         ChartJS.defaults.color       = '#444';
     }
 };
 
-const chartCanvas       = new ChartJSNodeCanvas({ width: 1000, height: 500, ...CHART_DEFAULTS });
-const chartCanvasTotals = new ChartJSNodeCanvas({ width: 1000, height: 600, ...CHART_DEFAULTS });
+// ─── Solution alternative et plus robuste ────────────────────────────────────
+// Au lieu de passer par chartCallback (asynchrone et peu fiable),
+// on utilise l'option `plugins` de ChartJSNodeCanvas pour forcer l'enregistrement.
+
+function createCanvasInstance(width, height) {
+    return new ChartJSNodeCanvas({
+        width,
+        height,
+        backgroundColour: 'white',
+        // `plugins.requireLegacy` charge le module dans le contexte de l'instance isolée
+        plugins: {
+            modern: ['chartjs-adapter-date-fns'],
+        },
+        chartCallback: (ChartJS) => {
+            ChartJS.defaults.font.family = FONT_FAMILY;
+            ChartJS.defaults.font.size   = 24;
+            ChartJS.defaults.color       = '#444';
+        }
+    });
+}
+
+const chartCanvas       = createCanvasInstance(2000, 1000);
+const chartCanvasTotals = createCanvasInstance(2000, 1200);
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 export const CORPUS_LABELS = {
@@ -76,7 +108,6 @@ const CORPUS_MIN_RESOLUTION = {
     "rap": "annee"
 };
 
-// Palette identique à l'ancienne version QuickChart
 const COLORS = [
     '#e6194b','#3cb44b','#4363d8','#f58231','#911eb4',
     '#46f0f0','#f032e6','#bcf60c','#fabebe','#008080',
@@ -223,7 +254,16 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             ? movingAverage(rawFreq, winSize)
             : [...rawFreq];
 
-        const xVal = (d) => resolution === "mois" ? d.date : parseInt(d.date);
+        // FIX: En résolution mensuelle, on utilise des objets Date natifs
+        // plutôt que des strings 'yyyy-MM', ce qui évite la dépendance
+        // au parser de l'adaptateur date-fns pour la lecture des x.
+        const xVal = (d) => {
+            if (resolution === "mois") {
+                // Date au 1er du mois — Chart.js accepte les timestamps natifs
+                return new Date(d.annee, (d.mois || 1) - 1, 1).getTime();
+            }
+            return parseInt(d.date);
+        };
 
         // Ligne lissée
         datasets.push({
@@ -260,11 +300,14 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
 
+    // FIX: En résolution mensuelle, on utilise type: 'time' avec des timestamps
+    // natifs (ms). On évite le `parser` custom qui requiert l'adaptateur.
+    // Les ticks sont formatés manuellement via `callback` pour ne PAS dépendre
+    // du système de formatage de date-fns (source du bug original).
     const xScale = resolution === "mois"
         ? {
             type: 'time',
             time: {
-                parser: 'yyyy-MM',
                 unit: 'year',
                 displayFormats: { year: 'yyyy', month: 'MMM yyyy' },
                 tooltipFormat: 'MMM yyyy'

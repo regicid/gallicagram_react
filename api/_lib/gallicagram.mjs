@@ -1,33 +1,69 @@
 // api/_lib/gallicagram.mjs
 import fetch from 'node-fetch';
-import 'canvas';
+import { createCanvas, registerFont } from 'canvas';
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import 'chartjs-adapter-date-fns'; // Requis pour l'axe temporel (mois)
+import { Chart, registerables } from 'chart.js';
+import 'chartjs-adapter-date-fns';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Initialiser les moteurs de rendu (configurés une seule fois)
-const chartCanvas = new ChartJSNodeCanvas({ width: 1000, height: 500, backgroundColour: 'white' });
-const chartCanvasTotals = new ChartJSNodeCanvas({ width: 1000, height: 600, backgroundColour: 'white' });
+Chart.register(...registerables);
 
+// ─── Polices embarquées ──────────────────────────────────────────────────────
+// Les fichiers .ttf DOIVENT être commités dans api/_lib/fonts/
+// (Poppins-Regular.ttf + Poppins-Bold.ttf ou DejaVuSans.ttf + DejaVuSans-Bold.ttf)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FONTS_DIR = join(__dirname, 'fonts');
+
+// Enregistrement des polices — silencieux si le fichier est absent
+function tryRegisterFont(file, family, options = {}) {
+    try {
+        registerFont(join(FONTS_DIR, file), { family, ...options });
+    } catch {
+        // Silencieux : chart.js utilisera la police système de fallback
+    }
+}
+
+tryRegisterFont('Poppins-Regular.ttf', 'Poppins');
+tryRegisterFont('Poppins-Bold.ttf',    'Poppins', { weight: 'bold' });
+
+// Police globale à utiliser dans toutes les configs Chart.js
+const FONT_FAMILY = 'Poppins';
+
+// ─── Configuration des renderers ────────────────────────────────────────────
+const CHART_DEFAULTS = {
+    backgroundColour: 'white',
+    chartCallback: (ChartJS) => {
+        ChartJS.defaults.font.family = FONT_FAMILY;
+        ChartJS.defaults.font.size   = 13;
+        ChartJS.defaults.color       = '#444';
+    }
+};
+
+const chartCanvas       = new ChartJSNodeCanvas({ width: 1000, height: 500, ...CHART_DEFAULTS });
+const chartCanvasTotals = new ChartJSNodeCanvas({ width: 1000, height: 600, ...CHART_DEFAULTS });
+
+// ─── Constantes ──────────────────────────────────────────────────────────────
 export const CORPUS_LABELS = {
-    "lemonde": "Le Monde (1944-2023)",
-    "presse": "Presse Gallica (1789-1950)",
-    "livres": "Livres Gallica (1600-1940)",
-    "persee": "Persée (1789-2023)",
-    "ddb": "Deutsches Zeitungsportal (1780-1950)",
-    "american_stories": "American Stories (1798-1963)",
-    "paris": "Journal de Paris (1777-1827)",
-    "moniteur": "Moniteur Universel (1789-1869)",
-    "journal_des_debats": "Journal des Débats (1789-1944)",
-    "la_presse": "La Presse (1836-1869)",
-    "constitutionnel": "Le Constitutionnel (1821-1913)",
-    "figaro": "Le Figaro (1854-1952)",
-    "temps": "Le Temps (1861-1942)",
-    "petit_journal": "Le Petit Journal (1863-1942)",
-    "petit_parisien": "Le Petit Parisien (1876-1944)",
-    "huma": "L'Humanité (1904-1952)",
-    "subtitles": "Sous-titres de films (FR) (1935-2020)",
-    "subtitles_en": "Sous-titres de films (EN) (1930-2020)",
-    "rap": "Rap (Genius) (1989-2024)"
+    "lemonde":           "Le Monde (1944-2023)",
+    "presse":            "Presse Gallica (1789-1950)",
+    "livres":            "Livres Gallica (1600-1940)",
+    "persee":            "Persée (1789-2023)",
+    "ddb":               "Deutsches Zeitungsportal (1780-1950)",
+    "american_stories":  "American Stories (1798-1963)",
+    "paris":             "Journal de Paris (1777-1827)",
+    "moniteur":          "Moniteur Universel (1789-1869)",
+    "journal_des_debats":"Journal des Débats (1789-1944)",
+    "la_presse":         "La Presse (1836-1869)",
+    "constitutionnel":   "Le Constitutionnel (1821-1913)",
+    "figaro":            "Le Figaro (1854-1952)",
+    "temps":             "Le Temps (1861-1942)",
+    "petit_journal":     "Le Petit Journal (1863-1942)",
+    "petit_parisien":    "Le Petit Parisien (1876-1944)",
+    "huma":              "L'Humanité (1904-1952)",
+    "subtitles":         "Sous-titres de films (FR) (1935-2020)",
+    "subtitles_en":      "Sous-titres de films (EN) (1930-2020)",
+    "rap":               "Rap (Genius) (1989-2024)"
 };
 
 const CORPUS_MIN_RESOLUTION = {
@@ -40,28 +76,27 @@ const CORPUS_MIN_RESOLUTION = {
     "rap": "annee"
 };
 
+// Palette identique à l'ancienne version QuickChart
 const COLORS = [
-    '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
-    '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080',
-    '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3',
-    '#808000', '#ffd8b1', '#000075', '#808080', '#000000',
-    '#ff6f61', '#6b5b95', '#88b04b', '#f7cac9', '#92a8d1',
-    '#955251', '#b565a7', '#009b77', '#dd4124', '#45b8ac'
+    '#e6194b','#3cb44b','#4363d8','#f58231','#911eb4',
+    '#46f0f0','#f032e6','#bcf60c','#fabebe','#008080',
+    '#e6beff','#9a6324','#fffac8','#800000','#aaffc3',
+    '#808000','#ffd8b1','#000075','#808080','#000000',
+    '#ff6f61','#6b5b95','#88b04b','#f7cac9','#92a8d1',
+    '#955251','#b565a7','#009b77','#dd4124','#45b8ac'
 ];
 
+// ─── Utilitaires ─────────────────────────────────────────────────────────────
 function movingAverage(data, windowSize = 5) {
     if (windowSize <= 1) return [...data];
     const result = [];
-    const halfWindow = Math.floor(windowSize / 2);
+    const half = Math.floor(windowSize / 2);
     for (let i = 0; i < data.length; i++) {
-        if (i < halfWindow || i >= data.length - halfWindow) {
+        if (i < half || i >= data.length - half) {
             result.push(data[i]);
         } else {
-            const start = i - halfWindow;
-            const end = i + halfWindow + 1;
-            const window = data.slice(start, end);
-            const sum = window.reduce((a, b) => a + b, 0);
-            result.push(sum / window.length);
+            const slice = data.slice(i - half, i + half + 1);
+            result.push(slice.reduce((a, b) => a + b, 0) / slice.length);
         }
     }
     return result;
@@ -76,116 +111,127 @@ function getOptimalResolution(corpus, from_year, to_year) {
     return "annee";
 }
 
-function getOptimalSmoothWindow(dataLength) {
-    if (dataLength <= 5) return 1;
-    if (dataLength <= 10) return 3;
-    if (dataLength <= 30) return 4;
+function getOptimalSmoothWindow(len) {
+    if (len <= 5)  return 1;
+    if (len <= 10) return 3;
+    if (len <= 30) return 4;
     return 5;
 }
 
-function formatDate(annee, mois = null, resolution = "annee") {
-    if (resolution === "annee") return annee.toString();
+function formatDate(annee, mois, resolution) {
+    if (resolution === "mois" && mois)
+        return `${annee}-${mois.toString().padStart(2, '0')}`;
+    return annee.toString();
+}
+
+function formatDateDisplay(annee, mois, resolution) {
     if (resolution === "mois" && mois) {
-        const moisStr = mois.toString().padStart(2, '0');
-        return `${annee}-${moisStr}`;
+        const names = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+        return `${names[mois - 1]} ${annee}`;
     }
     return annee.toString();
 }
 
-function formatDateDisplay(annee, mois = null, resolution = "annee") {
-    if (resolution === "annee") return annee.toString();
-    if (resolution === "mois" && mois) {
-        const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-        return `${monthNames[mois - 1]} ${annee}`;
-    }
-    return annee.toString();
-}
-
+// ─── Fetch Gallicagram ───────────────────────────────────────────────────────
 async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
     const finalResolution = resolution || getOptimalResolution(corpus, from_year, to_year);
     const params = new URLSearchParams({ mot, corpus, resolution: finalResolution });
     if (from_year) params.append('from', from_year);
-    if (to_year) params.append('to', to_year);
+    if (to_year)   params.append('to', to_year);
 
     const response = await fetch(`https://shiny.ens-paris-saclay.fr/guni/query?${params}`);
     if (!response.ok) throw new Error(`Erreur API Gallicagram : ${response.status}`);
     const text = await response.text();
-    if (!text.trim()) return [];
+    if (!text.trim()) return { data: [], resolution: finalResolution };
 
-    const lines = text.trim().split('\n');
-    const headerLine = lines[0];
-    const delimiter = headerLine.includes(';') ? ';' : ',';
-    const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase());
+    const lines     = text.trim().split('\n');
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    const headers   = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
 
-    const yearIdx = headers.findIndex(h => ['annee', 'year', 'année'].includes(h));
-    const monthIdx = headers.findIndex(h => ['mois', 'month'].includes(h));
-    const nIdx = headers.findIndex(h => ['n', 'count', 'nombre'].includes(h));
-    const totalIdx = headers.findIndex(h => ['total', 'tot', 'sum'].includes(h));
+    const yearIdx  = headers.findIndex(h => ['annee','year','année'].includes(h));
+    const monthIdx = headers.findIndex(h => ['mois','month'].includes(h));
+    const nIdx     = headers.findIndex(h => ['n','count','nombre'].includes(h));
+    const totalIdx = headers.findIndex(h => ['total','tot','sum'].includes(h));
 
-    const aggregatedData = new Map();
-
+    const aggregated = new Map();
     for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(delimiter);
         if (parts.length <= Math.max(yearIdx, nIdx, totalIdx)) continue;
-        
         const annee = parseInt(parts[yearIdx]);
-        const mois = monthIdx >= 0 ? parseInt(parts[monthIdx]) : null;
-        const n = parseFloat(parts[nIdx]) || 0;
+        const mois  = monthIdx >= 0 ? parseInt(parts[monthIdx]) : null;
+        const n     = parseFloat(parts[nIdx])     || 0;
         const total = parseFloat(parts[totalIdx]) || 0;
-        
         if (!isNaN(annee) && total > 0) {
-            const dateKey = formatDate(annee, mois, finalResolution);
-            if (!aggregatedData.has(dateKey)) {
-                aggregatedData.set(dateKey, { 
-                    annee, mois, n: 0, total: total, date: dateKey,
-                    dateDisplay: formatDateDisplay(annee, mois, finalResolution)
-                });
-            }
-            aggregatedData.get(dateKey).n += n;
+            const key = formatDate(annee, mois, finalResolution);
+            if (!aggregated.has(key))
+                aggregated.set(key, { annee, mois, n: 0, total, date: key,
+                    dateDisplay: formatDateDisplay(annee, mois, finalResolution) });
+            aggregated.get(key).n += n;
         }
     }
 
-    const csvRows = Array.from(aggregatedData.values()).map(row => ({
-        ...row, frequency: row.n / row.total
-    }));
+    const rows = Array.from(aggregated.values())
+        .map(r => ({ ...r, frequency: r.n / r.total }))
+        .sort((a, b) => a.annee !== b.annee ? a.annee - b.annee : (a.mois||0) - (b.mois||0));
 
-    csvRows.sort((a, b) => {
-        if (a.annee !== b.annee) return a.annee - b.annee;
-        if (a.mois !== b.mois) return (a.mois || 0) - (b.mois || 0);
-        return 0;
-    });
-
-    return { data: csvRows, resolution: finalResolution };
+    return { data: rows, resolution: finalResolution };
 }
 
+// ─── Couleur hexadécimale → rgba ─────────────────────────────────────────────
+function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ─── Styles communs ──────────────────────────────────────────────────────────
+const commonTitlePlugin = (text) => ({
+    display: true,
+    text,
+    font: { size: 16, family: FONT_FAMILY, weight: 'bold' },
+    color: '#333',
+    padding: { bottom: 16 }
+});
+
+const commonLegend = (filterFn = null) => ({
+    position: 'bottom',
+    labels: {
+        usePointStyle: true,
+        padding: 18,
+        font: { size: 12, family: FONT_FAMILY },
+        color: '#444',
+        ...(filterFn ? { filter: filterFn } : {})
+    }
+});
+
+// ─── generateChart ───────────────────────────────────────────────────────────
 export async function generateChart(mots, corpus, from_year, to_year, smooth = true) {
-    const allDatasets = [];
-    let usedResolution = "annee";
+    const datasets = [];
+    let resolution = "annee";
 
     for (let i = 0; i < mots.length; i++) {
         const mot = mots[i].trim();
-        const { data, resolution } = await fetchData(mot, corpus, from_year, to_year);
-        usedResolution = resolution; 
+        const { data, resolution: res } = await fetchData(mot, corpus, from_year, to_year);
+        resolution = res;
         if (data.length === 0) continue;
 
         const color = COLORS[i % COLORS.length];
-        const rawFrequencies = data.map(d => d.frequency * 1e6);
-        const smoothWindow = getOptimalSmoothWindow(data.length);
-        let lineFrequencies = [...rawFrequencies];
-        
-        if (smooth && lineFrequencies.length > smoothWindow) {
-            lineFrequencies = movingAverage(lineFrequencies, smoothWindow);
-        }
+        const rawFreq = data.map(d => d.frequency * 1e6);
+        const winSize = getOptimalSmoothWindow(data.length);
+        const lineFreq = (smooth && data.length > winSize)
+            ? movingAverage(rawFreq, winSize)
+            : [...rawFreq];
 
-        allDatasets.push({
+        const xVal = (d) => resolution === "mois" ? d.date : parseInt(d.date);
+
+        // Ligne lissée
+        datasets.push({
             label: mot,
-            data: data.map((d, idx) => ({ 
-                x: usedResolution === "mois" ? d.date : parseInt(d.date),
-                y: parseFloat(lineFrequencies[idx].toFixed(4))
-            })),
+            data: data.map((d, idx) => ({ x: xVal(d), y: parseFloat(lineFreq[idx].toFixed(4)) })),
             borderColor: color,
             backgroundColor: 'transparent',
-            borderWidth: 3,
+            borderWidth: 2.5,
             pointRadius: 0,
             pointHoverRadius: 0,
             fill: false,
@@ -195,14 +241,12 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             order: 2
         });
 
-        allDatasets.push({
+        // Points bruts semi-transparents
+        datasets.push({
             label: mot + ' (données brutes)',
-            data: data.map((d, idx) => ({ 
-                x: usedResolution === "mois" ? d.date : parseInt(d.date),
-                y: parseFloat(rawFrequencies[idx].toFixed(4))
-            })),
+            data: data.map((d, idx) => ({ x: xVal(d), y: parseFloat(rawFreq[idx].toFixed(4)) })),
             borderColor: 'transparent',
-            backgroundColor: color + '80',
+            backgroundColor: hexToRgba(color, 0.45),
             pointRadius: 2.5,
             pointHoverRadius: 5,
             pointBackgroundColor: color,
@@ -214,182 +258,205 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         });
     }
 
-    if (allDatasets.length === 0) throw new Error('Aucune donnée trouvée');
+    if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
 
-    const configuration = {
+    const xScale = resolution === "mois"
+        ? {
+            type: 'time',
+            time: {
+                parser: 'yyyy-MM',
+                unit: 'year',
+                displayFormats: { year: 'yyyy', month: 'MMM yyyy' },
+                tooltipFormat: 'MMM yyyy'
+            },
+            grid: { color: '#eee', drawBorder: false },
+            ticks: { font: { family: FONT_FAMILY }, color: '#555', maxTicksLimit: 12 }
+          }
+        : {
+            type: 'linear',
+            grid: { color: '#eee', drawBorder: false },
+            ticks: {
+                font: { family: FONT_FAMILY },
+                color: '#555',
+                maxTicksLimit: 12,
+                callback: (v) => Math.round(v).toString()
+            }
+          };
+
+    const config = {
         type: 'line',
-        data: { datasets: allDatasets },
+        data: { datasets },
         options: {
+            animation: false,
+            responsive: false,
             plugins: {
-                title: {
-                    display: true,
-                    text: `${CORPUS_LABELS[corpus] || corpus}`,
-                    font: { size: 18 },
-                    color: '#555'
-                },
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 20,
-                        // Plus besoin de stringifier ! On met le JS natif :
-                        filter: function(item) {
-                            return !item.text.includes("(données brutes)");
-                        }
-                    }
-                },
+                title: commonTitlePlugin(CORPUS_LABELS[corpus] || corpus),
+                legend: commonLegend((item) => !item.text.includes('(données brutes)')),
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            let value = context.parsed.y;
-                            if (label.includes('(données brutes)')) {
-                                label = label.replace(' (données brutes)', '');
-                            }
-                            return label + ': ' + value.toFixed(2) + ' ppm';
+                        label: (ctx) => {
+                            let lbl = ctx.dataset.label || '';
+                            if (lbl.includes('(données brutes)'))
+                                lbl = lbl.replace(' (données brutes)', '');
+                            return `${lbl}: ${ctx.parsed.y.toFixed(2)} ppm`;
                         }
                     }
                 }
             },
             scales: {
-                x: {
-                    type: usedResolution === "mois" ? 'time' : 'linear',
-                    position: 'bottom',
-                    grid: { display: true, drawOnChartArea: true, color: '#eee' },
-                    ticks: usedResolution !== "mois" ? {
-                        callback: function(val) { return Math.round(val).toString(); }
-                    } : undefined,
-                    time: usedResolution === "mois" ? {
-                        parser: 'yyyy-MM', // date-fns format
-                        unit: 'month',
-                        displayFormats: { month: 'MMM yyyy' },
-                        tooltipFormat: 'MMM yyyy'
-                    } : undefined
-                },
+                x: xScale,
                 y: {
-                    title: { display: true, text: 'Fréquence en mots\npar million de mots' },
+                    title: {
+                        display: true,
+                        text: 'Fréquence (occurrences par million de mots)',
+                        font: { size: 12, family: FONT_FAMILY },
+                        color: '#666'
+                    },
                     beginAtZero: true,
-                    grid: { display: false }
+                    grid: { display: false },
+                    ticks: { font: { family: FONT_FAMILY }, color: '#555' }
                 }
             }
         }
     };
 
-    // Génération et retour direct du buffer PNG
-    return await chartCanvas.renderToBuffer(configuration);
+    return chartCanvas.renderToBuffer(config);
 }
 
+// ─── generateHistogram ───────────────────────────────────────────────────────
 export async function generateHistogram(mots, corpus, from_year, to_year) {
-    const datasets = [];
-    let usedResolution = "annee";
-    let allDataPoints = new Map();
+    const allDataPoints = new Map();
+    let resolution = "annee";
 
     for (let i = 0; i < mots.length; i++) {
         const mot = mots[i].trim();
-        const { data, resolution } = await fetchData(mot, corpus, from_year, to_year);
-        usedResolution = resolution;
+        const { data, resolution: res } = await fetchData(mot, corpus, from_year, to_year);
+        resolution = res;
         if (data.length === 0) continue;
-        allDataPoints.set(mot, { data: data, color: COLORS[i % COLORS.length] });
+        allDataPoints.set(mot, { data, color: COLORS[i % COLORS.length] });
     }
 
     if (allDataPoints.size === 0) throw new Error('Aucune donnée trouvée');
 
-    let minYear = Infinity, maxYear = -Infinity;
-    let minMonth = null, maxMonth = null;
-    
-    for (const [mot, info] of allDataPoints) {
-        for (const d of info.data) {
+    let minYear = Infinity, maxYear = -Infinity, minMonth = null, maxMonth = null;
+    for (const { data } of allDataPoints.values()) {
+        for (const d of data) {
             if (d.annee < minYear) { minYear = d.annee; minMonth = d.mois; }
             if (d.annee > maxYear) { maxYear = d.annee; maxMonth = d.mois; }
         }
     }
 
     const allLabels = [];
-    if (usedResolution === "mois") {
+    if (resolution === "mois") {
         for (let y = minYear; y <= maxYear; y++) {
-            const startMonth = (y === minYear) ? (minMonth || 1) : 1;
-            const endMonth = (y === maxYear) ? (maxMonth || 12) : 12;
-            for (let m = startMonth; m <= endMonth; m++) {
+            const s = (y === minYear) ? (minMonth || 1) : 1;
+            const e = (y === maxYear) ? (maxMonth || 12) : 12;
+            for (let m = s; m <= e; m++)
                 allLabels.push(formatDateDisplay(y, m, "mois"));
-            }
         }
     } else {
-        for (let y = minYear; y <= maxYear; y++) {
-            allLabels.push(y.toString());
-        }
+        for (let y = minYear; y <= maxYear; y++) allLabels.push(y.toString());
     }
 
-    for (const [mot, info] of allDataPoints) {
-        const dataMap = new Map(info.data.map(d => [d.dateDisplay, d.n]));
+    const datasets = [];
+    for (const [mot, { data, color }] of allDataPoints) {
+        const dataMap = new Map(data.map(d => [d.dateDisplay, d.n]));
         datasets.push({
             label: mot,
-            data: allLabels.map(date => dataMap.get(date) || 0),
-            backgroundColor: info.color,
-            borderColor: info.color,
+            data: allLabels.map(l => dataMap.get(l) || 0),
+            backgroundColor: hexToRgba(color, 0.75),
+            borderColor: color,
             borderWidth: 1
         });
     }
 
-    const configuration = {
+    const config = {
         type: 'bar',
-        data: { labels: allLabels, datasets: datasets },
+        data: { labels: allLabels, datasets },
         options: {
+            animation: false,
+            responsive: false,
             plugins: {
-                title: { display: true, text: `${CORPUS_LABELS[corpus] || corpus}`, font: { size: 18 }, color: '#555' },
-                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
+                title: commonTitlePlugin(CORPUS_LABELS[corpus] || corpus),
+                legend: commonLegend()
             },
             scales: {
-                x: { stacked: false, grid: { display: false }, ticks: { maxTicksLimit: 20, autoSkip: true } },
-                y: { stacked: false, title: { display: true, text: 'Nombre d\'occurrences (n)' }, beginAtZero: true }
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { family: FONT_FAMILY }, color: '#555',
+                        maxTicksLimit: 20, autoSkip: true
+                    }
+                },
+                y: {
+                    title: { display: true, text: "Nombre d'occurrences (n)",
+                        font: { size: 12, family: FONT_FAMILY }, color: '#666' },
+                    beginAtZero: true,
+                    ticks: { font: { family: FONT_FAMILY }, color: '#555' }
+                }
             }
         }
     };
 
-    return await chartCanvas.renderToBuffer(configuration);
+    return chartCanvas.renderToBuffer(config);
 }
 
+// ─── generateTotalsChart ─────────────────────────────────────────────────────
 export async function generateTotalsChart(mots, corpus, from_year, to_year) {
     const totals = [];
-
     for (let i = 0; i < mots.length; i++) {
         const mot = mots[i].trim();
         const { data } = await fetchData(mot, corpus, from_year, to_year);
         if (data.length === 0) continue;
-        const totalOccurrences = data.reduce((sum, d) => sum + d.n, 0);
-        totals.push({ mot, total: totalOccurrences, color: COLORS[i % COLORS.length] });
+        totals.push({
+            mot,
+            total: data.reduce((s, d) => s + d.n, 0),
+            color: COLORS[i % COLORS.length]
+        });
     }
-
     if (totals.length === 0) throw new Error('Aucune donnée trouvée');
     totals.sort((a, b) => b.total - a.total);
 
-    const configuration = {
-        type: 'bar', // En Chart.js v4, 'horizontalBar' n'existe plus...
+    const config = {
+        type: 'bar',
         data: {
             labels: totals.map(t => t.mot),
             datasets: [{
                 label: 'Occurrences totales',
                 data: totals.map(t => t.total),
-                backgroundColor: totals.map(t => t.color),
+                backgroundColor: totals.map(t => hexToRgba(t.color, 0.75)),
                 borderColor: totals.map(t => t.color),
-                borderWidth: 1
+                borderWidth: 1.5
             }]
         },
         options: {
-            indexAxis: 'y', // ...c'est ceci qui rend le graphique horizontal
+            indexAxis: 'y',
+            animation: false,
+            responsive: false,
             plugins: {
-                title: { display: true, text: `${CORPUS_LABELS[corpus] || corpus}`, font: { size: 18 }, color: '#555' },
+                title: commonTitlePlugin(CORPUS_LABELS[corpus] || corpus),
                 legend: { display: false }
             },
             scales: {
-                x: { title: { display: true, text: 'Nombre total d\'occurrences' }, beginAtZero: true },
-                y: { grid: { display: false } }
+                x: {
+                    title: { display: true, text: "Nombre total d'occurrences",
+                        font: { size: 12, family: FONT_FAMILY }, color: '#666' },
+                    beginAtZero: true,
+                    grid: { color: '#eee', drawBorder: false },
+                    ticks: { font: { family: FONT_FAMILY }, color: '#555' }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { font: { family: FONT_FAMILY }, color: '#444' }
+                }
             }
         }
     };
 
-    return await chartCanvasTotals.renderToBuffer(configuration);
+    return chartCanvasTotals.renderToBuffer(config);
 }
 
+// ─── generateAnalysisPrompt ──────────────────────────────────────────────────
 export function generateAnalysisPrompt(mots, corpus, from, to) {
     return `Agis en tant qu'historien expert. Analyse l'évolution de la fréquence de "${mots.join(', ')}" dans le corpus "${CORPUS_LABELS[corpus] || corpus}" entre ${from || 'le début'} et ${to || 'la fin'}. 
 Sur le graphique, les points représentent les données annuelles brutes et la ligne représente la tendance lissée. Identifie les événements historiques, culturels ou sociaux qui pourraient expliquer les pics ou les déclins observés.`;

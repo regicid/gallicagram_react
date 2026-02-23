@@ -6,6 +6,11 @@ import { Chart, registerables } from 'chart.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+// NOTE: chartjs-adapter-date-fns est intentionnellement PAS importé.
+// On n'utilise plus type:'time' — on utilise type:'linear' avec des "decimal years"
+// (ex: 1850.5 = juillet 1850) et un callback de formatage manuel.
+// Ceci élimine toute dépendance à l'adaptateur de dates et son absence de package.json.
+
 Chart.register(...registerables);
 
 // ─── Polices embarquées ──────────────────────────────────────────────────────
@@ -16,7 +21,7 @@ function tryRegisterFont(file, family, options = {}) {
     try {
         registerFont(join(FONTS_DIR, file), { family, ...options });
     } catch {
-        // Silencieux : chart.js utilisera la police système de fallback
+        // Silencieux
     }
 }
 
@@ -26,44 +31,11 @@ tryRegisterFont('Poppins-Bold.ttf',    'Poppins', { weight: 'bold' });
 const FONT_FAMILY = 'Poppins';
 
 // ─── Configuration des renderers ─────────────────────────────────────────────
-// FIX: L'adaptateur de dates DOIT être enregistré via chartCallback,
-// car ChartJSNodeCanvas crée une instance Chart.js isolée.
-// L'import global `import 'chartjs-adapter-date-fns'` n'atteint PAS cette instance.
-const CHART_DEFAULTS = {
-    backgroundColour: 'white',
-    chartCallback: (ChartJS) => {
-        // Enregistrement de l'adaptateur date-fns dans l'instance isolée de ChartJSNodeCanvas
-        const { _adapters } = ChartJS;
-        if (_adapters && _adapters._date) {
-            // Importer et enregistrer l'adaptateur manuellement
-            import('chartjs-adapter-date-fns').then((adapter) => {
-                // L'adaptateur s'auto-enregistre à l'import, mais sur l'instance globale.
-                // On copie l'adaptateur sur cette instance isolée.
-                if (adapter.default && adapter.default._id) {
-                    ChartJS._adapters._date.override(adapter.default);
-                }
-            }).catch(() => {});
-        }
-
-        ChartJS.defaults.font.family = FONT_FAMILY;
-        ChartJS.defaults.font.size   = 24;
-        ChartJS.defaults.color       = '#444';
-    }
-};
-
-// ─── Solution alternative et plus robuste ────────────────────────────────────
-// Au lieu de passer par chartCallback (asynchrone et peu fiable),
-// on utilise l'option `plugins` de ChartJSNodeCanvas pour forcer l'enregistrement.
-
 function createCanvasInstance(width, height) {
     return new ChartJSNodeCanvas({
         width,
         height,
         backgroundColour: 'white',
-        // `plugins.requireLegacy` charge le module dans le contexte de l'instance isolée
-        plugins: {
-            modern: ['chartjs-adapter-date-fns'],
-        },
         chartCallback: (ChartJS) => {
             ChartJS.defaults.font.family = FONT_FAMILY;
             ChartJS.defaults.font.size   = 24;
@@ -117,6 +89,8 @@ const COLORS = [
     '#955251','#b565a7','#009b77','#dd4124','#45b8ac'
 ];
 
+const MONTH_NAMES = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
 function movingAverage(data, windowSize = 5) {
     if (windowSize <= 1) return [...data];
@@ -157,10 +131,42 @@ function formatDate(annee, mois, resolution) {
 
 function formatDateDisplay(annee, mois, resolution) {
     if (resolution === "mois" && mois) {
-        const names = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
-        return `${names[mois - 1]} ${annee}`;
+        return `${MONTH_NAMES[mois - 1]} ${annee}`;
     }
     return annee.toString();
+}
+
+/**
+ * Convertit annee+mois en "decimal year" pour l'axe X linéaire.
+ * 1850.0 = Jan 1850, 1850 + 6/12 = Jul 1850
+ * Évite toute dépendance à Date ou à un adaptateur de dates.
+ */
+function toDecimalYear(annee, mois) {
+    if (!mois) return annee;
+    return annee + (mois - 1) / 12;
+}
+
+/**
+ * Formate un decimal year en label lisible.
+ * N'affiche que l'année pour ne pas surcharger l'axe.
+ */
+function decimalYearToLabel(value, resolution) {
+    const annee = Math.floor(value + 0.001); // +epsilon pour éviter 1849.999...
+    if (resolution !== "mois") return annee.toString();
+    const moisIdx = Math.round((value - annee) * 12); // 0–11
+    // Afficher "Jan YYYY" pour janvier, sinon juste le mois
+    if (moisIdx === 0) return annee.toString();
+    return MONTH_NAMES[moisIdx] || '';
+}
+
+/**
+ * Formate un decimal year pour le tooltip (plus complet)
+ */
+function decimalYearToTooltip(value, resolution) {
+    const annee = Math.floor(value + 0.001);
+    if (resolution !== "mois") return annee.toString();
+    const moisIdx = Math.round((value - annee) * 12);
+    return `${MONTH_NAMES[moisIdx] || '?'} ${annee}`;
 }
 
 // ─── Fetch Gallicagram ───────────────────────────────────────────────────────
@@ -254,18 +260,9 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             ? movingAverage(rawFreq, winSize)
             : [...rawFreq];
 
-        // FIX: En résolution mensuelle, on utilise des objets Date natifs
-        // plutôt que des strings 'yyyy-MM', ce qui évite la dépendance
-        // au parser de l'adaptateur date-fns pour la lecture des x.
-        const xVal = (d) => {
-            if (resolution === "mois") {
-                // Date au 1er du mois — Chart.js accepte les timestamps natifs
-                return new Date(d.annee, (d.mois || 1) - 1, 1).getTime();
-            }
-            return parseInt(d.date);
-        };
+        // X = decimal year — fonctionne pour annee ET mois, sans adaptateur
+        const xVal = (d) => toDecimalYear(d.annee, resolution === "mois" ? d.mois : null);
 
-        // Ligne lissée
         datasets.push({
             label: mot,
             data: data.map((d, idx) => ({ x: xVal(d), y: parseFloat(lineFreq[idx].toFixed(4)) })),
@@ -281,7 +278,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             order: 2
         });
 
-        // Points bruts semi-transparents
         datasets.push({
             label: mot + ' (données brutes)',
             data: data.map((d, idx) => ({ x: xVal(d), y: parseFloat(rawFreq[idx].toFixed(4)) })),
@@ -300,31 +296,8 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
 
-    // FIX: En résolution mensuelle, on utilise type: 'time' avec des timestamps
-    // natifs (ms). On évite le `parser` custom qui requiert l'adaptateur.
-    // Les ticks sont formatés manuellement via `callback` pour ne PAS dépendre
-    // du système de formatage de date-fns (source du bug original).
-    const xScale = resolution === "mois"
-        ? {
-            type: 'time',
-            time: {
-                unit: 'year',
-                displayFormats: { year: 'yyyy', month: 'MMM yyyy' },
-                tooltipFormat: 'MMM yyyy'
-            },
-            grid: { color: '#eee', drawBorder: false },
-            ticks: { font: { family: FONT_FAMILY }, color: '#555', maxTicksLimit: 12 }
-          }
-        : {
-            type: 'linear',
-            grid: { color: '#eee', drawBorder: false },
-            ticks: {
-                font: { family: FONT_FAMILY },
-                color: '#555',
-                maxTicksLimit: 12,
-                callback: (v) => Math.round(v).toString()
-            }
-          };
+    // Capture resolution dans la closure pour les callbacks
+    const _resolution = resolution;
 
     const config = {
         type: 'line',
@@ -337,6 +310,10 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                 legend: commonLegend((item) => !item.text.includes('(données brutes)')),
                 tooltip: {
                     callbacks: {
+                        title: (items) => {
+                            if (!items.length) return '';
+                            return decimalYearToTooltip(items[0].parsed.x, _resolution);
+                        },
                         label: (ctx) => {
                             let lbl = ctx.dataset.label || '';
                             if (lbl.includes('(données brutes)'))
@@ -347,7 +324,16 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                 }
             },
             scales: {
-                x: xScale,
+                x: {
+                    type: 'linear',
+                    grid: { color: '#eee', drawBorder: false },
+                    ticks: {
+                        font: { family: FONT_FAMILY },
+                        color: '#555',
+                        maxTicksLimit: _resolution === "mois" ? 20 : 12,
+                        callback: (value) => decimalYearToLabel(value, _resolution)
+                    }
+                },
                 y: {
                     title: {
                         display: true,

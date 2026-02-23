@@ -1,4 +1,3 @@
-// api/_lib/gallicagram.mjs
 import fetch from 'node-fetch';
 import { createCanvas, registerFont } from 'canvas';
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
@@ -6,14 +5,8 @@ import { Chart, registerables } from 'chart.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// NOTE: chartjs-adapter-date-fns est intentionnellement PAS importé.
-// On n'utilise plus type:'time' — on utilise type:'linear' avec des "decimal years"
-// (ex: 1850.5 = juillet 1850) et un callback de formatage manuel.
-// Ceci élimine toute dépendance à l'adaptateur de dates et son absence de package.json.
-
 Chart.register(...registerables);
 
-// ─── Polices embarquées ──────────────────────────────────────────────────────
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FONTS_DIR = join(__dirname, 'fonts');
 
@@ -21,7 +14,6 @@ function tryRegisterFont(file, family, options = {}) {
     try {
         registerFont(join(FONTS_DIR, file), { family, ...options });
     } catch {
-        // Silencieux
     }
 }
 
@@ -30,7 +22,22 @@ tryRegisterFont('Poppins-Bold.ttf',    'Poppins', { weight: 'bold' });
 
 const FONT_FAMILY = 'Poppins';
 
-// ─── Configuration des renderers ─────────────────────────────────────────────
+const sourcePlugin = {
+    id: 'sourcePlugin',
+    afterDraw: (chart) => {
+        const { ctx, canvas } = chart;
+        const text = chart.options.plugins.sourcePlugin?.text;
+        if (!text) return;
+        ctx.save();
+        ctx.font = `italic 24px ${FONT_FAMILY}`;
+        ctx.fillStyle = '#666';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(text, canvas.width - 40, canvas.height - 30);
+        ctx.restore();
+    }
+};
+
 function createCanvasInstance(width, height) {
     return new ChartJSNodeCanvas({
         width,
@@ -38,8 +45,9 @@ function createCanvasInstance(width, height) {
         backgroundColour: 'white',
         chartCallback: (ChartJS) => {
             ChartJS.defaults.font.family = FONT_FAMILY;
-            ChartJS.defaults.font.size   = 24;
+            ChartJS.defaults.font.size   = 22;
             ChartJS.defaults.color       = '#444';
+            ChartJS.register(sourcePlugin);
         }
     });
 }
@@ -47,7 +55,6 @@ function createCanvasInstance(width, height) {
 const chartCanvas       = createCanvasInstance(2000, 1000);
 const chartCanvasTotals = createCanvasInstance(2000, 1200);
 
-// ─── Constantes ──────────────────────────────────────────────────────────────
 export const CORPUS_LABELS = {
     "lemonde":           "Le Monde (1944-2023)",
     "presse":            "Presse Gallica (1789-1950)",
@@ -91,7 +98,6 @@ const COLORS = [
 
 const MONTH_NAMES = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
 
-// ─── Utilitaires ─────────────────────────────────────────────────────────────
 function movingAverage(data, windowSize = 5) {
     if (windowSize <= 1) return [...data];
     const result = [];
@@ -136,32 +142,19 @@ function formatDateDisplay(annee, mois, resolution) {
     return annee.toString();
 }
 
-/**
- * Convertit annee+mois en "decimal year" pour l'axe X linéaire.
- * 1850.0 = Jan 1850, 1850 + 6/12 = Jul 1850
- * Évite toute dépendance à Date ou à un adaptateur de dates.
- */
 function toDecimalYear(annee, mois) {
     if (!mois) return annee;
     return annee + (mois - 1) / 12;
 }
 
-/**
- * Formate un decimal year en label lisible.
- * N'affiche que l'année pour ne pas surcharger l'axe.
- */
 function decimalYearToLabel(value, resolution) {
-    const annee = Math.floor(value + 0.001); // +epsilon pour éviter 1849.999...
+    const annee = Math.floor(value + 0.001);
     if (resolution !== "mois") return annee.toString();
-    const moisIdx = Math.round((value - annee) * 12); // 0–11
-    // Afficher "Jan YYYY" pour janvier, sinon juste le mois
+    const moisIdx = Math.round((value - annee) * 12);
     if (moisIdx === 0) return annee.toString();
     return MONTH_NAMES[moisIdx] || '';
 }
 
-/**
- * Formate un decimal year pour le tooltip (plus complet)
- */
 function decimalYearToTooltip(value, resolution) {
     const annee = Math.floor(value + 0.001);
     if (resolution !== "mois") return annee.toString();
@@ -169,7 +162,11 @@ function decimalYearToTooltip(value, resolution) {
     return `${MONTH_NAMES[moisIdx] || '?'} ${annee}`;
 }
 
-// ─── Fetch Gallicagram ───────────────────────────────────────────────────────
+function getCleanCorpusLabel(corpus) {
+    const label = CORPUS_LABELS[corpus] || corpus;
+    return label.replace(/\s*\(.*\)\s*$/, "").trim();
+}
+
 async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
     const finalResolution = resolution || getOptimalResolution(corpus, from_year, to_year);
     const params = new URLSearchParams({ mot, corpus, resolution: finalResolution });
@@ -214,7 +211,6 @@ async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
     return { data: rows, resolution: finalResolution };
 }
 
-// ─── Couleur hexadécimale → rgba ─────────────────────────────────────────────
 function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1,3),16);
     const g = parseInt(hex.slice(3,5),16);
@@ -222,27 +218,6 @@ function hexToRgba(hex, alpha) {
     return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// ─── Styles communs ──────────────────────────────────────────────────────────
-const commonTitlePlugin = (text) => ({
-    display: true,
-    text,
-    font: { size: 16, family: FONT_FAMILY, weight: 'bold' },
-    color: '#333',
-    padding: { bottom: 16 }
-});
-
-const commonLegend = (filterFn = null) => ({
-    position: 'bottom',
-    labels: {
-        usePointStyle: true,
-        padding: 18,
-        font: { size: 12, family: FONT_FAMILY },
-        color: '#444',
-        ...(filterFn ? { filter: filterFn } : {})
-    }
-});
-
-// ─── generateChart ───────────────────────────────────────────────────────────
 export async function generateChart(mots, corpus, from_year, to_year, smooth = true) {
     const datasets = [];
     let resolution = "annee";
@@ -260,7 +235,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             ? movingAverage(rawFreq, winSize)
             : [...rawFreq];
 
-        // X = decimal year — fonctionne pour annee ET mois, sans adaptateur
         const xVal = (d) => toDecimalYear(d.annee, resolution === "mois" ? d.mois : null);
 
         datasets.push({
@@ -268,7 +242,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             data: data.map((d, idx) => ({ x: xVal(d), y: parseFloat(lineFreq[idx].toFixed(4)) })),
             borderColor: color,
             backgroundColor: 'transparent',
-            borderWidth: 2.5,
+            borderWidth: 4,
             pointRadius: 0,
             pointHoverRadius: 0,
             fill: false,
@@ -283,8 +257,8 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             data: data.map((d, idx) => ({ x: xVal(d), y: parseFloat(rawFreq[idx].toFixed(4)) })),
             borderColor: 'transparent',
             backgroundColor: hexToRgba(color, 0.45),
-            pointRadius: 2.5,
-            pointHoverRadius: 5,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             pointBackgroundColor: color,
             pointBorderColor: color,
             pointBorderWidth: 1,
@@ -296,7 +270,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
 
-    // Capture resolution dans la closure pour les callbacks
     const _resolution = resolution;
 
     const config = {
@@ -305,19 +278,26 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
         options: {
             animation: false,
             responsive: false,
+            layout: { padding: { bottom: 80, top: 20, left: 20, right: 20 } },
             plugins: {
-                title: commonTitlePlugin(CORPUS_LABELS[corpus] || corpus),
-                legend: commonLegend((item) => !item.text.includes('(données brutes)')),
+                title: { display: false },
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 30,
+                        font: { size: 28, family: FONT_FAMILY },
+                        color: '#444',
+                        filter: (item) => !item.text.includes('(données brutes)')
+                    }
+                },
+                sourcePlugin: { text: `Source : ${getCleanCorpusLabel(corpus)}` },
                 tooltip: {
                     callbacks: {
-                        title: (items) => {
-                            if (!items.length) return '';
-                            return decimalYearToTooltip(items[0].parsed.x, _resolution);
-                        },
+                        title: (items) => items.length ? decimalYearToTooltip(items[0].parsed.x, _resolution) : '',
                         label: (ctx) => {
                             let lbl = ctx.dataset.label || '';
-                            if (lbl.includes('(données brutes)'))
-                                lbl = lbl.replace(' (données brutes)', '');
+                            if (lbl.includes('(données brutes)')) lbl = lbl.replace(' (données brutes)', '');
                             return `${lbl}: ${ctx.parsed.y.toFixed(2)} ppm`;
                         }
                     }
@@ -328,7 +308,7 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                     type: 'linear',
                     grid: { color: '#eee', drawBorder: false },
                     ticks: {
-                        font: { family: FONT_FAMILY },
+                        font: { family: FONT_FAMILY, size: 22 },
                         color: '#555',
                         maxTicksLimit: _resolution === "mois" ? 20 : 12,
                         callback: (value) => decimalYearToLabel(value, _resolution)
@@ -337,13 +317,13 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
                 y: {
                     title: {
                         display: true,
-                        text: 'Fréquence (occurrences par million de mots)',
-                        font: { size: 12, family: FONT_FAMILY },
+                        text: 'Fréquence (ppm)',
+                        font: { size: 28, family: FONT_FAMILY, weight: 'bold' },
                         color: '#666'
                     },
                     beginAtZero: true,
                     grid: { display: false },
-                    ticks: { font: { family: FONT_FAMILY }, color: '#555' }
+                    ticks: { font: { family: FONT_FAMILY, size: 22 }, color: '#555' }
                 }
             }
         }
@@ -352,7 +332,6 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
     return chartCanvas.renderToBuffer(config);
 }
 
-// ─── generateHistogram ───────────────────────────────────────────────────────
 export async function generateHistogram(mots, corpus, from_year, to_year) {
     const allDataPoints = new Map();
     let resolution = "annee";
@@ -405,23 +384,25 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
         options: {
             animation: false,
             responsive: false,
+            layout: { padding: { bottom: 80, top: 20 } },
             plugins: {
-                title: commonTitlePlugin(CORPUS_LABELS[corpus] || corpus),
-                legend: commonLegend()
+                title: { display: false },
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 28, family: FONT_FAMILY }, padding: 30 }
+                },
+                sourcePlugin: { text: `Source : ${getCleanCorpusLabel(corpus)}` }
             },
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: {
-                        font: { family: FONT_FAMILY }, color: '#555',
-                        maxTicksLimit: 20, autoSkip: true
-                    }
+                    ticks: { font: { family: FONT_FAMILY, size: 22 }, color: '#555', maxTicksLimit: 20 }
                 },
                 y: {
                     title: { display: true, text: "Nombre d'occurrences (n)",
-                        font: { size: 12, family: FONT_FAMILY }, color: '#666' },
+                        font: { size: 28, family: FONT_FAMILY, weight: 'bold' }, color: '#666' },
                     beginAtZero: true,
-                    ticks: { font: { family: FONT_FAMILY }, color: '#555' }
+                    ticks: { font: { family: FONT_FAMILY, size: 22 }, color: '#555' }
                 }
             }
         }
@@ -430,7 +411,6 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
     return chartCanvas.renderToBuffer(config);
 }
 
-// ─── generateTotalsChart ─────────────────────────────────────────────────────
 export async function generateTotalsChart(mots, corpus, from_year, to_year) {
     const totals = [];
     for (let i = 0; i < mots.length; i++) {
@@ -462,21 +442,23 @@ export async function generateTotalsChart(mots, corpus, from_year, to_year) {
             indexAxis: 'y',
             animation: false,
             responsive: false,
+            layout: { padding: { bottom: 80, top: 20, right: 40 } },
             plugins: {
-                title: commonTitlePlugin(CORPUS_LABELS[corpus] || corpus),
-                legend: { display: false }
+                title: { display: false },
+                legend: { display: false },
+                sourcePlugin: { text: `Source : ${getCleanCorpusLabel(corpus)}` }
             },
             scales: {
                 x: {
                     title: { display: true, text: "Nombre total d'occurrences",
-                        font: { size: 12, family: FONT_FAMILY }, color: '#666' },
+                        font: { size: 28, family: FONT_FAMILY, weight: 'bold' }, color: '#666' },
                     beginAtZero: true,
                     grid: { color: '#eee', drawBorder: false },
-                    ticks: { font: { family: FONT_FAMILY }, color: '#555' }
+                    ticks: { font: { family: FONT_FAMILY, size: 22 }, color: '#555' }
                 },
                 y: {
                     grid: { display: false },
-                    ticks: { font: { family: FONT_FAMILY }, color: '#444' }
+                    ticks: { font: { family: FONT_FAMILY, size: 24 }, color: '#333' }
                 }
             }
         }
@@ -485,8 +467,7 @@ export async function generateTotalsChart(mots, corpus, from_year, to_year) {
     return chartCanvasTotals.renderToBuffer(config);
 }
 
-// ─── generateAnalysisPrompt ──────────────────────────────────────────────────
 export function generateAnalysisPrompt(mots, corpus, from, to) {
-    return `Agis en tant qu'historien expert. Analyse l'évolution de la fréquence de "${mots.join(', ')}" dans le corpus "${CORPUS_LABELS[corpus] || corpus}" entre ${from || 'le début'} et ${to || 'la fin'}. 
+    return `Agis en tant qu'historien expert. Analyse l'évolution de la fréquence de "${mots.join(', ')}" dans le corpus "${getCleanCorpusLabel(corpus)}" entre ${from || 'le début'} et ${to || 'la fin'}. 
 Sur le graphique, les points représentent les données annuelles brutes et la ligne représente la tendance lissée. Identifie les événements historiques, culturels ou sociaux qui pourraient expliquer les pics ou les déclins observés.`;
 }

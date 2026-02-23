@@ -1,5 +1,6 @@
 // api/_lib/gallicagram.mjs
 import fetch from 'node-fetch';
+import 'canvas';
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import 'chartjs-adapter-date-fns'; // Requis pour l'axe temporel (mois)
 

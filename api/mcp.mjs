@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { generateChart, generateHistogram, generateTotalsChart, generateAnalysisPrompt, CORPUS_LABELS } from './_lib/gallicagram.mjs';
 import { uploadToS3 } from './_lib/s3.mjs';
+import { getContext } from './gallicagram-context.mjs';
 
 // Factory function to create a new server instance
 function createServer() {
@@ -12,7 +13,7 @@ function createServer() {
     });
 
     // Register Tools
-    
+
     // 1. TOOL PRINCIPAL : Graphique ligne/points avec fréquences (DEFAULT)
     server.registerTool(
         "gallicagram_chart",
@@ -250,6 +251,34 @@ function createServer() {
             return {
                 content: [{ type: "text", text: `Corpus disponibles:\n\n${list}` }]
             };
+        }
+    );
+
+    // 5. NOUVEAU TOOL : Contexte (extraits)
+    server.registerTool(
+        "gallicagram_context",
+        {
+            description: "Récupère le contexte (extraits de texte) d'un ngram donné pour une date donnée (année, mois ou jour) dans les corpus Gallica, Le Monde, Persée ou RAP. Utile pour comprendre comment un mot était utilisé à une période précise.",
+            inputSchema: z.object({
+                mot: z.string().describe("Le mot ou ngram à rechercher"),
+                date: z.string().describe("La date précise (ex: '1789', '1789-07', '1789-07-14')"),
+                corpus: z.string().default("presse").describe("Code du corpus (presse, livres, lemonde, persee, rap, etc.)"),
+                limit: z.number().default(5).describe("Nombre maximum d'occurrences à renvoyer (max 10)")
+            })
+        },
+        async ({ mot, date, corpus = "presse", limit = 5 }) => {
+            try {
+                const text = await getContext(mot, date, corpus, limit);
+                return {
+                    content: [{ type: "text", text }]
+                };
+            } catch (error) {
+                console.error('gallicagram_context error:', error);
+                return {
+                    content: [{ type: "text", text: `Erreur: ${error.message}` }],
+                    isError: true
+                };
+            }
         }
     );
 

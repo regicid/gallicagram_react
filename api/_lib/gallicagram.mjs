@@ -18,7 +18,7 @@ function tryRegisterFont(file, family, options = {}) {
 }
 
 tryRegisterFont('Poppins-Regular.ttf', 'Poppins');
-tryRegisterFont('Poppins-Bold.ttf',    'Poppins', { weight: 'bold' });
+tryRegisterFont('Poppins-Bold.ttf', 'Poppins', { weight: 'bold' });
 
 const FONT_FAMILY = 'Poppins';
 
@@ -45,36 +45,36 @@ function createCanvasInstance(width, height) {
         backgroundColour: 'white',
         chartCallback: (ChartJS) => {
             ChartJS.defaults.font.family = FONT_FAMILY;
-            ChartJS.defaults.font.size   = 22;
-            ChartJS.defaults.color       = '#444';
+            ChartJS.defaults.font.size = 22;
+            ChartJS.defaults.color = '#444';
             ChartJS.register(sourcePlugin);
         }
     });
 }
 
-const chartCanvas       = createCanvasInstance(2000, 1000);
+const chartCanvas = createCanvasInstance(2000, 1000);
 const chartCanvasTotals = createCanvasInstance(2000, 1200);
 
 export const CORPUS_LABELS = {
-    "lemonde":           "Le Monde (1944-2023)",
-    "presse":            "Presse Gallica (1789-1950)",
-    "livres":            "Livres Gallica (1600-1940)",
-    "persee":            "Persée (1789-2023)",
-    "ddb":               "Deutsches Zeitungsportal (1780-1950)",
-    "american_stories":  "American Stories (1798-1963)",
-    "paris":             "Journal de Paris (1777-1827)",
-    "moniteur":          "Moniteur Universel (1789-1869)",
-    "journal_des_debats":"Journal des Débats (1789-1944)",
-    "la_presse":         "La Presse (1836-1869)",
-    "constitutionnel":   "Le Constitutionnel (1821-1913)",
-    "figaro":            "Le Figaro (1854-1952)",
-    "temps":             "Le Temps (1861-1942)",
-    "petit_journal":     "Le Petit Journal (1863-1942)",
-    "petit_parisien":    "Le Petit Parisien (1876-1944)",
-    "huma":              "L'Humanité (1904-1952)",
-    "subtitles":         "Sous-titres de films (FR) (1935-2020)",
-    "subtitles_en":      "Sous-titres de films (EN) (1930-2020)",
-    "rap":               "Rap (Genius) (1989-2024)"
+    "lemonde": "Le Monde (1944-2023)",
+    "presse": "Presse Gallica (1789-1950)",
+    "livres": "Livres Gallica (1600-1940)",
+    "persee": "Persée (1789-2023)",
+    "ddb": "Deutsches Zeitungsportal (1780-1950)",
+    "american_stories": "American Stories (1798-1963)",
+    "paris": "Journal de Paris (1777-1827)",
+    "moniteur": "Moniteur Universel (1789-1869)",
+    "journal_des_debats": "Journal des Débats (1789-1944)",
+    "la_presse": "La Presse (1836-1869)",
+    "constitutionnel": "Le Constitutionnel (1821-1913)",
+    "figaro": "Le Figaro (1854-1952)",
+    "temps": "Le Temps (1861-1942)",
+    "petit_journal": "Le Petit Journal (1863-1942)",
+    "petit_parisien": "Le Petit Parisien (1876-1944)",
+    "huma": "L'Humanité (1904-1952)",
+    "subtitles": "Sous-titres de films (FR) (1935-2020)",
+    "subtitles_en": "Sous-titres de films (EN) (1930-2020)",
+    "rap": "Rap (Genius) (1989-2024)"
 };
 
 const CORPUS_MIN_RESOLUTION = {
@@ -88,15 +88,15 @@ const CORPUS_MIN_RESOLUTION = {
 };
 
 const COLORS = [
-    '#e6194b','#3cb44b','#4363d8','#f58231','#911eb4',
-    '#46f0f0','#f032e6','#bcf60c','#fabebe','#008080',
-    '#e6beff','#9a6324','#fffac8','#800000','#aaffc3',
-    '#808000','#ffd8b1','#000075','#808080','#000000',
-    '#ff6f61','#6b5b95','#88b04b','#f7cac9','#92a8d1',
-    '#955251','#b565a7','#009b77','#dd4124','#45b8ac'
+    '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+    '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080',
+    '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3',
+    '#808000', '#ffd8b1', '#000075', '#808080', '#000000',
+    '#ff6f61', '#6b5b95', '#88b04b', '#f7cac9', '#92a8d1',
+    '#955251', '#b565a7', '#009b77', '#dd4124', '#45b8ac'
 ];
 
-const MONTH_NAMES = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+const MONTH_NAMES = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
 function movingAverage(data, windowSize = 5) {
     if (windowSize <= 1) return [...data];
@@ -123,7 +123,7 @@ function getOptimalResolution(corpus, from_year, to_year) {
 }
 
 function getOptimalSmoothWindow(len) {
-    if (len <= 5)  return 1;
+    if (len <= 5) return 1;
     if (len <= 10) return 3;
     if (len <= 30) return 4;
     return 5;
@@ -171,50 +171,52 @@ async function fetchData(mot, corpus, from_year, to_year, resolution = null) {
     const finalResolution = resolution || getOptimalResolution(corpus, from_year, to_year);
     const params = new URLSearchParams({ mot, corpus, resolution: finalResolution });
     if (from_year) params.append('from', from_year);
-    if (to_year)   params.append('to', to_year);
+    if (to_year) params.append('to', to_year);
 
     const response = await fetch(`https://shiny.ens-paris-saclay.fr/guni/query?${params}`);
     if (!response.ok) throw new Error(`Erreur API Gallicagram : ${response.status}`);
     const text = await response.text();
     if (!text.trim()) return { data: [], resolution: finalResolution };
 
-    const lines     = text.trim().split('\n');
+    const lines = text.trim().split('\n');
     const delimiter = lines[0].includes(';') ? ';' : ',';
-    const headers   = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
+    const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
 
-    const yearIdx  = headers.findIndex(h => ['annee','year','année'].includes(h));
-    const monthIdx = headers.findIndex(h => ['mois','month'].includes(h));
-    const nIdx     = headers.findIndex(h => ['n','count','nombre'].includes(h));
-    const totalIdx = headers.findIndex(h => ['total','tot','sum'].includes(h));
+    const yearIdx = headers.findIndex(h => ['annee', 'year', 'année'].includes(h));
+    const monthIdx = headers.findIndex(h => ['mois', 'month'].includes(h));
+    const nIdx = headers.findIndex(h => ['n', 'count', 'nombre'].includes(h));
+    const totalIdx = headers.findIndex(h => ['total', 'tot', 'sum'].includes(h));
 
     const aggregated = new Map();
     for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(delimiter);
         if (parts.length <= Math.max(yearIdx, nIdx, totalIdx)) continue;
         const annee = parseInt(parts[yearIdx]);
-        const mois  = monthIdx >= 0 ? parseInt(parts[monthIdx]) : null;
-        const n     = parseFloat(parts[nIdx])     || 0;
+        const mois = monthIdx >= 0 ? parseInt(parts[monthIdx]) : null;
+        const n = parseFloat(parts[nIdx]) || 0;
         const total = parseFloat(parts[totalIdx]) || 0;
         if (!isNaN(annee) && total > 0) {
             const key = formatDate(annee, mois, finalResolution);
             if (!aggregated.has(key))
-                aggregated.set(key, { annee, mois, n: 0, total, date: key,
-                    dateDisplay: formatDateDisplay(annee, mois, finalResolution) });
+                aggregated.set(key, {
+                    annee, mois, n: 0, total, date: key,
+                    dateDisplay: formatDateDisplay(annee, mois, finalResolution)
+                });
             aggregated.get(key).n += n;
         }
     }
 
     const rows = Array.from(aggregated.values())
         .map(r => ({ ...r, frequency: r.n / r.total }))
-        .sort((a, b) => a.annee !== b.annee ? a.annee - b.annee : (a.mois||0) - (b.mois||0));
+        .sort((a, b) => a.annee !== b.annee ? a.annee - b.annee : (a.mois || 0) - (b.mois || 0));
 
     return { data: rows, resolution: finalResolution };
 }
 
 function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1,3),16);
-    const g = parseInt(hex.slice(3,5),16);
-    const b = parseInt(hex.slice(5,7),16);
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r},${g},${b},${alpha})`;
 }
 
@@ -270,6 +272,16 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
 
     if (datasets.length === 0) throw new Error('Aucune donnée trouvée');
 
+    // Calculer les bornes min/max pour l'axe X pour éviter les blancs
+    let minX = Infinity;
+    let maxX = -Infinity;
+    datasets.forEach(ds => {
+        ds.data.forEach(p => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+        });
+    });
+
     const _resolution = resolution;
 
     const config = {
@@ -306,6 +318,8 @@ export async function generateChart(mots, corpus, from_year, to_year, smooth = t
             scales: {
                 x: {
                     type: 'linear',
+                    min: minX,
+                    max: maxX,
                     grid: { color: '#eee', drawBorder: false },
                     ticks: {
                         font: { family: FONT_FAMILY, size: 22 },
@@ -399,8 +413,10 @@ export async function generateHistogram(mots, corpus, from_year, to_year) {
                     ticks: { font: { family: FONT_FAMILY, size: 22 }, color: '#555', maxTicksLimit: 20 }
                 },
                 y: {
-                    title: { display: true, text: "Nombre d'occurrences (n)",
-                        font: { size: 28, family: FONT_FAMILY, weight: 'bold' }, color: '#666' },
+                    title: {
+                        display: true, text: "Nombre d'occurrences (n)",
+                        font: { size: 28, family: FONT_FAMILY, weight: 'bold' }, color: '#666'
+                    },
                     beginAtZero: true,
                     ticks: { font: { family: FONT_FAMILY, size: 22 }, color: '#555' }
                 }
@@ -450,8 +466,10 @@ export async function generateTotalsChart(mots, corpus, from_year, to_year) {
             },
             scales: {
                 x: {
-                    title: { display: true, text: "Nombre total d'occurrences",
-                        font: { size: 28, family: FONT_FAMILY, weight: 'bold' }, color: '#666' },
+                    title: {
+                        display: true, text: "Nombre total d'occurrences",
+                        font: { size: 28, family: FONT_FAMILY, weight: 'bold' }, color: '#666'
+                    },
                     beginAtZero: true,
                     grid: { color: '#eee', drawBorder: false },
                     ticks: { font: { family: FONT_FAMILY, size: 22 }, color: '#555' }

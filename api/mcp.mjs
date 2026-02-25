@@ -258,7 +258,7 @@ function createServer() {
     server.registerTool(
         "gallicagram_context",
         {
-            description: "Récupère le contexte (extraits de texte) d'un ngram pour une date donnée. Corpus : Gallica (presse, livres, paris, moniteur, journal_des_debats, la_presse, constitutionnel, figaro, temps, petit_journal, petit_parisien, huma), Le Monde (lemonde), Persée (persee), Rap (rap).",
+            description: "Récupère le contexte (extraits de texte) d'un ngram pour une date donnée. Corpus : Gallica (presse, livres, paris, moniteur, journal_des_debats, la_presse, constitutionnel, figaro, temps, petit_journal, petit_parisien, huma), Rap (rap).",
             inputSchema: z.object({
                 mot: z.string().describe("Le mot ou ngram à rechercher"),
                 date: z.string().describe("La date précise (ex: '1789', '1789-07', '1789-07-14')"),

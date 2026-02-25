@@ -5,7 +5,7 @@ const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 /**
- * Custom fetch with User-Agent to avoid being blocked.
+ * Custom fetch with User-Agent.
  */
 async function customFetch(url) {
     const res = await fetch(url, {
@@ -31,6 +31,7 @@ function parseDate(dateStr) {
 async function fetchGallicaContext(mot, date, corpus, limit) {
     const { year, month, day } = parseDate(date);
 
+    // Helper to wrap multi-word terms in quotes
     const processedMot = mot.trim().split(' ').length > 1 ? `"${mot.trim()}"` : mot.trim();
     const finalMot = processedMot.replace(/’/g, "'");
 
@@ -124,96 +125,6 @@ async function fetchGallicaContext(mot, date, corpus, limit) {
 }
 
 /**
- * Fetches context from Le Monde.
- */
-async function fetchLeMondeContext(mot, date, limit) {
-    const year = date.split('-')[0];
-    const queryParams = `?search_keywords=${encodeURIComponent(mot)}&page_recherche=1&start_at=01/01/${year}&end_at=31/12/${year}`;
-    const fetchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
-
-    const res = await customFetch(fetchUrl);
-    if (!res.ok) throw new Error(`Failed to fetch Le Monde (${res.status})`);
-    const html = await res.text();
-
-    const results = [];
-    // Even more robust regex for Le Monde teasers
-    const teaserRegex = /<section[^>]*class="teaser[^"]*"[^>]*>([\s\S]*?)<\/section>/g;
-    let match;
-    let count = 0;
-
-    while ((match = teaserRegex.exec(html)) !== null && count < limit) {
-        const content = match[1];
-        const titleMatch = /<h3[^>]*class="teaser__title"[^>]*>([\s\S]*?)<\/h3>/.exec(content);
-        const linkMatch = /<a[^>]*class="teaser__link"[^>]*href="([^"]+)"/.exec(content);
-        const descMatch = /<p[^>]*class="teaser__desc"[^>]*>([\s\S]*?)<\/p>/.exec(content);
-        const dateMatch = /<span[^>]*class="meta__date"[^>]*>([\s\S]*?)<\/span>/.exec(content);
-
-        if (titleMatch && linkMatch) {
-            results.push({
-                title: titleMatch[1].replace(/<[^>]+>/g, '').trim(),
-                href: linkMatch[1],
-                description: descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : '',
-                date: dateMatch ? dateMatch[1].replace(/<[^>]+>/g, '').trim() : ''
-            });
-            count++;
-        }
-    }
-
-    if (results.length === 0) {
-        if (html.includes('Captcha') || html.includes('captcha')) {
-            throw new Error("Accès bloqué par un Captcha Le Monde. Impossible de scraper les résultats.");
-        }
-        return `Aucun résultat trouvé dans Le Monde pour "${mot}" en ${year}.`;
-    }
-
-    return results.map(r =>
-        `### [${r.title}](${r.href})\n**Date:** ${r.date}\n\n${r.description}`
-    ).join('\n\n---\n\n');
-}
-
-/**
- * Fetches context from Persée.
- */
-async function fetchPerseeContext(mot, date, limit) {
-    const year = date.split('-')[0];
-    const queryParams = `?l=fre&da=${year}&q=%22${encodeURIComponent(mot)}%22`;
-    const fetchUrl = `https://www.persee.fr/search${queryParams}`;
-
-    const res = await customFetch(fetchUrl);
-    if (!res.ok) throw new Error(`Failed to fetch Persée (${res.status})`);
-    const html = await res.text();
-
-    const results = [];
-    // Persée usually has doc-result div
-    const docRegex = /<div[^>]*class="doc-result[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/g;
-    let match;
-    let count = 0;
-
-    while ((match = docRegex.exec(html)) !== null && count < limit) {
-        const content = match[1];
-        const titleMatch = /<a[^>]*class="title[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(content);
-        const authorMatch = /<span[^>]*class="name"[^>]*>([\s\S]*?)<\/span>/.exec(content);
-        const snipMatch = /<div[^>]*class="searchContext"[^>]*>([\s\S]*?)<\/div>/.exec(content);
-
-        if (titleMatch) {
-            results.push({
-                title: titleMatch[2].replace(/<[^>]+>/g, '').trim(),
-                href: 'https://www.persee.fr' + titleMatch[1],
-                author: authorMatch ? authorMatch[1].replace(/<[^>]+>/g, '').trim() : '',
-                snippet: snipMatch ? snipMatch[1].replace(/<[^>]+>/g, '').replace(/<span class="highlight">/g, '**').replace(/<\/span>/g, '**').trim() : ''
-            });
-            count++;
-        }
-    }
-
-    if (results.length === 0) return `Aucun résultat trouvé dans Persée pour "${mot}" en ${year}.`;
-
-    return results.map(r =>
-        `### [${r.title}](${r.href})\n**Auteur:** ${r.author}\n\n${r.snippet}`
-    ).join('\n\n---\n\n');
-}
-
-/**
  * Fetches context from RAP.
  */
 async function fetchRapContext(mot, date, limit) {
@@ -248,13 +159,10 @@ async function fetchRapContext(mot, date, limit) {
  * Main function to get context for any corpus.
  */
 export async function getContext(mot, date, corpus, limit = 5) {
-    if (corpus === 'lemonde' || corpus === 'lemonde_rubriques') {
-        return await fetchLeMondeContext(mot, date, limit);
-    } else if (corpus === 'persee' || corpus === 'route à part (query_persee)') {
-        return await fetchPerseeContext(mot, date, limit);
-    } else if (corpus === 'rap') {
+    if (corpus === 'rap') {
         return await fetchRapContext(mot, date, limit);
     } else {
+        // Assume Gallica-like corpus
         return await fetchGallicaContext(mot, date, corpus, limit);
     }
 }

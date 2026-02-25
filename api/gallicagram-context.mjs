@@ -2,6 +2,17 @@ import fetch from 'node-fetch';
 import Papa from 'papaparse';
 
 const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+/**
+ * Custom fetch with User-Agent to avoid being blocked.
+ */
+async function customFetch(url) {
+    const res = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT }
+    });
+    return res;
+}
 
 /**
  * Parses a date string into year, month, and day components.
@@ -20,7 +31,6 @@ function parseDate(dateStr) {
 async function fetchGallicaContext(mot, date, corpus, limit) {
     const { year, month, day } = parseDate(date);
 
-    // Helper to wrap multi-word terms in quotes (mimic Occurrence.js)
     const processedMot = mot.trim().split(' ').length > 1 ? `"${mot.trim()}"` : mot.trim();
     const finalMot = processedMot.replace(/’/g, "'");
 
@@ -42,8 +52,16 @@ async function fetchGallicaContext(mot, date, corpus, limit) {
     const corpusConfigs = {
         "presse": { filter: { source: "periodical" } },
         "livres": { filter: { source: "book" } },
-        "journal_des_debats": { filter: { source: "periodical", code: "cb327986871" } },
-        "moniteur": { filter: { source: "periodical", code: "cb344019391" } }
+        "paris": { filter: { source: "periodical", codes: "cb327986698" } },
+        "moniteur": { filter: { source: "periodical", codes: "cb34452336z" } },
+        "journal_des_debats": { filter: { source: "periodical", codes: "cb39294634r" } },
+        "la_presse": { filter: { source: "periodical", codes: "cb34448033b" } },
+        "constitutionnel": { filter: { source: "periodical", codes: "cb32747578p" } },
+        "figaro": { filter: { source: "periodical", codes: "cb34355551z" } },
+        "temps": { filter: { source: "periodical", codes: "cb34431794k" } },
+        "petit_journal": { filter: { source: "periodical", codes: "cb32895690j" } },
+        "petit_parisien": { filter: { source: "periodical", codes: "cb34419111x" } },
+        "huma": { filter: { source: "periodical", codes: "cb327877302" } }
     };
 
     const config = corpusConfigs[corpus];
@@ -52,7 +70,7 @@ async function fetchGallicaContext(mot, date, corpus, limit) {
     }
 
     const occUrl = `${GALLICA_PROXY_API_URL}/api/occurrences_no_context?${params.toString()}`;
-    const occRes = await fetch(occUrl);
+    const occRes = await customFetch(occUrl);
     if (!occRes.ok) throw new Error(`Erreur API occurrences: ${occRes.status}`);
     const occData = await occRes.json();
 
@@ -69,7 +87,6 @@ async function fetchGallicaContext(mot, date, corpus, limit) {
                 terms: finalMot
             });
 
-            // Use exact date from record if available for context accuracy
             const recordDate = new Date(record.date);
             if (!isNaN(recordDate.getTime())) {
                 contextParams.append('month', recordDate.getMonth() + 1);
@@ -86,7 +103,7 @@ async function fetchGallicaContext(mot, date, corpus, limit) {
             }
 
             const contextUrl = `${GALLICA_PROXY_API_URL}/api/context?${contextParams.toString()}`;
-            const contextRes = await fetch(contextUrl);
+            const contextRes = await customFetch(contextUrl);
             if (contextRes.ok) {
                 const contextData = await contextRes.json();
                 results.push({
@@ -107,19 +124,19 @@ async function fetchGallicaContext(mot, date, corpus, limit) {
 }
 
 /**
- * Fetches context from Le Monde by scraping their search page.
+ * Fetches context from Le Monde.
  */
 async function fetchLeMondeContext(mot, date, limit) {
     const year = date.split('-')[0];
     const queryParams = `?search_keywords=${encodeURIComponent(mot)}&page_recherche=1&start_at=01/01/${year}&end_at=31/12/${year}`;
     const fetchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
 
-    const res = await fetch(fetchUrl);
-    if (!res.ok) throw new Error('Failed to fetch Le Monde content');
+    const res = await customFetch(fetchUrl);
+    if (!res.ok) throw new Error(`Failed to fetch Le Monde (${res.status})`);
     const html = await res.text();
 
     const results = [];
-    // More robust regex for Le Monde teasers
+    // Even more robust regex for Le Monde teasers
     const teaserRegex = /<section[^>]*class="teaser[^"]*"[^>]*>([\s\S]*?)<\/section>/g;
     let match;
     let count = 0;
@@ -142,7 +159,12 @@ async function fetchLeMondeContext(mot, date, limit) {
         }
     }
 
-    if (results.length === 0) return `Aucun résultat trouvé dans Le Monde pour "${mot}" en ${year}.`;
+    if (results.length === 0) {
+        if (html.includes('Captcha') || html.includes('captcha')) {
+            throw new Error("Accès bloqué par un Captcha Le Monde. Impossible de scraper les résultats.");
+        }
+        return `Aucun résultat trouvé dans Le Monde pour "${mot}" en ${year}.`;
+    }
 
     return results.map(r =>
         `### [${r.title}](${r.href})\n**Date:** ${r.date}\n\n${r.description}`
@@ -157,12 +179,12 @@ async function fetchPerseeContext(mot, date, limit) {
     const queryParams = `?l=fre&da=${year}&q=%22${encodeURIComponent(mot)}%22`;
     const fetchUrl = `https://www.persee.fr/search${queryParams}`;
 
-    const res = await fetch(fetchUrl);
-    if (!res.ok) throw new Error('Failed to fetch Persée content');
+    const res = await customFetch(fetchUrl);
+    if (!res.ok) throw new Error(`Failed to fetch Persée (${res.status})`);
     const html = await res.text();
 
     const results = [];
-    // Persée uses div.doc-result
+    // Persée usually has doc-result div
     const docRegex = /<div[^>]*class="doc-result[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/g;
     let match;
     let count = 0;
@@ -198,8 +220,8 @@ async function fetchRapContext(mot, date, limit) {
     const year = date.split('-')[0];
     const url = `${GALLICA_PROXY_API_URL}/source_rap?mot=${encodeURIComponent(mot.replace(/’/g, "'"))}&year=${year}`;
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to fetch Rap data');
+    const res = await customFetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch Rap data (${res.status})`);
     const csvText = await res.text();
 
     const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
@@ -217,7 +239,8 @@ async function fetchRapContext(mot, date, limit) {
             const m = url.match(/href=['"]([^'"]+)['"]/);
             url = m ? m[1] : '#';
         }
-        return `### [${row.title || row.titre || 'Sans titre'}](${url})\n**Artiste:** ${row.artist || row.artiste || 'Inconnu'}\n**Album:** ${row.album || '-'}\n**Occurrences:** ${row.counts}`;
+        const snippet = `${row.context_left || ''} **${row.pivot || mot}** ${row.context_right || ''}`.trim();
+        return `### [${row.title || row.titre || 'Sans titre'}](${url})\n**Artiste:** ${row.artist || row.artiste || 'Inconnu'}\n**Album:** ${row.album || '-'}\n**Occurrences:** ${row.counts}\n\n${snippet}`;
     }).join('\n\n---\n\n');
 }
 
@@ -232,7 +255,6 @@ export async function getContext(mot, date, corpus, limit = 5) {
     } else if (corpus === 'rap') {
         return await fetchRapContext(mot, date, limit);
     } else {
-        // Assume Gallica-like corpus (presse, livres, etc.)
         return await fetchGallicaContext(mot, date, corpus, limit);
     }
 }

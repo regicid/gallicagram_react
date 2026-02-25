@@ -329,9 +329,6 @@ function MCPPage() {
                         >
                             Gallicagram MCP
                         </Typography>
-                        <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3, fontWeight: 500 }}>
-                            Model Context Protocol
-                        </Typography>
 
                         <Divider sx={{ mb: 3, opacity: 0.6 }} />
 
@@ -371,15 +368,6 @@ function MCPPage() {
                         }}>
                             {`{\n  "name": "gallicagram",\n  "url": "${MCP_URL}",\n  "transport": "streamable-http"\n}`}
                         </Box>
-
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(25, 118, 210, 0.02)', borderColor: 'rgba(25, 118, 210, 0.1)' }}>
-                            <Typography variant="body2" color="#455a64" sx={{ display: 'flex', alignItems: 'start' }}>
-                                <HelpOutlineIcon sx={{ fontSize: 18, mr: 1, mt: 0.2, color: '#1976d2' }} />
-                                <span>
-                                    Compatible avec <strong>Le Chat (Mistral)</strong>, <strong>Claude Desktop</strong> et tout client supportant <code>streamable-http</code>.
-                                </span>
-                            </Typography>
-                        </Paper>
                     </Paper>
                 </Grid>
 

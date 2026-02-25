@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Box, Typography, Paper, Container, Grid, Divider, Chip, List, ListItem,
-    ListItemText, ListItemIcon, Accordion, AccordionSummary, AccordionDetails
+    Box, Typography, Paper, Container, Grid, Divider,
+    Accordion, AccordionSummary, AccordionDetails,
+    TextField, Button, CircularProgress, Alert, Skeleton
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import IconButton from '@mui/material/IconButton';
@@ -9,15 +10,126 @@ import Tooltip from '@mui/material/Tooltip';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
-import HistoryIcon from '@mui/icons-material/History';
 import ListIcon from '@mui/icons-material/List';
 import DescriptionIcon from '@mui/icons-material/Description';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import HistoryIcon from '@mui/icons-material/History';
 
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-function ToolCard({ name, description, parameters, example, icon }) {
+const MCP_URL = 'https://www.gallicagram.com/api/mcp';
+
+const MCP_HEADERS = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json, text/event-stream',
+};
+
+async function mcpFetch(method, params = {}, id = 1) {
+    const response = await fetch(MCP_URL, {
+        method: 'POST',
+        headers: MCP_HEADERS,
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            method,
+            params,
+            id,
+        }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+
+    // Handle SSE / text-event-stream response
+    if (contentType.includes('text/event-stream')) {
+        const text = await response.text();
+        // SSE format: "event: message\ndata: {...}\n"
+        // Find the data line that follows an "event: message" block
+        const blocks = text.split('\n\n').filter(Boolean);
+        for (const block of blocks.reverse()) {
+            if (block.includes('event: message') || block.includes('event:message')) {
+                const dataLine = block.split('\n').find(l => l.startsWith('data:'));
+                if (dataLine) {
+                    return JSON.parse(dataLine.replace(/^data:\s*/, ''));
+                }
+            }
+        }
+        // Fallback: take the last data: line
+        const dataLines = text.split('\n').filter(l => l.startsWith('data:'));
+        if (!dataLines.length) throw new Error('Réponse SSE vide ou format inattendu');
+        return JSON.parse(dataLines[dataLines.length - 1].replace(/^data:\s*/, ''));
+    }
+
+    return response.json();
+}
+
+const getToolIcon = (name) => {
+    if (name.includes('chart')) return <ShowChartIcon color="primary" />;
+    if (name.includes('histogram') || name.includes('bar')) return <BarChartIcon color="primary" />;
+    if (name.includes('totals')) return <BarChartIcon sx={{ transform: 'rotate(90deg)', color: '#1976d2' }} />;
+    if (name.includes('context') || name.includes('text')) return <DescriptionIcon color="primary" />;
+    if (name.includes('list')) return <ListIcon color="primary" />;
+    return <HelpOutlineIcon color="primary" />;
+};
+
+function ToolCard({ tool, onExecute }) {
+    const { name, description, inputSchema } = tool;
+    const properties = inputSchema?.properties || {};
+    const required = inputSchema?.required || [];
+
+    const [params, setParams] = useState(() => {
+        const defaults = {};
+        Object.entries(properties).forEach(([key, value]) => {
+            if (value.default !== undefined) defaults[key] = String(value.default);
+        });
+        return defaults;
+    });
+
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState(null);
+    const [error, setError] = useState(null);
+
+    const handleParamChange = (pName, value) => {
+        setParams(prev => ({ ...prev, [pName]: value }));
+    };
+
+    const handleRun = async (e) => {
+        e.stopPropagation();
+        setLoading(true);
+        setError(null);
+        setResult(null);
+        try {
+            const cleanedArgs = {};
+            Object.entries(params).forEach(([key, value]) => {
+                const prop = properties[key];
+                if (!prop) { cleanedArgs[key] = value; return; }
+                if (prop.type === 'number' || prop.type === 'integer') {
+                    cleanedArgs[key] = parseFloat(value);
+                } else if (prop.type === 'boolean') {
+                    cleanedArgs[key] = value === 'true' || value === true;
+                } else {
+                    cleanedArgs[key] = value;
+                }
+            });
+
+            const data = await onExecute(name, cleanedArgs);
+            if (data.isError) {
+                setError(data.content?.[0]?.text || 'Une erreur est survenue');
+            } else {
+                setResult(data.content);
+            }
+        } catch (err) {
+            setError(err.message || "Erreur lors de l'exécution");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <Accordion
             elevation={0}
@@ -37,11 +149,7 @@ function ToolCard({ name, description, parameters, example, icon }) {
         >
             <AccordionSummary
                 expandIcon={<ExpandMoreIcon color="primary" />}
-                sx={{
-                    px: 3,
-                    py: 1,
-                    '& .MuiAccordionSummary-content': { alignItems: 'center' }
-                }}
+                sx={{ px: 3, py: 1, '& .MuiAccordionSummary-content': { alignItems: 'center' } }}
             >
                 <Box sx={{
                     p: 1.2,
@@ -51,14 +159,14 @@ function ToolCard({ name, description, parameters, example, icon }) {
                     display: 'flex',
                     color: '#1976d2'
                 }}>
-                    {React.cloneElement(icon, { sx: { fontSize: 24 } })}
+                    {getToolIcon(name)}
                 </Box>
-                <Box>
+                <Box sx={{ flexGrow: 1 }}>
                     <Typography variant="subtitle1" component="div" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#1a237e' }}>
                         {name}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                        {description.substring(0, 60)}...
+                        {description?.substring(0, 80)}...
                     </Typography>
                 </Box>
             </AccordionSummary>
@@ -69,47 +177,85 @@ function ToolCard({ name, description, parameters, example, icon }) {
                 </Typography>
 
                 <Typography variant="subtitle2" gutterBottom fontWeight="700" sx={{ color: '#546e7a', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', mt: 2 }}>
-                    Paramètres
+                    Arguments
                 </Typography>
                 <Box sx={{ mb: 2.5 }}>
-                    {parameters.length > 0 ? (
-                        parameters.map((param, index) => (
-                            <Chip
-                                key={index}
-                                label={param}
-                                size="small"
-                                sx={{
-                                    mr: 0.5,
-                                    mb: 0.5,
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600,
-                                    bgcolor: 'rgba(0,0,0,0.04)',
-                                    border: '1px solid rgba(0,0,0,0.08)',
-                                    '& .MuiChip-label': { px: 1 }
-                                }}
-                            />
-                        ))
-                    ) : (
-                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>Aucun paramètre</Typography>
-                    )}
+                    <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                        {Object.entries(properties).map(([pName, prop], index) => {
+                            const isRequired = required.includes(pName);
+                            return (
+                                <Grid item xs={12} sm={6} key={index}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        label={pName + (isRequired ? ' *' : '')}
+                                        variant="outlined"
+                                        value={params[pName] || ''}
+                                        onChange={(e) => handleParamChange(pName, e.target.value)}
+                                        placeholder={prop.description || ''}
+                                        helperText={prop.description}
+                                        FormHelperTextProps={{ sx: { fontSize: '0.65rem' } }}
+                                        sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+                                    />
+                                </Grid>
+                            );
+                        })}
+                        {Object.keys(properties).length === 0 && (
+                            <Grid item xs={12}>
+                                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                                    Cet outil ne prend aucun argument.
+                                </Typography>
+                            </Grid>
+                        )}
+                    </Grid>
                 </Box>
 
-                <Typography variant="subtitle2" gutterBottom fontWeight="700" sx={{ color: '#546e7a', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
-                    Exemple
-                </Typography>
-                <Box component="pre" sx={{
-                    bgcolor: '#263238',
-                    color: '#eceff1',
-                    p: 2,
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    overflowX: 'auto',
-                    border: '1px solid #37474f',
-                    boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.2)',
-                    fontFamily: '"Fira Code", "Roboto Mono", monospace'
-                }}>
-                    {example}
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
+                        onClick={handleRun}
+                        disabled={loading}
+                        sx={{ borderRadius: '20px', px: 3, textTransform: 'none' }}
+                    >
+                        {loading ? 'Exécution...' : "Tester l'outil"}
+                    </Button>
                 </Box>
+
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>
+                )}
+
+                {result && (
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom fontWeight="700" sx={{ color: '#546e7a', textTransform: 'uppercase', fontSize: '0.7rem', mb: 1 }}>
+                            Résultat
+                        </Typography>
+                        <Box sx={{
+                            p: 2,
+                            bgcolor: '#f8f9fa',
+                            borderRadius: 2,
+                            border: '1px solid #e0e0e0',
+                            maxWidth: '100%',
+                            overflow: 'auto'
+                        }}>
+                            {result.map((item, idx) => {
+                                if (item.type === 'text') {
+                                    if (item.text.startsWith('http')) {
+                                        return <Box key={idx} component="img" src={item.text} sx={{ maxWidth: '100%', borderRadius: 1, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />;
+                                    }
+                                    return (
+                                        <Typography key={idx} variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                            {item.text}
+                                        </Typography>
+                                    );
+                                }
+                                return null;
+                            })}
+                        </Box>
+                    </Box>
+                )}
             </AccordionDetails>
         </Accordion>
     );
@@ -117,53 +263,35 @@ function ToolCard({ name, description, parameters, example, icon }) {
 
 function MCPPage() {
     const [copied, setCopied] = React.useState(false);
+    const [tools, setTools] = useState([]);
+    const [loadingTools, setLoadingTools] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
     const { t } = useTranslation();
-    const origin = window.location.origin;
-    const sseUrl = `${origin}/api/mcp`;
+
+    useEffect(() => {
+        mcpFetch('tools/list')
+            .then(data => {
+                if (data.error) throw new Error(data.error.message);
+                setTools(data.result?.tools || []);
+            })
+            .catch(err => {
+                console.error('Failed to fetch tools:', err);
+                setFetchError(err.message);
+            })
+            .finally(() => setLoadingTools(false));
+    }, []);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(sseUrl);
+        navigator.clipboard.writeText(MCP_URL);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const tools = [
-        {
-            name: "gallicagram_chart",
-            icon: <ShowChartIcon color="primary" />,
-            description: "Génère un graphique de fréquence lexicale (ligne + points) pour comparer l'évolution de mots dans le temps.",
-            parameters: ["mot (requis)", "corpus", "from_year", "to_year", "smooth"],
-            example: "Compare 'révolution' et 'liberté' dans le corpus 'presse' entre 1789 et 1815"
-        },
-        {
-            name: "gallicagram_histogram",
-            icon: <BarChartIcon color="primary" />,
-            description: "Génère un histogramme vertical montrant le nombre brut d'occurrences (n). Idéal pour les mots rares.",
-            parameters: ["mot (requis)", "corpus", "from_year", "to_year"],
-            example: "Affiche l'histogramme des occurrences du mot 'télégraphe' au XIXe siècle"
-        },
-        {
-            name: "gallicagram_totals",
-            icon: <BarChartIcon sx={{ transform: 'rotate(90deg)', color: '#1976d2' }} />,
-            description: "Génère un graphique à barres horizontales pour comparer la somme totale des occurrences de plusieurs mots.",
-            parameters: ["mot (requis)", "corpus", "from_year", "to_year"],
-            example: "Quels sont les totaux pour 'vélo', 'bicyclette' et 'automobile' entre 1880 et 1910 ?"
-        },
-        {
-            name: "gallicagram_context",
-            icon: <DescriptionIcon color="primary" />,
-            description: "Récupère des extraits de texte (contexte) autour d'un mot pour une date ou période précise.",
-            parameters: ["mot (requis)", "date (requis)", "corpus", "limit"],
-            example: "Donne-moi des extraits de presse contenant le mot 'Bastille' en juillet 1789"
-        },
-        {
-            name: "list_corpus",
-            icon: <ListIcon color="primary" />,
-            description: "Liste tous les corpus disponibles (presse, livres, lemonde, persee, rap, etc.).",
-            parameters: [],
-            example: "Quels sont les corpus disponibles ?"
-        }
-    ];
+    const callTool = async (toolName, args) => {
+        const data = await mcpFetch('tools/call', { name: toolName, arguments: args }, Date.now());
+        if (data.error) throw new Error(data.error.message || 'Erreur MCP');
+        return data.result;
+    };
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
@@ -174,6 +302,7 @@ function MCPPage() {
             </Box>
 
             <Grid container spacing={4}>
+                {/* Left panel */}
                 <Grid item xs={12} md={5}>
                     <Paper
                         elevation={0}
@@ -217,9 +346,9 @@ function MCPPage() {
                             </Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'white', p: 1, pl: 2, borderRadius: 2, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                                 <Typography variant="body2" sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.85rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {sseUrl}
+                                    {MCP_URL}
                                 </Typography>
-                                <Tooltip title={copied ? "Copié !" : "Copier"}>
+                                <Tooltip title={copied ? 'Copié !' : 'Copier'}>
                                     <IconButton onClick={handleCopy} size="small" sx={{ color: copied ? '#4caf50' : '#1976d2', ml: 1 }}>
                                         <ContentCopyIcon fontSize="small" sx={{ transform: copied ? 'scale(1.1)' : 'none', transition: 'all 0.3s' }} />
                                     </IconButton>
@@ -241,11 +370,7 @@ function MCPPage() {
                             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                             border: '1px solid #333'
                         }}>
-                            {`{
-  "name": "gallicagram",
-  "url": "${sseUrl}",
-  "transport": "streamable-http"
-}`}
+                            {`{\n  "name": "gallicagram",\n  "url": "${MCP_URL}",\n  "transport": "streamable-http"\n}`}
                         </Box>
 
                         <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(25, 118, 210, 0.02)', borderColor: 'rgba(25, 118, 210, 0.1)' }}>
@@ -259,66 +384,26 @@ function MCPPage() {
                     </Paper>
                 </Grid>
 
+                {/* Right panel — tools only */}
                 <Grid item xs={12} md={7}>
                     <Typography variant="h5" gutterBottom fontWeight="800" sx={{ mb: 3, color: '#1a237e', display: 'flex', alignItems: 'center' }}>
                         <ListIcon sx={{ mr: 1.5, color: '#1976d2' }} />
                         Outils disponibles
                     </Typography>
 
-                    <Box sx={{ mb: 6 }}>
-                        {tools.map((tool, index) => (
-                            <ToolCard key={index} {...tool} />
-                        ))}
-                    </Box>
-
-                    <Typography variant="h5" gutterBottom fontWeight="800" sx={{ mb: 3, color: '#1a237e', display: 'flex', alignItems: 'center' }}>
-                        <HistoryIcon sx={{ mr: 1.5, color: '#1976d2' }} />
-                        Corpus Principaux
-                    </Typography>
-
-                    <Paper elevation={0} sx={{ p: 1, borderRadius: 3, border: '1px solid #e0e6ed', bgcolor: '#fff' }}>
-                        <List disablePadding>
-                            {[
-                                { code: 'presse', label: 'Presse & Livres (Gallica)', desc: 'Plus de 150 milliards de mots du XVIIe au XXe siècle.' },
-                                { code: 'lemonde', label: 'Archives Le Monde', desc: 'Le quotidien de référence depuis 1944.' },
-                                { code: 'persee', label: 'Persée', desc: 'Revues scientifiques et académiques.' },
-                                { code: 'rap', label: 'Corpus Rap', desc: 'Paroles de rap français (1990-2024).' }
-                            ].map((c, i) => (
-                                <React.Fragment key={c.code}>
-                                    <ListItem alignItems="flex-start" sx={{ py: 2, px: 3, borderRadius: 2, '&:hover': { bgcolor: '#f8faff' } }}>
-                                        <ListItemText
-                                            primary={
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                                    <Box component="span" sx={{
-                                                        fontWeight: 'bold',
-                                                        fontFamily: 'monospace',
-                                                        bgcolor: '#e3f2fd',
-                                                        color: '#1976d2',
-                                                        px: 1,
-                                                        py: 0.3,
-                                                        borderRadius: 1,
-                                                        mr: 2,
-                                                        fontSize: '0.85rem'
-                                                    }}>
-                                                        {c.code}
-                                                    </Box>
-                                                    <Typography component="span" variant="subtitle2" sx={{ fontWeight: 700, color: '#1a237e' }}>
-                                                        {c.label}
-                                                    </Typography>
-                                                </Box>
-                                            }
-                                            secondary={
-                                                <Typography variant="body2" color="text.secondary">
-                                                    {c.desc}
-                                                </Typography>
-                                            }
-                                        />
-                                    </ListItem>
-                                    {i < 3 && <Divider component="li" sx={{ mx: 2, opacity: 0.5 }} />}
-                                </React.Fragment>
-                            ))}
-                        </List>
-                    </Paper>
+                    {loadingTools ? (
+                        [1, 2, 3].map(i => (
+                            <Skeleton key={i} variant="rectangular" height={80} sx={{ mb: 2, borderRadius: 3 }} />
+                        ))
+                    ) : fetchError ? (
+                        <Alert severity="error">
+                            Impossible de charger la liste des outils : {fetchError}
+                        </Alert>
+                    ) : (
+                        tools.map((tool, index) => (
+                            <ToolCard key={index} tool={tool} onExecute={callTool} />
+                        ))
+                    )}
                 </Grid>
             </Grid>
         </Container>

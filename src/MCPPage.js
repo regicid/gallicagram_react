@@ -14,7 +14,6 @@ import ListIcon from '@mui/icons-material/List';
 import DescriptionIcon from '@mui/icons-material/Description';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import HistoryIcon from '@mui/icons-material/History';
 
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';

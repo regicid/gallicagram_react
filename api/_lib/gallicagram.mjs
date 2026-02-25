@@ -103,12 +103,10 @@ function movingAverage(data, windowSize = 5) {
     const result = [];
     const half = Math.floor(windowSize / 2);
     for (let i = 0; i < data.length; i++) {
-        if (i < half || i >= data.length - half) {
-            result.push(data[i]);
-        } else {
-            const slice = data.slice(i - half, i + half + 1);
-            result.push(slice.reduce((a, b) => a + b, 0) / slice.length);
-        }
+        const start = Math.max(0, i - half);
+        const end = Math.min(data.length, i + half + 1);
+        const slice = data.slice(start, end);
+        result.push(slice.reduce((a, b) => a + b, 0) / slice.length);
     }
     return result;
 }

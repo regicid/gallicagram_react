@@ -1,5 +1,8 @@
 import React from 'react';
-import { Box, Typography, Paper, Container, Grid, Divider, Chip, List, ListItem, ListItemText, ListItemIcon } from '@mui/material';
+import {
+    Box, Typography, Paper, Container, Grid, Divider, Chip, List, ListItem,
+    ListItemText, ListItemIcon, Accordion, AccordionSummary, AccordionDetails
+} from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
@@ -9,37 +12,106 @@ import ShowChartIcon from '@mui/icons-material/ShowChart';
 import HistoryIcon from '@mui/icons-material/History';
 import ListIcon from '@mui/icons-material/List';
 import DescriptionIcon from '@mui/icons-material/Description';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 function ToolCard({ name, description, parameters, example, icon }) {
     return (
-        <Paper elevation={1} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid #eee', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: 4 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <Box sx={{ p: 1, bgcolor: '#e3f2fd', borderRadius: 1, mr: 2, display: 'flex' }}>
-                    {icon}
+        <Accordion
+            elevation={0}
+            sx={{
+                mb: 2,
+                borderRadius: '12px !important',
+                border: '1px solid #e0e6ed',
+                overflow: 'hidden',
+                '&:before': { display: 'none' },
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                    borderColor: '#1976d2',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                    transform: 'translateY(-2px)'
+                }
+            }}
+        >
+            <AccordionSummary
+                expandIcon={<ExpandMoreIcon color="primary" />}
+                sx={{
+                    px: 3,
+                    py: 1,
+                    '& .MuiAccordionSummary-content': { alignItems: 'center' }
+                }}
+            >
+                <Box sx={{
+                    p: 1.2,
+                    bgcolor: 'rgba(25, 118, 210, 0.08)',
+                    borderRadius: '10px',
+                    mr: 2,
+                    display: 'flex',
+                    color: '#1976d2'
+                }}>
+                    {React.cloneElement(icon, { sx: { fontSize: 24 } })}
                 </Box>
-                <Typography variant="h6" component="div" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#1976d2' }}>
-                    {name}
+                <Box>
+                    <Typography variant="subtitle1" component="div" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#1a237e' }}>
+                        {name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        {description.substring(0, 60)}...
+                    </Typography>
+                </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ px: 3, pb: 3, pt: 0 }}>
+                <Divider sx={{ mb: 2, opacity: 0.6 }} />
+                <Typography variant="body2" color="text.secondary" paragraph sx={{ lineHeight: 1.6 }}>
+                    {description}
                 </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" paragraph>
-                {description}
-            </Typography>
 
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">Paramètres :</Typography>
-            <Box sx={{ mb: 2 }}>
-                {parameters.map((param, index) => (
-                    <Chip key={index} label={param} size="small" sx={{ mr: 0.5, mb: 0.5, fontSize: '0.75rem' }} />
-                ))}
-            </Box>
+                <Typography variant="subtitle2" gutterBottom fontWeight="700" sx={{ color: '#546e7a', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', mt: 2 }}>
+                    Paramètres
+                </Typography>
+                <Box sx={{ mb: 2.5 }}>
+                    {parameters.length > 0 ? (
+                        parameters.map((param, index) => (
+                            <Chip
+                                key={index}
+                                label={param}
+                                size="small"
+                                sx={{
+                                    mr: 0.5,
+                                    mb: 0.5,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    bgcolor: 'rgba(0,0,0,0.04)',
+                                    border: '1px solid rgba(0,0,0,0.08)',
+                                    '& .MuiChip-label': { px: 1 }
+                                }}
+                            />
+                        ))
+                    ) : (
+                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>Aucun paramètre</Typography>
+                    )}
+                </Box>
 
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">Exemple :</Typography>
-            <Box component="pre" sx={{ bgcolor: '#f8f9fa', p: 1.5, borderRadius: 1, fontSize: '0.85rem', overflowX: 'auto', border: '1px solid #e0e0e0' }}>
-                {example}
-            </Box>
-        </Paper>
+                <Typography variant="subtitle2" gutterBottom fontWeight="700" sx={{ color: '#546e7a', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+                    Exemple
+                </Typography>
+                <Box component="pre" sx={{
+                    bgcolor: '#263238',
+                    color: '#eceff1',
+                    p: 2,
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    overflowX: 'auto',
+                    border: '1px solid #37474f',
+                    boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.2)',
+                    fontFamily: '"Fira Code", "Roboto Mono", monospace'
+                }}>
+                    {example}
+                </Box>
+            </AccordionDetails>
+        </Accordion>
     );
 }
 
@@ -103,37 +175,72 @@ function MCPPage() {
 
             <Grid container spacing={4}>
                 <Grid item xs={12} md={5}>
-                    <Paper elevation={3} sx={{ p: 4, borderRadius: 3, position: 'sticky', top: 24 }}>
-                        <Typography variant="h4" component="h1" gutterBottom fontWeight="bold" sx={{ color: '#1976d2' }}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 4,
+                            borderRadius: 4,
+                            position: 'sticky',
+                            top: 24,
+                            background: 'linear-gradient(135deg, #ffffff 0%, #f8faff 100%)',
+                            border: '1px solid #e3f2fd',
+                            boxShadow: '0 10px 40px rgba(25, 118, 210, 0.05)'
+                        }}
+                    >
+                        <Typography
+                            variant="h4"
+                            component="h1"
+                            gutterBottom
+                            fontWeight="800"
+                            sx={{
+                                background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                mb: 1
+                            }}
+                        >
                             Gallicagram MCP
                         </Typography>
-                        <Divider sx={{ mb: 3 }} />
-
-                        <Typography variant="body1" paragraph>
-                            Utilisez toute la puissance de Gallicagram directement dans vos assistants IA (Mistral, Claude, ChatGPT via client MCP).
+                        <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3, fontWeight: 500 }}>
+                            Model Context Protocol
                         </Typography>
 
-                        <Box sx={{ my: 4, p: 3, bgcolor: '#f5f7fa', borderRadius: 2, border: '1px solid #e0e6ed' }}>
-                            <Typography variant="subtitle2" gutterBottom fontWeight="bold" color="text.secondary">
-                                URL DU SERVEUR (HTTP SSE)
+                        <Divider sx={{ mb: 3, opacity: 0.6 }} />
+
+                        <Typography variant="body1" paragraph sx={{ color: '#455a64', lineHeight: 1.7 }}>
+                            Intégrez Gallicagram dans vos assistants IA (Mistral, Claude, etc.) pour des analyses historiques et linguistiques sans quitter votre chat.
+                        </Typography>
+
+                        <Box sx={{ my: 4, p: 3, bgcolor: '#f1f5f9', borderRadius: 3, border: '1px solid #e2e8f0' }}>
+                            <Typography variant="subtitle2" gutterBottom fontWeight="700" color="#64748b" sx={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                URL DU SERVEUR
                             </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'white', p: 1.5, borderRadius: 1.5, border: '1px solid #ced4da' }}>
-                                <Typography variant="body2" sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'white', p: 1, pl: 2, borderRadius: 2, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                <Typography variant="body2" sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.85rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {sseUrl}
                                 </Typography>
-                                <Tooltip title={copied ? "Copié !" : "Copier l'URL"}>
-                                    <IconButton onClick={handleCopy} size="small" color="primary">
-                                        <HistoryIcon sx={{ transform: copied ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s' }} />
-                                        <ContentCopyIcon fontSize="small" />
+                                <Tooltip title={copied ? "Copié !" : "Copier"}>
+                                    <IconButton onClick={handleCopy} size="small" sx={{ color: copied ? '#4caf50' : '#1976d2', ml: 1 }}>
+                                        <ContentCopyIcon fontSize="small" sx={{ transform: copied ? 'scale(1.1)' : 'none', transition: 'all 0.3s' }} />
                                     </IconButton>
                                 </Tooltip>
                             </Box>
                         </Box>
 
-                        <Typography variant="h6" gutterBottom fontWeight="bold">
-                            Configuration du client
+                        <Typography variant="subtitle2" gutterBottom fontWeight="700" sx={{ color: '#546e7a', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+                            Configuration (JSON)
                         </Typography>
-                        <Box component="pre" sx={{ bgcolor: '#212529', color: '#f8f9fa', p: 2, borderRadius: 2, fontSize: '0.8rem', overflowX: 'auto', mb: 3 }}>
+                        <Box component="pre" sx={{
+                            bgcolor: '#1e1e1e',
+                            color: '#e0e0e0',
+                            p: 2.5,
+                            borderRadius: 3,
+                            fontSize: '0.8rem',
+                            overflowX: 'auto',
+                            mb: 3,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                            border: '1px solid #333'
+                        }}>
                             {`{
   "name": "gallicagram",
   "url": "${sseUrl}",
@@ -141,29 +248,35 @@ function MCPPage() {
 }`}
                         </Box>
 
-                        <Typography variant="body2" color="text.secondary">
-                            <HelpOutlineIcon sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
-                            Compatible avec <strong>Le Chat (Mistral)</strong>, <strong>Claude Desktop</strong> et tout client supportant le transport <code>streamable-http</code>.
-                        </Typography>
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(25, 118, 210, 0.02)', borderColor: 'rgba(25, 118, 210, 0.1)' }}>
+                            <Typography variant="body2" color="#455a64" sx={{ display: 'flex', alignItems: 'start' }}>
+                                <HelpOutlineIcon sx={{ fontSize: 18, mr: 1, mt: 0.2, color: '#1976d2' }} />
+                                <span>
+                                    Compatible avec <strong>Le Chat (Mistral)</strong>, <strong>Claude Desktop</strong> et tout client supportant <code>streamable-http</code>.
+                                </span>
+                            </Typography>
+                        </Paper>
                     </Paper>
                 </Grid>
 
                 <Grid item xs={12} md={7}>
-                    <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}><ListIcon color="primary" /></ListItemIcon>
+                    <Typography variant="h5" gutterBottom fontWeight="800" sx={{ mb: 3, color: '#1a237e', display: 'flex', alignItems: 'center' }}>
+                        <ListIcon sx={{ mr: 1.5, color: '#1976d2' }} />
                         Outils disponibles
                     </Typography>
 
-                    {tools.map((tool, index) => (
-                        <ToolCard key={index} {...tool} />
-                    ))}
+                    <Box sx={{ mb: 6 }}>
+                        {tools.map((tool, index) => (
+                            <ToolCard key={index} {...tool} />
+                        ))}
+                    </Box>
 
-                    <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ mt: 6, mb: 3, display: 'flex', alignItems: 'center' }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}><HistoryIcon color="primary" /></ListItemIcon>
+                    <Typography variant="h5" gutterBottom fontWeight="800" sx={{ mb: 3, color: '#1a237e', display: 'flex', alignItems: 'center' }}>
+                        <HistoryIcon sx={{ mr: 1.5, color: '#1976d2' }} />
                         Corpus Principaux
                     </Typography>
 
-                    <Paper elevation={1} sx={{ p: 0, borderRadius: 2, overflow: 'hidden', border: '1px solid #eee' }}>
+                    <Paper elevation={0} sx={{ p: 1, borderRadius: 3, border: '1px solid #e0e6ed', bgcolor: '#fff' }}>
                         <List disablePadding>
                             {[
                                 { code: 'presse', label: 'Presse & Livres (Gallica)', desc: 'Plus de 150 milliards de mots du XVIIe au XXe siècle.' },
@@ -172,18 +285,36 @@ function MCPPage() {
                                 { code: 'rap', label: 'Corpus Rap', desc: 'Paroles de rap français (1990-2024).' }
                             ].map((c, i) => (
                                 <React.Fragment key={c.code}>
-                                    <ListItem alignItems="flex-start" sx={{ py: 2 }}>
+                                    <ListItem alignItems="flex-start" sx={{ py: 2, px: 3, borderRadius: 2, '&:hover': { bgcolor: '#f8faff' } }}>
                                         <ListItemText
-                                            primary={<Box component="span" sx={{ fontWeight: 'bold', fontFamily: 'monospace', bgcolor: '#f0f0f0', px: 1, borderRadius: 1, mr: 1 }}>{c.code}</Box>}
-                                            secondary={
-                                                <Box component="span" sx={{ display: 'block' }}>
-                                                    <Typography component="span" variant="body2" color="text.primary" sx={{ fontWeight: 'bold' }}>{c.label}</Typography>
-                                                    {" — " + c.desc}
+                                            primary={
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                                    <Box component="span" sx={{
+                                                        fontWeight: 'bold',
+                                                        fontFamily: 'monospace',
+                                                        bgcolor: '#e3f2fd',
+                                                        color: '#1976d2',
+                                                        px: 1,
+                                                        py: 0.3,
+                                                        borderRadius: 1,
+                                                        mr: 2,
+                                                        fontSize: '0.85rem'
+                                                    }}>
+                                                        {c.code}
+                                                    </Box>
+                                                    <Typography component="span" variant="subtitle2" sx={{ fontWeight: 700, color: '#1a237e' }}>
+                                                        {c.label}
+                                                    </Typography>
                                                 </Box>
+                                            }
+                                            secondary={
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {c.desc}
+                                                </Typography>
                                             }
                                         />
                                     </ListItem>
-                                    {i < 3 && <Divider component="li" />}
+                                    {i < 3 && <Divider component="li" sx={{ mx: 2, opacity: 0.5 }} />}
                                 </React.Fragment>
                             ))}
                         </List>

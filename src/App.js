@@ -18,7 +18,7 @@ import { FingerprintSpinner } from 'react-epic-spinners';
 import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
 import AboutPage from "./AboutPage";
-import MCPPage from "./MCPPage";
+// import MCPPage from "./MCPPage";
 
 const theme = createTheme({
   typography: {

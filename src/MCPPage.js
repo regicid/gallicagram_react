@@ -267,6 +267,7 @@ function MCPPage() {
     const [fetchError, setFetchError] = useState(null);
     const { t } = useTranslation();
 
+    /*
     useEffect(() => {
         mcpFetch('tools/list')
             .then(data => {
@@ -279,6 +280,7 @@ function MCPPage() {
             })
             .finally(() => setLoadingTools(false));
     }, []);
+    */
 
     const handleCopy = () => {
         navigator.clipboard.writeText(MCP_URL);

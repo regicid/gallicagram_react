@@ -2017,7 +2017,7 @@ function App() {
       <Routes>
         <Route path="/swagger" element={<SwaggerPage />} />
         <Route path="/about_us" element={<AboutPage />} />
-        <Route path="/mcp" element={<MCPPage />} />
+        {/* <Route path="/mcp" element={<MCPPage />} /> */}
 
         <Route path="*" element={
           <>

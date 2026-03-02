@@ -305,8 +305,8 @@ export default async function handler(req, res) {
         });
 
         // Connect and handle the request
-        await server.connect(transport);
-        await transport.handleRequest(req, res, req.body);
+        // await server.connect(transport);
+        // await transport.handleRequest(req, res, req.body);
 
     } catch (error) {
         console.error('MCP handler error:', error);

@@ -221,6 +221,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       margin: { l: 45, r: 0, t: 40, b: 50 } // Reduce margins on mobile to use full width
     } : {}),
     ...plotlyTheme,
+    showlegend: true,
     legend: {
       font: {
         size: 16

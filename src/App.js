@@ -500,6 +500,11 @@ function App() {
       }
     });
 
+    // Build display word: "a x b" for cooccurrence modes
+    const displayWord = (query.searchMode === 'cooccurrence' || query.searchMode === 'cooccurrence_article') && query.word2
+      ? `${query.word} x ${query.word2}`
+      : query.word;
+
     return {
       x: processedData.map(d => d.x),
       y: yValues,
@@ -512,8 +517,8 @@ function App() {
       fill: plotType === 'area' ? 'tozeroy' : undefined,
       line: plotType === 'line' || plotType === 'area' ? { shape: 'spline' } : undefined,
       name: allSameCorpus
-        ? (query.word || `${t('Query')} ${query.id}`)
-        : `${query.word || `${t('Query')} ${query.id}`} (${corpusPeriods[query.corpus]?.name || query.corpus})`,
+        ? (displayWord || `${t('Query')} ${query.id}`)
+        : `${displayWord || `${t('Query')} ${query.id}`} (${corpusPeriods[query.corpus]?.name || query.corpus})`,
       connectgaps: false,
       meta: { responseIndex: index }
     };
@@ -540,12 +545,16 @@ function App() {
           } else {
             total = res.total || 0;
           }
+          // Build display word: "a x b" for cooccurrence modes
+          const displayWord = (res.query.searchMode === 'cooccurrence' || res.query.searchMode === 'cooccurrence_article') && res.query.word2
+            ? `${res.query.word} x ${res.query.word2}`
+            : res.query.word;
           const name = allSameCorpus
-            ? (res.query.word || `${t('Query')} ${res.query.id}`)
-            : `${res.query.word || `${t('Query')} ${res.query.id}`} (${corpusPeriods[res.query.corpus]?.name || res.query.corpus})`;
+            ? (displayWord || `${t('Query')} ${res.query.id}`)
+            : `${displayWord || `${t('Query')} ${res.query.id}`} (${corpusPeriods[res.query.corpus]?.name || res.query.corpus})`;
 
           return {
-            word: res.query.word || `${t('Query')} ${res.query.id}`,
+            word: displayWord || `${t('Query')} ${res.query.id}`,
             name: name,
             corpus: res.query.corpus,
             total: total

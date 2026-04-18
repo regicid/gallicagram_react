@@ -296,14 +296,16 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
             onChange={handleChange}
             fullWidth
           />
-          <TextField
-            label={t('Distance')}
-            name="distance"
-            type="number"
-            value={distance ?? ''}
-            onChange={handleChange}
-            sx={{ width: '150px' }}
-          />
+          {searchMode === 'cooccurrence' && (
+            <TextField
+              label={t('Distance')}
+              name="distance"
+              type="number"
+              value={distance ?? ''}
+              onChange={handleChange}
+              sx={{ width: '150px' }}
+            />
+          )}
         </div>
       )}
 

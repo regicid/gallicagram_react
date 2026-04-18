@@ -1926,7 +1926,7 @@ function App() {
         });
 
         // Legend
-        if (tracesToDraw.length > 1) {
+        if (tracesToDraw.length >= 1) {
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
           ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;

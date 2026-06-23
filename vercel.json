@@ -15,6 +15,10 @@
     {
       "source": "/api/sru",
       "destination": "https://gallica.bnf.fr/SRU"
+    },
+    {
+      "source": "/api/content-search",
+      "destination": "https://gallica.bnf.fr/services/ContentSearch"
     }
   ]
 }

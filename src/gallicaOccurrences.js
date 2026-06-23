@@ -63,9 +63,7 @@ export async function fetchOccurrencesNoContext({
     query: cql,
   });
 
-  const response = await fetch(`${SRU_PROXY_URL}?${params.toString()}`, {
-    headers: { Accept: 'application/xml, text/xml, */*' },
-  });
+  const response = await fetch(`${SRU_PROXY_URL}?${params.toString()}`);
   const xmlText = await response.text();
   if (!response.ok) {
     throw new Error(`Gallica SRU returned ${response.status}`);

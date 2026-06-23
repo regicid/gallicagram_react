@@ -29,9 +29,7 @@ export async function fetchContext({ ark, terms, url }) {
   params.append('ark', ark);
   terms.forEach((term) => params.append('query', term));
 
-  const response = await fetch(`${GALLICA_CONTENT_SEARCH_URL}?${params.toString()}`, {
-    headers: { Accept: 'application/xml, text/xml, */*' },
-  });
+  const response = await fetch(`${GALLICA_CONTENT_SEARCH_URL}?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`Gallica ContentSearch returned ${response.status}`);
   }

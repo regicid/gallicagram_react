@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@mui/material/Button';
-
-const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
+import { fetchContext } from './gallicaContext';
 
 const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
   const [context, setContext] = useState(null);
@@ -19,44 +18,16 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
     setError(null);
     try {
       const terms = ensureMultiWordIsWrapped(record.terms).map(term => term.split('+')[0]);
-      const params = new URLSearchParams({
+
+      // Fetch context directly from Gallica client-side (the server IP gets
+      // blocked by Gallica). Only ark, terms and url are needed by Gallica's
+      // ContentSearch service; the corpus/resolution params were ignored
+      // server-side too.
+      const data = await fetchContext({
         ark: record.ark,
+        terms,
         url: record.url,
       });
-      terms.forEach(term => params.append('terms', term));
-
-      // Handle resolution specific parameters (month, day)
-      if (resolution === 'mois' || resolution === 'jour') {
-        const dateObj = new Date(record.date);
-        if (!isNaN(dateObj.getTime())) {
-          params.append('month', dateObj.getMonth() + 1);
-          if (resolution === 'jour') {
-            params.append('day', dateObj.getDate());
-          }
-        }
-      }
-
-      // Add corpus specific filters if available
-      const config = corpusConfigs?.[corpus];
-      if (config && config.filter) {
-        const filterParams = new URLSearchParams(config.filter);
-        filterParams.forEach((value, key) => {
-          params.append(key, value);
-        });
-      } else if (corpus === 'livres') {
-        params.append('source', 'book');
-      } else if (['presse', 'journal_des_debats', 'moniteur'].includes(corpus)) {
-        if (!params.has('source')) {
-          params.append('source', 'periodical');
-        }
-      }
-
-      const response = await fetch(`${GALLICA_PROXY_API_URL}/api/context?${params.toString()}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail?.[0]?.msg || 'Failed to fetch context');
-      }
-      const data = await response.json();
       setContext(data);
     } catch (err) {
       setError(err.message);

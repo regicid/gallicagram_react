@@ -18,6 +18,7 @@ import { FingerprintSpinner } from 'react-epic-spinners';
 import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
 import AboutPage from "./AboutPage";
+import { fetchOccurrencesNoContext } from './gallicaOccurrences';
 // import MCPPage from "./MCPPage";
 
 const theme = createTheme({
@@ -773,38 +774,28 @@ function App() {
       return;
     }
 
-    const params = new URLSearchParams({
-      terms: query.word.split('+')[0].replace(/’/g, "'"),
-      year: date.getFullYear(),
-      limit: searchParams.limit,
-      cursor: searchParams.cursor,
-      sort: 'relevance'
-    });
-
-    // Add resolution specific parameters (month, day)
+    // Parse the corpus filter (e.g. "source=periodical&codes=cb327986698")
+    // into source / codes for the SRU CQL query.
+    const filter = new URLSearchParams(config.filter);
+    const source = filter.get('source') || undefined;
+    const codes = filter.get('codes') || undefined;
     const resolution = query.resolution;
-    if (resolution === 'mois' || resolution === 'jour') {
-      if (!isNaN(date.getTime())) {
-        params.append('month', date.getMonth() + 1); // getMonth is 0-indexed
-        if (resolution === 'jour') {
-          params.append('day', date.getDate());
-        }
-      }
-    }
-
-    if (config && config.filter) {
-      const filterParams = new URLSearchParams(config.filter);
-      filterParams.forEach((value, key) => {
-        params.append(key, value);
-      });
-    }
+    const month = (resolution === 'mois' || resolution === 'jour')
+      ? date.getMonth() + 1
+      : undefined;
+    // Note: day is intentionally ignored to match the server's date_params.
 
     try {
-      const response = await fetch(`${GALLICA_PROXY_API_URL}/api/occurrences_no_context?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch occurrences');
-      }
-      const data = await response.json();
+      const data = await fetchOccurrencesNoContext({
+        terms: query.word.split('+')[0].replace(/’/g, "'"),
+        year: date.getFullYear(),
+        month,
+        cursor: searchParams.cursor,
+        limit: searchParams.limit,
+        sort: 'relevance',
+        source,
+        codes,
+      });
       if (shouldAppend) {
         setOccurrences(prev => [...prev, ...data.records]);
       } else {

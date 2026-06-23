@@ -34,7 +34,7 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [record, corpus, corpusConfigs, resolution]);
+  }, [record]);
 
   useEffect(() => {
     performFetch();

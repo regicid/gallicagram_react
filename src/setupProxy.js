@@ -38,4 +38,14 @@ module.exports = function (app) {
       },
     })
   );
+  app.use(
+    '/api/content-search',
+    createProxyMiddleware({
+      target: 'https://gallica.bnf.fr',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/api/content-search': '/services/ContentSearch',
+      },
+    })
+  );
 };

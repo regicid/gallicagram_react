@@ -66,10 +66,18 @@ export async function fetchOccurrencesNoContext({
   const response = await fetch(`${SRU_PROXY_URL}?${params.toString()}`, {
     headers: { Accept: 'application/xml, text/xml, */*' },
   });
+  const xmlText = await response.text();
   if (!response.ok) {
     throw new Error(`Gallica SRU returned ${response.status}`);
   }
-  const xmlText = await response.text();
+  // Gallica is behind Cloudflare; if the proxy got challenged we receive an
+  // HTML interstitial ("Just a moment..." / "Attention Required") instead of
+  // XML. Detect that and surface a clear error rather than empty results.
+  if (xmlText.includes('Just a moment') || xmlText.includes('cf-challenge')
+      || xmlText.includes('Attention Required') || xmlText.includes('cloudflare')) {
+    throw new Error('Gallica is blocking the request (Cloudflare challenge). ' +
+      'The proxy IP appears to be flagged by Gallica.');
+  }
   return parseSruResponse(xmlText, termList);
 }
 
@@ -96,7 +104,7 @@ function buildCql({ terms, year, month, sort, source, codes }) {
 
 function buildTermCql(terms) {
   if (!terms || terms.length === 0) return '';
-  return '(text adj "' + '" or text adj "'.join(terms) + '")';
+  return '(text adj "' + terms.join('" or text adj "') + '")';
 }
 
 // Mirrors make_wide_groupings_for_all_search + VolumeQuery.build_date_cql.
@@ -131,7 +139,7 @@ function buildSourceCql(source, codes) {
   const codeList = toArray(codes).filter(Boolean);
   if (codeList.length > 0) {
     const formatted = codeList.map((c) => `${c}_date`);
-    return 'arkPress adj "' + '" or arkPress adj "'.join(formatted) + '"';
+    return 'arkPress adj "' + formatted.join('" or arkPress adj "') + '"';
   }
   if (source === 'periodical') return 'dc.type all "fascicule"';
   if (source === 'book') return 'dc.type all "monographie"';
@@ -149,10 +157,16 @@ function toArray(v) {
 function parseSruResponse(xmlText, terms) {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
   if (doc.querySelector('parsererror') || !doc.documentElement) {
-    throw new Error('Failed to parse Gallica SRU response');
+    throw new Error('Gallica SRU response was not valid XML ' +
+      '(possibly a Cloudflare block page).');
   }
 
   const totalRecords = parseTotalRecords(doc);
+  // If there's no numberOfRecords element at all, this isn't a real SRU response.
+  if (totalRecords === 0 && doc.getElementsByTagNameNS(SRW_NS, 'numberOfRecords').length === 0) {
+    throw new Error('Gallica SRU response had no numberOfRecords ' +
+      '(possibly a Cloudflare block page).');
+  }
 
   const recordEls = doc.getElementsByTagNameNS(SRW_NS, 'record');
   const records = [];

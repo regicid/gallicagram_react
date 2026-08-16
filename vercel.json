@@ -22,7 +22,7 @@
     },
     {
       "source": "/mcp-proxy/:path*",
-      "destination": "https://shiny.ens-paris-saclay.fr/guni/v2/mcp/:path*"
+      "destination": "https://shiny.ens-paris-saclay.fr/guni/v2/mcp/mcp/:path*"
     }
   ]
 }

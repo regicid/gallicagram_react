@@ -36,16 +36,8 @@ const getMcpClientUrl = () => {
   if (typeof window === 'undefined') {
     return REAL_MCP_URL;
   }
-
-  const hostname = window.location.hostname;
-  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-  const isVercel = hostname.endsWith('.vercel.app') || hostname === 'vercel.app';
-
-  if (isLocalhost || isVercel) {
-    return new URL('/mcp-proxy', window.location.origin).toString();
-  }
-
-  return REAL_MCP_URL;
+  // Toujours passer par le proxy dans le navigateur pour éviter CORS / 405
+  return new URL('/mcp-proxy', window.location.origin).toString();
 };
 
 const getToolIcon = (name) => {

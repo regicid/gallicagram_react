@@ -2020,6 +2020,25 @@ function App() {
     i18n.changeLanguage(lng);
   };
 
+  const LanguageFlag = ({ code, label, active }) => (
+    <button
+      type="button"
+      className={`language-button ${active ? 'active' : ''}`}
+      aria-label={label}
+      title={label}
+      onClick={() => {
+        changeLanguage(code);
+        setIsMobileMenuOpen(false);
+      }}
+    >
+      <span aria-hidden="true">{code === 'en' ? '🇬🇧' : '🇫🇷'}</span>
+    </button>
+  );
+
+  const XLogo = () => (
+    <span aria-label="X/Twitter" title="X/Twitter" className="x-link">𝕏</span>
+  );
+
   const activeQuery = queries.find(q => q.id === activeQueryId);
 
   return (
@@ -2045,26 +2064,21 @@ function App() {
                 </div>
                 <div className={`header-links ${isMobileMenuOpen ? 'open' : ''}`}>
                   <Link to="/about_us" onClick={() => setIsMobileMenuOpen(false)}>{t('Who are we?')}</Link>
-                  <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
+                  <a className="x-link" href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer" aria-label="X/Twitter">
+                    <XLogo />
+                  </a>
                   <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
-                  <Button
+                  <button
+                    type="button"
                     id="api-menu-button"
+                    className="header-link-button"
                     aria-controls={apiMenuAnchor ? 'api-menu' : undefined}
                     aria-haspopup="true"
                     aria-expanded={apiMenuAnchor ? 'true' : undefined}
                     onClick={(event) => setApiMenuAnchor(event.currentTarget)}
-                    sx={{
-                      ml: 1.5,
-                      textTransform: 'none',
-                      color: 'inherit',
-                      fontFamily: 'inherit',
-                      fontSize: 'inherit',
-                      minWidth: 'auto',
-                      padding: '6px 8px'
-                    }}
                   >
                     API/MCP
-                  </Button>
+                  </button>
                   <Menu
                     id="api-menu"
                     anchorEl={apiMenuAnchor}
@@ -2098,8 +2112,8 @@ function App() {
                   </Menu>
                   <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
                   <a href="https://github.com/regicid/gallicagram_react" target="_blank" rel="noopener noreferrer">{t('Code')}</a>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => { changeLanguage('en'); setIsMobileMenuOpen(false); }}>🇬🇧</button>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => { changeLanguage('fr'); setIsMobileMenuOpen(false); }}>🇫🇷</button>
+                  <LanguageFlag code="en" label="English" active={i18n.language?.startsWith('en')} />
+                  <LanguageFlag code="fr" label="Français" active={i18n.language?.startsWith('fr')} />
                   <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
                     <Typography variant="body2" style={{ marginRight: '3px' }}>🌙</Typography>
                     <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} size="small" />

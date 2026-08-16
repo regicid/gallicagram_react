@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton, Switch, Snackbar } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Slider, TextField, Box, Alert, Tooltip, IconButton, Switch, Snackbar, Menu } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import MenuIcon from '@mui/icons-material/Menu';
 import SumsComponent from './SumsComponent';
@@ -18,7 +18,7 @@ import { FingerprintSpinner } from 'react-epic-spinners';
 import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
 import AboutPage from "./AboutPage";
-// import MCPPage from "./MCPPage";
+import MCPPage from "./MCPPage";
 
 const theme = createTheme({
   typography: {
@@ -277,6 +277,7 @@ function App() {
   const [dateWarnings, setDateWarnings] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [apiMenuAnchor, setApiMenuAnchor] = useState(null);
   const [fetchId, setFetchId] = useState(0); // Track data fetches for graph updates
 
   useEffect(() => {
@@ -2026,7 +2027,7 @@ function App() {
       <Routes>
         <Route path="/swagger" element={<SwaggerPage />} />
         <Route path="/about_us" element={<AboutPage />} />
-        {/* <Route path="/mcp" element={<MCPPage />} /> */}
+        <Route path="/mcp" element={<MCPPage />} />
 
         <Route path="*" element={
           <>
@@ -2046,8 +2047,55 @@ function App() {
                   <Link to="/about_us" onClick={() => setIsMobileMenuOpen(false)}>{t('Who are we?')}</Link>
                   <a href="https://x.com/gallicagram" target="_blank" rel="noopener noreferrer">{t('X')}</a>
                   <a href="https://osf.io/preprints/socarxiv/84bf3_v1" target="_blank" rel="noopener noreferrer">{t('Paper')}</a>
-                  <Link to="/swagger" onClick={() => setIsMobileMenuOpen(false)}> {t('API')} </Link>
-                  {/* <Link to="/mcp" onClick={() => setIsMobileMenuOpen(false)}> {t('MCP')} </Link> */}
+                  <Button
+                    id="api-menu-button"
+                    aria-controls={apiMenuAnchor ? 'api-menu' : undefined}
+                    aria-haspopup="true"
+                    aria-expanded={apiMenuAnchor ? 'true' : undefined}
+                    onClick={(event) => setApiMenuAnchor(event.currentTarget)}
+                    sx={{
+                      ml: 1.5,
+                      textTransform: 'none',
+                      color: 'inherit',
+                      fontFamily: 'inherit',
+                      fontSize: 'inherit',
+                      minWidth: 'auto',
+                      padding: '6px 8px'
+                    }}
+                  >
+                    API/MCP
+                  </Button>
+                  <Menu
+                    id="api-menu"
+                    anchorEl={apiMenuAnchor}
+                    open={Boolean(apiMenuAnchor)}
+                    onClose={() => setApiMenuAnchor(null)}
+                    MenuListProps={{ 'aria-labelledby': 'api-menu-button' }}
+                  >
+                    <MenuItem
+                      component={Link}
+                      to="/swagger"
+                      onClick={() => setApiMenuAnchor(null)}
+                    >
+                      Swagger API v1
+                    </MenuItem>
+                    <MenuItem
+                      component="a"
+                      href="https://shiny.ens-paris-saclay.fr/guni/v2/docs"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setApiMenuAnchor(null)}
+                    >
+                      Swagger API v2
+                    </MenuItem>
+                    <MenuItem
+                      component={Link}
+                      to="/mcp"
+                      onClick={() => setApiMenuAnchor(null)}
+                    >
+                      MCP
+                    </MenuItem>
+                  </Menu>
                   <a href="https://archive.org/download/2024-01-19-de-courson/2024-01-19-De%20Courson.mp4" target="_blank" rel="noopener noreferrer">{t('Video')}</a>
                   <a href="https://github.com/regicid/gallicagram_react" target="_blank" rel="noopener noreferrer">{t('Code')}</a>
                   <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }} onClick={() => { changeLanguage('en'); setIsMobileMenuOpen(false); }}>🇬🇧</button>

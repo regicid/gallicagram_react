@@ -37,7 +37,11 @@ const getMcpClientUrl = () => {
     return REAL_MCP_URL;
   }
 
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  const hostname = window.location.hostname;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isVercel = hostname.endsWith('.vercel.app') || hostname === 'vercel.app';
+
+  if (isLocalhost || isVercel) {
     return new URL('/mcp-proxy', window.location.origin).toString();
   }
 

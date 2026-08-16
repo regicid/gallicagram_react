@@ -15,6 +15,14 @@
     {
       "source": "/api/sru",
       "destination": "https://gallica.bnf.fr/SRU"
+    },
+    {
+      "source": "/mcp-proxy",
+      "destination": "https://shiny.ens-paris-saclay.fr/guni/v2/mcp/mcp"
+    },
+    {
+      "source": "/mcp-proxy/:path*",
+      "destination": "https://shiny.ens-paris-saclay.fr/guni/v2/mcp/:path*"
     }
   ]
 }

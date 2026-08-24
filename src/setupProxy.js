@@ -38,4 +38,19 @@ module.exports = function (app) {
       },
     })
   );
+
+  // Gallicagram MCP Proxy
+  app.use(
+    '/mcp-proxy',
+    createProxyMiddleware({
+      target: 'https://shiny.ens-paris-saclay.fr/guni/v2/mcp/mcp',
+      changeOrigin: true,
+      secure: true,
+      followRedirects: true,
+      pathRewrite: {
+        '^/mcp-proxy': '',
+        '^/': '',
+      },
+    })
+  );
 };

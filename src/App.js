@@ -2095,7 +2095,7 @@ function App() {
                     </MenuItem>
                     <MenuItem
                       component="a"
-                      href="/api/v2/"
+                      href="/guni/v2/"
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => setApiMenuAnchor(null)}

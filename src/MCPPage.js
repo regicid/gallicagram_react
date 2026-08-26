@@ -30,14 +30,14 @@ import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-const REAL_MCP_URL = 'https://shiny.ens-paris-saclay.fr/guni/v2/mcp/mcp';
+const PUBLIC_MCP_URL = 'https://www.gallicagram.com/mcp';
 
 const getMcpClientUrl = () => {
   if (typeof window === 'undefined') {
-    return REAL_MCP_URL;
+    return PUBLIC_MCP_URL;
   }
   // Toujours passer par le proxy dans le navigateur pour éviter CORS / 405
-  return new URL('/mcp-proxy', window.location.origin).toString();
+  return new URL('/mcp', window.location.origin).toString();
 };
 
 const getToolIcon = (name) => {
@@ -392,7 +392,7 @@ function MCPPage() {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(REAL_MCP_URL);
+      await navigator.clipboard.writeText(PUBLIC_MCP_URL);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -462,7 +462,7 @@ function MCPPage() {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'white', p: 1, pl: 2, borderRadius: 2, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                 <Typography variant="body2" sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.85rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {REAL_MCP_URL}
+                  {PUBLIC_MCP_URL}
                 </Typography>
                 <Tooltip title={copied ? 'Copié !' : 'Copier'}>
                   <IconButton onClick={handleCopy} size="small" sx={{ color: copied ? '#4caf50' : '#1976d2', ml: 1 }}>
@@ -489,7 +489,7 @@ function MCPPage() {
                 border: '1px solid #333',
               }}
             >
-              {`{\n  "name": "gallicagram",\n  "url": "${REAL_MCP_URL}",\n  "transport": "streamable-http"\n}`}
+              {`{\n  "name": "gallicagram",\n  "url": "${PUBLIC_MCP_URL}",\n  "transport": "streamable-http"\n}`}
             </Box>
           </Paper>
         </Grid>

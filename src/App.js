@@ -2046,7 +2046,7 @@ function App() {
       <Routes>
         <Route path="/swagger" element={<SwaggerPage />} />
         <Route path="/about_us" element={<AboutPage />} />
-        <Route path="/mcp" element={<MCPPage />} />
+        <Route path="/mcp-docs" element={<MCPPage />} />
 
         <Route path="*" element={
           <>
@@ -2095,7 +2095,7 @@ function App() {
                     </MenuItem>
                     <MenuItem
                       component="a"
-                      href="https://shiny.ens-paris-saclay.fr/guni/v2/docs"
+                      href="/api/v2/"
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => setApiMenuAnchor(null)}
@@ -2104,7 +2104,7 @@ function App() {
                     </MenuItem>
                     <MenuItem
                       component={Link}
-                      to="/mcp"
+                      to="/mcp-docs"
                       onClick={() => setApiMenuAnchor(null)}
                     >
                       MCP

@@ -203,6 +203,19 @@ function movingSum(data, windowSize) {
 }
 
 const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
+const AGORA_API_URL = 'https://shiny.ens-paris-saclay.fr/guni/agora';
+
+// Corpus IDs served by the Agoragram API (distinct URL prefix from the main Gallicagram API)
+const AGORA_CORPORA = new Set([
+  '20minutes', 'atlantico', 'bfmtv', 'challenges', 'cnews', 'francesoir',
+  'gala', 'l_opinion', 'la_croix', 'la_depeche', 'laprovence', 'latribune',
+  'le_capital', 'le_courrier_de_l_ouest', 'le_figaro', 'le_journal_du_dimanche',
+  'le_maine_libre', 'le_marin', 'le_monde', 'le_nouvel_observateur',
+  'le_telegramme', 'leparisien', 'les_echos', 'marianne', 'mediapart',
+  'midilibre', 'nice_matin', 'ouest_france2', 'paris_match', 'paris_normandie',
+  'presse_ocean', 'sud_ouest', 'telerama', 'valeurs_actuelles', 'voici',
+  'voiles_et_voiliers',
+]);
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -1103,6 +1116,8 @@ function App() {
       const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
       const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
+    } else if (AGORA_CORPORA.has(corpus)) {
+      url = `${AGORA_API_URL}/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else {
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     }

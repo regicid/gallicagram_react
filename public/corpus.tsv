@@ -1,5 +1,5 @@
 Titre	Période (conseillée)	Volume (en mots)	Code API	Longueur max	Résolution	Seuils	Date de téléchargement	Gallica_context_filter	Available_modes
-Le Monde	1945-2024	1.5 milliards	lemonde_rubriques	4	Journalière	Aucun	Janvier 2023		article|cooccurrence_article|associated_article|joker|nearby
+Le Monde (rubriques)	1945-2024	1.5 milliards	lemonde_rubriques	4	Journalière	Aucun	Janvier 2023		article|cooccurrence_article|associated_article|joker|nearby
 Presse de Gallica	1789-1950	57 milliards	presse	3	Mensuelle	"2gram>1;3gram>1"	Mars 2021	source=periodical	document|cooccurrence|joker|nearby
 Livres de Gallica	1700-1940	16 milliards	livres	5	Annuelle	2gram>1, etc	Mars 2021	source=book	document|cooccurrence|joker|nearby
 Deutsches Zeitungsportal (DDB)	1780-1950	39 milliards	ddb	2	Mensuelle	1gram > 1, 2gram>2	Août 2023		
@@ -18,15 +18,46 @@ Opensubtitles (français)	1935-2020	17 millions	subtitles	3	Annuelle	Aucun	Juill
 Opensubtitles (anglais)	1930-2020	102 millions	subtitles_en	3	Annuelle	Aucun	Juillet 2023		
 Rap français (Genius)	1995-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024		
 Persée	~1930-2023	1 milliard	route à part (query_persee)	2	Annuelle	Aucun	Décembre 2023		
-Ouest-France	1899-2025	?	ouest	2	Annuelle	Aucun	Octobre 2025		
+Ouest-France (Gallica)	1899-2025	?	ouest	2	Annuelle	Aucun	Octobre 2025		
 Prénoms INSEE	1700-2024	?	prenoms	1	Annuelle	Aucun	2025		
 Libération	1998-2025	?	libe	3	Journalière	Aucun	Novembre 2025		
-Mediapart	2008-2024	?	mediapart	3	Mensuelle	Aucun	Mars 2024		
-Le Figaro (web)	2006-2024	?	lefigaro	3	Mensuelle	Aucun	Février 2024		
-Le Parisien	2000-2024	?	leparisien	3	Mensuelle	Aucun	Juillet 2024		
-Les Échos	1991-2024	?	lesechos	3	Mensuelle	Aucun	Octobre 2024		
-La Croix	1995-2024	?	lacroix	3	Mensuelle	Aucun	Juillet 2024
 Majinbook français	1700-2023	?	majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025	
 Majinbook espagnol	1700-2023	?	spa_majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025	
 Majinbook anglais	1700-2023	?	eng_majinbook	2	Annuelle	2gram>1	September 2025	
 Majinbook allemand	1700-2023	?	deu_majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025
+20 Minutes	2006-2026	?	20minutes	2	Journalière	Aucun	Septembre 2026		
+Atlantico	2011-2026	?	atlantico	2	Journalière	Aucun	Septembre 2026		
+BFM TV	2006-2026	?	bfmtv	2	Journalière	Aucun	Septembre 2026		
+Challenges	1999-2026	?	challenges	2	Journalière	Aucun	Septembre 2026		
+CNews	2012-2026	?	cnews	2	Journalière	Aucun	Septembre 2026		
+France Soir	2010-2026	?	francesoir	2	Journalière	Aucun	Septembre 2026		
+Gala	2007-2026	?	gala	2	Journalière	Aucun	Septembre 2026		
+L'Opinion	2012-2026	?	l_opinion	2	Journalière	Aucun	Septembre 2026		
+La Croix	1998-2026	?	la_croix	2	Journalière	Aucun	Septembre 2026		
+La Dépêche	1997-2026	?	la_depeche	2	Journalière	Aucun	Septembre 2026		
+La Provence	2006-2026	?	laprovence	2	Journalière	Aucun	Septembre 2026		
+La Tribune	2010-2026	?	latribune	2	Journalière	Aucun	Septembre 2026		
+Le Capital	2004-2026	?	le_capital	2	Journalière	Aucun	Septembre 2026		
+Le Courrier de l'Ouest	2012-2026	?	le_courrier_de_l_ouest	2	Journalière	Aucun	Septembre 2026		
+Le Figaro (web)	2004-2026	?	le_figaro	2	Journalière	Aucun	Septembre 2026		
+Le Journal du Dimanche	1990-2026	?	le_journal_du_dimanche	2	Journalière	Aucun	Septembre 2026		
+Le Maine Libre	2010-2026	?	le_maine_libre	2	Journalière	Aucun	Septembre 2026		
+Le Marin	2012-2026	?	le_marin	2	Journalière	Aucun	Septembre 2026		
+Le Monde	1944-2026	?	le_monde	2	Journalière	Aucun	Septembre 2026		
+Le Nouvel Observateur	2009-2026	?	le_nouvel_observateur	2	Journalière	Aucun	Septembre 2026		
+Le Télégramme	2008-2011	?	le_telegramme	2	Journalière	Aucun	Septembre 2026		
+Le Parisien	2010-2026	?	leparisien	2	Journalière	Aucun	Septembre 2026		
+Les Échos	1991-2026	?	les_echos	2	Journalière	Aucun	Septembre 2026		
+Marianne	2007-2026	?	marianne	2	Journalière	Aucun	Septembre 2026		
+Mediapart	2008-2026	?	mediapart	2	Journalière	Aucun	Septembre 2026		
+Midi Libre	1970-2026	?	midilibre	2	Journalière	Aucun	Septembre 2026		
+Nice-Matin	2013-2026	?	nice_matin	2	Journalière	Aucun	Septembre 2026		
+Ouest-France	2001-2026	?	ouest_france2	2	Journalière	Aucun	Septembre 2026		
+Paris Match	1970-2026	?	paris_match	2	Journalière	Aucun	Septembre 2026		
+Paris Normandie	2019-2026	?	paris_normandie	2	Journalière	Aucun	Septembre 2026		
+Presse Océan	2012-2026	?	presse_ocean	2	Journalière	Aucun	Septembre 2026		
+Sud Ouest	2010-2018	?	sud_ouest	2	Journalière	Aucun	Septembre 2026		
+Télérama	1950-2026	?	telerama	2	Journalière	Aucun	Septembre 2026		
+Valeurs Actuelles	2003-2026	?	valeurs_actuelles	2	Journalière	Aucun	Septembre 2026		
+Voici	2007-2026	?	voici	2	Journalière	Aucun	Septembre 2026		
+Voiles et Voiliers	2008-2026	?	voiles_et_voiliers	2	Journalière	Aucun	Septembre 2026		

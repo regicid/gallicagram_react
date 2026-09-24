@@ -5,7 +5,7 @@ import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './Plot
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
-import { REVUE_CORPORA, TV_CORPORA, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection } from './revueCorpora';
+import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl } from './revueCorpora';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -381,6 +381,8 @@ function App() {
   const [corpusPeriods, setCorpusPeriods] = useState({});
   const [corpusConfigs, setCorpusConfigs] = useState({});
   const [revuesData, setRevuesData] = useState({});
+  // Needed synchronously when a Cairn point is clicked, so it is loaded up front.
+  const [cairnDisciplines, setCairnDisciplines] = useState(null);
   const [dateWarnings, setDateWarnings] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -421,6 +423,11 @@ function App() {
         setCorpusConfigs(configs);
       })
       .catch(error => console.error('Error loading corpus periods:', error));
+
+    fetch('/cairn_disciplines.json')
+      .then(res => res.json())
+      .then(setCairnDisciplines)
+      .catch(err => console.error('Error loading Cairn disciplines', err));
 
     // Load the revue/discipline lists of every corpus that supports filtering by revue
     Object.entries(REVUE_CORPORA).forEach(([corpus, { revues }]) => {
@@ -1218,11 +1225,26 @@ function App() {
       setSelectedQuery(query);
       const date = new Date(point.x);
       setSelectedDate(date);
+
+      // Cairn cannot be read from inside the app, so a click goes straight to its search.
+      // This has to happen here, synchronously in the click handler: opening it later from
+      // the context panel's effect is no longer tied to the gesture and gets blocked.
+      if (query.corpus === CAIRN_CORPUS) {
+        const url = cairnSearchUrl({
+          word: (query.word || '').split('+')[0].trim(),
+          year: date.getFullYear(),
+          revues: getSelection(query, CAIRN_CORPUS).revues,
+          revueMap: revuesData[CAIRN_CORPUS],
+          disciplineIds: cairnDisciplines,
+        });
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+
       const newSearchParams = { limit: 10, cursor: 0 };
       setContextSearchParams(newSearchParams);
       fetchOccurrences(date, newSearchParams, query, false);
     }
-  }, [queries, activeQueryId, plotType, apiResponses, fetchOccurrences]);
+  }, [queries, activeQueryId, plotType, apiResponses, fetchOccurrences, revuesData, cairnDisciplines]);
 
   const handleContextPageChange = (pageIndex) => {
     const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };

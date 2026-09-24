@@ -188,6 +188,6 @@
   "Semaine": "Semaine",
   "tv_corpus_asr_note": "Les transcriptions sont produites automatiquement, par reconnaissance vocale (Whisper). Le vocabulaire courant est bien reconnu, mais les noms propres le sont moins, surtout lorsqu’ils sont récents : un nom apparu dans l’actualité depuis peu peut être mal orthographié ou rendu par un mot plus courant, et se trouve donc sous-compté. Les courbes de noms propres récents sont à lire avec prudence.",
   "Search on Cairn": "Chercher sur Cairn",
-  "cairn_context_link_note": "Cairn ne permet pas de consulter les occurrences depuis Gallicagram. Le lien ci-dessous ouvre la recherche correspondante sur Cairn, avec le mot, l’année et les revues sélectionnées.",
-  "credit_line": "Crédit : {{name}}"
+  "cairn_context_link_note": "Cairn ne permet pas de consulter les occurrences depuis Gallicagram : la recherche s’ouvre directement sur leur site, avec le mot et les revues sélectionnées. Cairn ne sait filtrer que par période relative (année en cours, 3, 5 ou 10 dernières années) : les résultats ne sont donc pas limités à l’année cliquée.",
+  "Credit": "Crédit :"
 }

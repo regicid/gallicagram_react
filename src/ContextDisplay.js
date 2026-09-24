@@ -143,8 +143,10 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           // link instead: opened in the browser it also applies the year, which the
           // server-rendered page ignores.
           const { revueMap, disciplineIds } = await loadCairnMeta();
+          // The click handler already opened this in a new tab; the panel repeats the link
+          // for the case where a pop-up blocker stopped it. No externalUrl here: the header
+          // it belongs to is hidden for this type, and it would only duplicate the button.
           const url = cairnSearchUrl({ word, year, revues: record.revues, revueMap, disciplineIds });
-          setExternalUrl({ url, label: t('Search on Cairn') });
           setData({ type: 'cairn_link', content: url });
 
         } else if (isTvCorpus(corpus)) {
@@ -180,26 +182,41 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
 
   // Shown on every path, including the "no context for this corpus" message, which is
   // exactly where the modern press and Majinbook corpora end up.
+  // The label is a separate string from the name so the name can be a link; the French
+  // translation carries its own space before the colon.
   const credit = CATEGORY_CREDITS[category];
   const creditLine = credit
-    ? <p style={{ fontSize: '0.85em', color: '#777', margin: '0 0 0.75rem' }}>{t('credit_line', { name: credit })}</p>
+    ? (
+      <p style={{ fontSize: '0.85em', color: '#777', margin: '0 0 0.75rem' }}>
+        {t('Credit')}{' '}
+        {credit.url
+          ? <a href={credit.url} target="_blank" rel="noopener noreferrer">{credit.name}</a>
+          : credit.name}
+      </p>
+    )
     : null;
 
   if (isLoading) return <>{creditLine}<div>{t('Loading...')}</div></>;
   if (error) return <>{creditLine}<div style={{ color: 'inherit' }}>{error}</div></>;
   if (!data) return <>{creditLine}<div>{t('No data')}</div></>;
 
+  // These corpora show no occurrences at all — a note, or a link out — so heading them
+  // "Context for <word> (<date>)" would announce something that is not there.
+  const hasOccurrences = data.type !== 'tv_note' && data.type !== 'cairn_link';
+
   return (
     <div className="special-context-display">
       {creditLine}
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3>{t('Context for')} {record.terms[0]} ({record.date.split('T')[0]})</h3>
-        {externalUrl && (
-          <a href={externalUrl.url} target="_blank" rel="noopener noreferrer" className="external-link-button">
-            {externalUrl.label}
-          </a>
-        )}
-      </div>
+      {hasOccurrences && (
+        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('Context for')} {record.terms[0]} ({record.date.split('T')[0]})</h3>
+          {externalUrl && (
+            <a href={externalUrl.url} target="_blank" rel="noopener noreferrer" className="external-link-button">
+              {externalUrl.label}
+            </a>
+          )}
+        </div>
+      )}
 
       {data.type === 'lemonde' && (
         <>

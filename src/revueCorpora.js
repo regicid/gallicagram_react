@@ -28,9 +28,9 @@ export const COMBINED_CORPORA = {
 // Who put a corpus together, keyed by the category in corpus.tsv. Shown above the
 // context panel; the same people are thanked at greater length in About.
 export const CATEGORY_CREDITS = {
-  'Modern press': 'Elias Echikr',
-  'Majinbook': 'Antoine Mazières',
-  'TV transcripts': 'Yann de Boisvilliers',
+  'Modern press': { name: 'Elias Echikr' },
+  'Majinbook': { name: 'Antoine Mazières', url: 'https://antonomase.fr/' },
+  'TV transcripts': { name: 'Yann de Boisvilliers' },
 };
 
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
@@ -61,9 +61,8 @@ const MAX_REVUE_PARAMS = 40;
 // The result is only ever handed to the user as a link: Cairn is behind bot protection
 // that answers automated requests with a CAPTCHA, so the site is not queried from here.
 //
-// That link is opened in a real browser, which is also the only place the year filter
-// works — the server-rendered page ignores beginYear/endYear and reports yearGap "all",
-// applying them later from its own scripts.
+// Cairn offers no exact-year filter, so the link cannot be pinned to the clicked year;
+// see the yearGap note below.
 export const buildCairnSearchParams = ({ word, year, revues, revueMap, disciplineIds }) => {
   const p = new URLSearchParams();
   p.set('lang', 'fr');
@@ -71,9 +70,16 @@ export const buildCairnSearchParams = ({ word, year, revues, revueMap, disciplin
   p.set('advancedFilters[0][operator]', 'and');
   p.set('advancedFilters[0][value]', word);
   p.set('typepubs[0]', '1'); // journals only: books and book chapters are not in the ngram corpus
-  if (year) {
-    p.set('beginYear', String(year));
-    p.set('endYear', String(year));
+
+  // Cairn cannot filter on a given year. Its only date control is `yearGap`, a relative
+  // preset: current year, or the last 3, 5 or 10. beginYear/endYear exist in its state but
+  // are bound to no input, which is why it echoes them back empty. The tightest preset
+  // still containing the clicked year is used — that narrows recent searches without ever
+  // excluding the year itself; anything older simply searches the whole period.
+  const gap = year ? new Date().getFullYear() - Number(year) : null;
+  if (gap !== null && gap >= 0) {
+    const preset = [0, 2, 4, 9].find(g => gap <= g);
+    if (preset !== undefined) p.set('yearGap', String(preset));
   }
 
   const selected = Array.isArray(revues) ? revues : null;

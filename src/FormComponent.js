@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment, Menu, MenuList, Popper, Paper } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { REVUE_CORPORA, revueCorpusParts, getSelection } from './revueCorpora';
+import { REVUE_CORPORA, revueCorpusParts, getSelection, isTvCorpus } from './revueCorpora';
 
 // Order of the category dropdown. Values match the "Catégorie" column of corpus.tsv
 // and are translation keys, like every other user-facing string.
@@ -348,22 +348,36 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
   const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
   const availableModes = selectedCorpus?.availableModes || [];
 
+  const supportsMonthly = maxResolution === 'Mensuelle' || maxResolution === 'Journalière';
+  const supportsDaily = maxResolution === 'Journalière';
+  // Weekly is aggregated from daily data and is only offered where it helps: the TV
+  // transcripts cover a few months, so days are noisy and months give three points.
+  const supportsWeekly = isTvCorpus(corpus);
+
   // Auto-adjust resolution when corpus changes and current resolution is not supported
   useEffect(() => {
     if (!selectedCorpus) return;
 
-    // Determine which resolutions are valid for this corpus
-    const supportsMonthly = maxResolution === 'Mensuelle' || maxResolution === 'Journalière';
-    const supportsDaily = maxResolution === 'Journalière';
-
     // If current resolution is not supported, fall back to a valid one
-    if (resolution === 'jour' && !supportsDaily) {
-      const newResolution = supportsMonthly ? 'mois' : 'annee';
-      onFormChange({ id: formData.id, resolution: newResolution });
+    if (resolution === 'semaine' && !supportsWeekly) {
+      onFormChange({ id: formData.id, resolution: supportsDaily ? 'jour' : supportsMonthly ? 'mois' : 'annee' });
+    } else if (resolution === 'jour' && !supportsDaily) {
+      onFormChange({ id: formData.id, resolution: supportsMonthly ? 'mois' : 'annee' });
     } else if (resolution === 'mois' && !supportsMonthly) {
       onFormChange({ id: formData.id, resolution: 'annee' });
     }
-  }, [corpus, selectedCorpus, maxResolution, resolution, formData.id, onFormChange]);
+  }, [corpus, selectedCorpus, resolution, supportsWeekly, supportsDaily, supportsMonthly, formData.id, onFormChange]);
+
+  // Arriving on a TV corpus selects weekly, but only on the switch, so the choice can
+  // still be changed afterwards without being forced back.
+  const prevCorpusRef = useRef(null);
+  useEffect(() => {
+    if (!selectedCorpus) return;
+    if (prevCorpusRef.current !== null && prevCorpusRef.current !== corpus && isTvCorpus(corpus)) {
+      onFormChange({ id: formData.id, resolution: 'semaine' });
+    }
+    prevCorpusRef.current = corpus;
+  }, [corpus, selectedCorpus, formData.id, onFormChange]);
 
   // Available search modes with descriptions
   const searchModes = [
@@ -617,6 +631,11 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
             <label className="checkbox-label">
               <input type="radio" name="resolution" value="mois" checked={resolution === 'mois'} onChange={handleChange} />
               {t('Mois')}
+            </label>}
+          {supportsWeekly &&
+            <label className="checkbox-label">
+              <input type="radio" name="resolution" value="semaine" checked={resolution === 'semaine'} onChange={handleChange} />
+              {t('Semaine')}
             </label>}
           {maxResolution === 'Journalière' &&
             <label className="checkbox-label">

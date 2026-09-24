@@ -253,6 +253,43 @@ export const buildRevueFilter = (revues, revueMap, supportsDiscipline) => {
     + (leftover.length > 0 ? `&revue=${encodeURIComponent(leftover.join(' '))}` : '');
 };
 
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+// Monday of the week containing the given date, in UTC.
+const weekStartUTC = (year, month, day) => {
+  const d = new Date(Date.UTC(year, (month || 1) - 1, day || 1));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d;
+};
+
+// The API has no weekly resolution, so weeks are rolled up here from daily rows, and each
+// row is re-dated to its Monday. Both the occurrences and the corpus size are summed,
+// because every day carries its own denominator — this has to happen per word, before the
+// multi-word combiner downstream, which deliberately keeps one total per date.
+export const rollUpToWeeks = (rows) => {
+  const byWeek = new Map();
+  (rows || []).forEach(row => {
+    const year = Number(row.annee ?? row.date ?? row.year);
+    if (!year || Number.isNaN(year)) return;
+    const start = weekStartUTC(year, Number(row.mois), Number(row.jour));
+    const acc = byWeek.get(start.getTime());
+    if (acc) {
+      acc.n += Number(row.n) || 0;
+      acc.total += Number(row.total) || 0;
+    } else {
+      byWeek.set(start.getTime(), {
+        ...row,
+        n: Number(row.n) || 0,
+        total: Number(row.total) || 0,
+        annee: start.getUTCFullYear(),
+        mois: start.getUTCMonth() + 1,
+        jour: start.getUTCDate(),
+      });
+    }
+  });
+  return [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+};
+
 // Adds several yearly series together. Both the occurrences and the corpus size have to
 // be summed, so that the frequency of the whole is (n1 + n2) / (total1 + total2) — unlike
 // the multi-word combiner downstream, where every word shares a single denominator.
@@ -524,6 +561,14 @@ function App() {
         for (let m = 0; m < 12; m++) {
           dataMap.set(Date.UTC(y, m), null);
         }
+      }
+    } else if (resolution === 'semaine') {
+      // Seeded on Mondays, matching the keys rollUpToWeeks produces.
+      let current = weekStartUTC(start, 1, 1).getTime();
+      const finalDate = Date.UTC(end, 11, 31);
+      while (current <= finalDate) {
+        dataMap.set(current, null);
+        current += WEEK_MS;
       }
     } else if (resolution === 'jour') {
       let currentDate = new Date(Date.UTC(start, 0, 1));
@@ -1185,7 +1230,10 @@ function App() {
   }
 
   const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, query, rubriques, byRubrique) => {
-    const apiResolution = resolution === 'decennie' ? 'annee' : resolution;
+    // Neither decade nor week exists upstream: both are aggregated from a finer series.
+    const apiResolution = resolution === 'decennie' ? 'annee'
+      : resolution === 'semaine' ? 'jour'
+        : resolution;
     // A combined corpus is the sum of its parts: query each route with its own
     // discipline/revue selection, then add the series together.
     if (isCombinedCorpus(corpus)) {
@@ -1243,7 +1291,7 @@ function App() {
               if (results.errors.length) {
                 console.error(`CSV Parsing errors for "${word}":`, results.errors);
               }
-              papaResolve(results.data);
+              papaResolve(resolution === 'semaine' ? rollUpToWeeks(results.data) : results.data);
             }
           });
         });

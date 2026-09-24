@@ -185,5 +185,6 @@
   "Disciplines": "Disciplines",
   "Journals": "Journals",
   "TV transcripts": "TV transcripts",
-  "tv_corpus_gaps_note": "This corpus is built by continuously recording rolling-news channels. The recording is occasionally interrupted, so some days are missing from the corpus. These gaps come from recording failures, not from an actual drop in the word's usage."
+  "tv_corpus_gaps_note": "This corpus is built by continuously recording rolling-news channels. The recording is occasionally interrupted, so some days are missing from the corpus. They do not show up as a drop but as a break in the line: where there is no line, there is no data.",
+  "Semaine": "Week"
 }

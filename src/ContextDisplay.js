@@ -5,7 +5,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
-import { CAIRN_CORPUS, isTvCorpus, cairnSearchUrl } from './revueCorpora';
+import { CAIRN_CORPUS, isTvCorpus, cairnSearchUrl, CATEGORY_CREDITS } from './revueCorpora';
 
 // Cached across renders: both files are static and only needed for Cairn context.
 let cairnMetaPromise = null;
@@ -20,7 +20,7 @@ const loadCairnMeta = () => {
   return cairnMetaPromise;
 };
 
-const SpecialContextDisplay = ({ record, corpus }) => {
+const SpecialContextDisplay = ({ record, corpus, category }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -178,12 +178,20 @@ const SpecialContextDisplay = ({ record, corpus }) => {
     fetchContext();
   }, [record, corpus, t]);
 
-  if (isLoading) return <div>{t('Loading...')}</div>;
-  if (error) return <div style={{ color: 'inherit' }}>{error}</div>;
-  if (!data) return <div>{t('No data')}</div>;
+  // Shown on every path, including the "no context for this corpus" message, which is
+  // exactly where the modern press and Majinbook corpora end up.
+  const credit = CATEGORY_CREDITS[category];
+  const creditLine = credit
+    ? <p style={{ fontSize: '0.85em', color: '#777', margin: '0 0 0.75rem' }}>{t('credit_line', { name: credit })}</p>
+    : null;
+
+  if (isLoading) return <>{creditLine}<div>{t('Loading...')}</div></>;
+  if (error) return <>{creditLine}<div style={{ color: 'inherit' }}>{error}</div></>;
+  if (!data) return <>{creditLine}<div>{t('No data')}</div></>;
 
   return (
     <div className="special-context-display">
+      {creditLine}
       <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3>{t('Context for')} {record.terms[0]} ({record.date.split('T')[0]})</h3>
         {externalUrl && (
@@ -359,7 +367,7 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
 
   // Check for dummy record indicating special corpus handling
   if (records.length > 0 && records[0].dummy) {
-    return <SpecialContextDisplay record={records[0]} corpus={corpus} />;
+    return <SpecialContextDisplay record={records[0]} corpus={corpus} category={corpusConfigs?.[corpus]?.category} />;
   }
 
   if (isLoading && records.length === 0) {

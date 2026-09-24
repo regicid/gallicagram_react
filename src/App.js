@@ -413,7 +413,8 @@ function App() {
             const code = columns[3].trim();
             const filter = columns[8] ? columns[8].trim() : '';
             const maxLength = columns[4] ? parseInt(columns[4].trim(), 10) : 2;
-            configs[code] = { filter, maxLength };
+            const category = columns[10] ? columns[10].trim() : '';
+            configs[code] = { filter, maxLength, category };
           }
         });
         setCorpusPeriods(periods);

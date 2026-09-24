@@ -188,5 +188,6 @@
   "Semaine": "Week",
   "tv_corpus_asr_note": "The transcripts are produced automatically by speech recognition (Whisper). Everyday vocabulary is recognised well, proper nouns less so, especially recent ones: a name that has only just entered the news may be misspelt or replaced by a more common word, and is therefore undercounted. Curves for recent proper nouns should be read with caution.",
   "Search on Cairn": "Search on Cairn",
-  "cairn_context_link_note": "Cairn does not allow occurrences to be read from within Gallicagram. The link below opens the matching search on Cairn, with the word, the year and the selected journals."
+  "cairn_context_link_note": "Cairn does not allow occurrences to be read from within Gallicagram. The link below opens the matching search on Cairn, with the word, the year and the selected journals.",
+  "credit_line": "Credit: {{name}}"
 }

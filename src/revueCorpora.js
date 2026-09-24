@@ -25,6 +25,14 @@ export const COMBINED_CORPORA = {
   'route à part (persee+cairn)': ['route à part (query_persee)', 'route à part (query_cairn)'],
 };
 
+// Who put a corpus together, keyed by the category in corpus.tsv. Shown above the
+// context panel; the same people are thanked at greater length in About.
+export const CATEGORY_CREDITS = {
+  'Modern press': 'Elias Echikr',
+  'Majinbook': 'Antoine Mazières',
+  'TV transcripts': 'Yann de Boisvilliers',
+};
+
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 
 export const isRevueCorpus = (corpus) => has(REVUE_CORPORA, corpus);

@@ -29,6 +29,16 @@ module.exports = function (app) {
     })
   );
   app.use(
+    '/api/cairn',
+    createProxyMiddleware({
+      target: 'https://shs.cairn.info',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/': '/recherche',
+      },
+    })
+  );
+  app.use(
     '/api/sru',
     createProxyMiddleware({
       target: 'https://gallica.bnf.fr',

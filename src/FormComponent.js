@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Accordion from '@mui/material/Accordion';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -8,17 +8,290 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import { useTranslation } from 'react-i18next';
-import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment, Menu, MenuList, Popper, Paper } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { REVUE_CORPORA, revueCorpusParts, getSelection } from './revueCorpora';
 
-const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
+// Order of the category dropdown. Values match the "Catégorie" column of corpus.tsv
+// and are translation keys, like every other user-facing string.
+const MISC_CATEGORY = 'Miscellaneous';
+const CORPUS_CATEGORIES = ['Gallica', 'Modern press', 'TV transcripts', 'Academic journals', 'Majinbook', 'Foreign corpora', MISC_CATEGORY];
+
+// Corpus picker as a cascading menu: categories on the left, the corpora of the
+// hovered/tapped category in a submenu on the right. With over sixty corpora a flat
+// list is unusable, and this keeps it to one control instead of two chained selects.
+const CorpusMenu = ({ corpora, categories, corpus, currentCategory, onSelect }) => {
   const { t } = useTranslation();
-  const { word, corpus, resolution, revues, rubriques, byRubrique, searchMode, word2, distance, n_joker, length, stopwords } = formData;
-  const [corpora, setCorpora] = useState([]);
-  const [selectedDisciplines, setSelectedDisciplines] = useState([]);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [openCategory, setOpenCategory] = useState(null);
+  // The submenu anchor is the category row's DOM node. It has to live in state, not in
+  // a ref: refs attach during commit, so a Popper reading one while rendering would see
+  // null on the first open and nothing would re-render to correct it.
+  const [submenuAnchor, setSubmenuAnchor] = useState(null);
+  const itemRefs = useRef({});
+
+  const selectedLabel = corpora.find(c => c.value === corpus)?.label || '';
+
+  const open = (e) => {
+    // Anchor on the Select's outlined box so the menu lines up with the field.
+    setAnchorEl(e.currentTarget.closest('.MuiFormControl-root') || e.currentTarget);
+    setOpenCategory(currentCategory); // start on the category we are already in
+  };
+  const close = () => {
+    setAnchorEl(null);
+    setOpenCategory(null);
+    setSubmenuAnchor(null);
+  };
+
+  const openSubmenu = (cat, el) => {
+    setOpenCategory(cat);
+    setSubmenuAnchor(el);
+  };
+
+  // Covers the category opened automatically when the menu appears, whose row has no
+  // pointer event to supply the anchor. Runs after commit, so the ref exists by then.
+  useEffect(() => {
+    if (!anchorEl || !openCategory) return;
+    setSubmenuAnchor(prev => prev || itemRefs.current[openCategory] || null);
+  }, [anchorEl, openCategory]);
+
+  const byCategory = useMemo(() => {
+    const groups = {};
+    corpora.forEach(c => { (groups[c.category] = groups[c.category] || []).push(c); });
+    return groups;
+  }, [corpora]);
+
+  return (
+    <>
+      {/* A real Select renders the same markup and classes as the other dropdowns, so it
+          matches them exactly. Its own menu never opens: `open` is pinned false and
+          `onOpen` hands the click to the cascading menu below. */}
+      <FormControl fullWidth>
+        <InputLabel id="corpus-select-label">{t('Corpus:')}</InputLabel>
+        <Select
+          labelId="corpus-select-label"
+          id="corpus-select"
+          label={t('Corpus:')}
+          value={selectedLabel ? corpus : ''}
+          open={false}
+          onOpen={open}
+          sx={{ fontFamily: 'serif' }}
+        >
+          {corpora.map(c => (
+            <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={close}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{ paper: { sx: { minWidth: 260, overflow: 'visible' } } }}
+        MenuListProps={{ sx: { py: 0.5 } }}
+      >
+        {categories.map((cat) => (
+          <MenuItem
+            key={cat}
+            ref={(el) => { itemRefs.current[cat] = el; }}
+            selected={cat === openCategory}
+            // Hover drives it on desktop; tapping the row opens the submenu on touch,
+            // where there is no hover to rely on.
+            onMouseEnter={(e) => openSubmenu(cat, e.currentTarget)}
+            onClick={(e) => openSubmenu(cat, e.currentTarget)}
+            sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}
+          >
+            <ListItemText primary={t(cat)} />
+            <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />
+          </MenuItem>
+        ))}
+
+        {/* Rendered inside the Menu so clicks stay within its modal rather than
+            landing on the backdrop and closing everything. */}
+        <Popper
+          open={Boolean(openCategory) && Boolean(submenuAnchor)}
+          anchorEl={submenuAnchor}
+          placement="right-start"
+          modifiers={[{ name: 'offset', options: { offset: [-4, 4] } },
+                      { name: 'preventOverflow', options: { padding: 8 } }]}
+          sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
+        >
+          <Paper elevation={8} sx={{ maxHeight: '60vh', overflowY: 'auto', minWidth: 300 }}>
+            <MenuList sx={{ py: 0.5 }}>
+              {(byCategory[openCategory] || []).map((c) => (
+                <MenuItem
+                  key={c.value}
+                  selected={c.value === corpus}
+                  onClick={() => { onSelect(c.value); close(); }}
+                  sx={{ fontFamily: 'serif' }}
+                >
+                  {c.label}
+                </MenuItem>
+              ))}
+            </MenuList>
+          </Paper>
+        </Popper>
+      </Menu>
+    </>
+  );
+};
+
+// Discipline + revue pickers for one revue corpus. A combined corpus mounts one of
+// these per part, which is why the two taxonomies are never merged into a single list:
+// they share only 10 discipline names, and 41 revue codes differ solely by case.
+const RevuePicker = ({ corpus, revueMap, selection, onSelectionChange, showCorpusName }) => {
+  const { t } = useTranslation();
   const [disciplineSearch, setDisciplineSearch] = useState('');
   const [journalSearch, setJournalSearch] = useState('');
-  const [hasInitializedPersee, setHasInitializedPersee] = useState(false);
+  const corpusName = REVUE_CORPORA[corpus]?.label || corpus;
+
+  const selectedDisciplines = useMemo(() => selection.disciplines || [], [selection.disciplines]);
+  const revues = useMemo(() => selection.revues || [], [selection.revues]);
+
+  const { allDisciplines, codeToName } = useMemo(() => {
+    if (!revueMap) return { allDisciplines: [], codeToName: {} };
+    const mapping = {};
+    Object.values(revueMap).forEach(d => {
+      Object.entries(d).forEach(([code, name]) => { mapping[code] = name; });
+    });
+    return {
+      allDisciplines: Object.keys(revueMap).sort((a, b) => a.localeCompare(b, 'fr')),
+      codeToName: mapping,
+    };
+  }, [revueMap]);
+
+  const codesOfDisciplines = useCallback((disciplines) => {
+    const codes = new Set();
+    disciplines.forEach(disc => {
+      Object.keys(revueMap?.[disc] || {}).forEach(c => codes.add(c));
+    });
+    return codes;
+  }, [revueMap]);
+
+  // Start from "everything selected", so the picker shows what the query actually
+  // covers. Keyed by corpus, so each corpus seeds once and keeps its own selection.
+  useEffect(() => {
+    if (!revueMap || selection.disciplines) return;
+    onSelectionChange(corpus, {
+      disciplines: Object.keys(revueMap),
+      revues: [...new Set(Object.values(revueMap).flatMap(d => Object.keys(d)))],
+    });
+  }, [revueMap, selection.disciplines, corpus, onSelectionChange]);
+
+  const availableJournals = useMemo(() => {
+    if (!revueMap) return [];
+    return Array.from(codesOfDisciplines(selectedDisciplines))
+      .map(code => ({ code, name: codeToName[code] }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  }, [selectedDisciplines, revueMap, codeToName, codesOfDisciplines]);
+
+  const filteredDisciplines = useMemo(
+    () => allDisciplines.filter(d => d.toLowerCase().includes(disciplineSearch.toLowerCase())),
+    [allDisciplines, disciplineSearch]);
+
+  const filteredJournals = useMemo(
+    () => availableJournals.filter(j => j.name.toLowerCase().includes(journalSearch.toLowerCase())),
+    [availableJournals, journalSearch]);
+
+  // Disciplines are a first filter on revues: choosing them selects every journal they
+  // contain and excludes all others. (Intersecting with the current selection instead
+  // left the list empty whenever nothing was selected yet, and an empty list used to be
+  // sent as "no filter", i.e. the whole corpus.)
+  const setDisciplines = (disciplines) =>
+    onSelectionChange(corpus, { disciplines, revues: [...codesOfDisciplines(disciplines)] });
+
+  const label = (base) => (showCorpusName ? `${t(base)} — ${corpusName}` : t(base));
+
+  if (!revueMap) return null;
+
+  return (
+    <>
+      <FormControl fullWidth style={{ marginBottom: '1rem' }}>
+        <InputLabel id={`disciplines-label-${corpus}`}>{label('Disciplines')}</InputLabel>
+        <Select
+          labelId={`disciplines-label-${corpus}`}
+          multiple
+          value={selectedDisciplines}
+          onChange={(e) => setDisciplines(e.target.value)}
+          input={<OutlinedInput label={label('Disciplines')} />}
+          renderValue={(selected) => selected.length === allDisciplines.length ? t('All Disciplines') : `${selected.length} ${t('selected')}`}
+          // Default "selectedMenu" scrolls the first selected item into view, which lands
+          // mid-list and hides the All/None buttons; "menu" always opens at the top.
+          MenuProps={{ variant: 'menu', autoFocus: false, PaperProps: { sx: { maxHeight: 420 } } }}
+        >
+          <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
+            <Button fullWidth size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDisciplines(allDisciplines); }}>{t('All')}</Button>
+            <Button fullWidth size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDisciplines([]); }}>{t('None')}</Button>
+          </Box>
+          <Box sx={{ p: 1 }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder={t('Search disciplines...')}
+              value={disciplineSearch}
+              onChange={(e) => setDisciplineSearch(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+          </Box>
+          <Divider />
+          {filteredDisciplines.map((name) => (
+            <MenuItem key={name} value={name}>
+              <Checkbox checked={selectedDisciplines.indexOf(name) > -1} />
+              <ListItemText primary={name} />
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl fullWidth style={{ marginBottom: '1rem' }}>
+        <InputLabel id={`journals-label-${corpus}`}>{label('Journals')}</InputLabel>
+        <Select
+          labelId={`journals-label-${corpus}`}
+          multiple
+          value={revues}
+          onChange={(e) => onSelectionChange(corpus, { revues: e.target.value })}
+          input={<OutlinedInput label={label('Journals')} />}
+          renderValue={(selected) => selected.length === availableJournals.length ? t('All Journals') : `${selected.length} ${t('selected')}`}
+          MenuProps={{ variant: 'menu', autoFocus: false, PaperProps: { sx: { maxHeight: 420 } } }}
+        >
+          <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
+            <Button fullWidth size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); onSelectionChange(corpus, { revues: availableJournals.map(j => j.code) }); }}>{t('All')}</Button>
+            <Button fullWidth size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); onSelectionChange(corpus, { revues: [] }); }}>{t('None')}</Button>
+          </Box>
+          <Box sx={{ p: 1 }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder={t('Search journals...')}
+              value={journalSearch}
+              onChange={(e) => setJournalSearch(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+          </Box>
+          <Divider />
+          {filteredJournals.map((j) => (
+            <MenuItem key={j.code} value={j.code}>
+              <Checkbox checked={revues.indexOf(j.code) > -1} />
+              <ListItemText primary={j.name} />
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </>
+  );
+};
+
+const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSelectionChange }) => {
+  const { t } = useTranslation();
+  const { word, corpus, resolution, rubriques, byRubrique, searchMode, word2, distance, n_joker, length, stopwords } = formData;
+  const [corpora, setCorpora] = useState([]);
+
+  // One discipline+revue picker per revue corpus: a single one for Persée or Cairn,
+  // two pairs for the combined corpus.
+  const revueParts = revueCorpusParts(corpus);
 
   useEffect(() => {
     fetch('/corpus.tsv')
@@ -33,107 +306,37 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
             resolution: columns[5],
             maxLength: parseInt(columns[4], 10),
             contextFilter: columns[8] || '',
-            availableModes: columns[9] ? columns[9].split('|').map(m => m.trim()).filter(m => m) : []
+            availableModes: columns[9] ? columns[9].split('|').map(m => m.trim()).filter(m => m) : [],
+            category: (columns[10] || '').trim() || MISC_CATEGORY
           };
         }).filter(c => c.value);
-        setCorpora([...corporaData, { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle' }]);
+        setCorpora([...corporaData, { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle', category: MISC_CATEGORY }]);
       });
   }, [t]);
 
-  const { allDisciplines, codeToName } = useMemo(() => {
-    if (!perseeData) return { allDisciplines: [], codeToName: {} };
-    const disciplines = Object.keys(perseeData).sort();
-    const mapping = {};
-    Object.values(perseeData).forEach(d => {
-      Object.entries(d).forEach(([code, name]) => {
-        mapping[code] = name;
-      });
-    });
-    return { allDisciplines: disciplines, codeToName: mapping };
-  }, [perseeData]);
+  // Categories keep the corpus list browsable: there are over sixty corpora, so the
+  // first dropdown narrows the second one instead of just labelling a long list.
+  const categories = useMemo(() => {
+    const present = new Set(corpora.map(c => c.category));
+    return CORPUS_CATEGORIES.filter(c => present.has(c));
+  }, [corpora]);
 
-  useEffect(() => {
-    if (corpus === 'route à part (query_persee)' && perseeData && !hasInitializedPersee) {
-      // Only initialize if we haven't done so yet for this session/mount
-      setSelectedDisciplines(Object.keys(perseeData));
+  // The category is derived from the corpus, not stored: a query restored from a URL
+  // or a duplicated tab then lands in the right category on its own.
+  const currentCategory = useMemo(
+    () => corpora.find(c => c.value === corpus)?.category || categories[0] || MISC_CATEGORY,
+    [corpora, corpus, categories]);
 
-      const allCodes = Object.values(perseeData).flatMap(d => Object.keys(d));
-      const uniqueCodes = [...new Set(allCodes)];
-      onFormChange({ ...formData, revues: uniqueCodes });
-
-      setHasInitializedPersee(true);
-    }
-  }, [corpus, perseeData, hasInitializedPersee, formData, onFormChange]);
-
-  const availableJournals = useMemo(() => {
-    if (!perseeData) return [];
-    const codes = new Set();
-    selectedDisciplines.forEach(disc => {
-      const journalMap = perseeData[disc];
-      if (journalMap) {
-        Object.keys(journalMap).forEach(code => codes.add(code));
-      }
-    });
-    return Array.from(codes).map(code => ({ code, name: codeToName[code] })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedDisciplines, perseeData, codeToName]);
-
-  const filteredDisciplines = useMemo(() => {
-    return allDisciplines.filter(d => d.toLowerCase().includes(disciplineSearch.toLowerCase()));
-  }, [allDisciplines, disciplineSearch]);
-
-  const filteredJournals = useMemo(() => {
-    return availableJournals.filter(j => j.name.toLowerCase().includes(journalSearch.toLowerCase()));
-  }, [availableJournals, journalSearch]);
+  const handleSelectionChange = useCallback(
+    (partCorpus, partial) => onRevueSelectionChange(formData.id, partCorpus, partial),
+    [onRevueSelectionChange, formData.id]);
 
   const handleChange = (e) => {
     onFormChange({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleDisciplineChange = (event) => {
-    const value = event.target.value;
-    setSelectedDisciplines(value);
-
-    const newAvailableCodes = new Set();
-    value.forEach(disc => {
-      if (perseeData[disc]) {
-        Object.keys(perseeData[disc]).forEach(c => newAvailableCodes.add(c));
-      }
-    });
-
-    const currentRevues = revues || [];
-    const newRevues = currentRevues.filter(r => newAvailableCodes.has(r));
-    onFormChange({ ...formData, revues: newRevues });
-  };
-
-  const handleJournalChange = (event) => {
-    onFormChange({ ...formData, revues: event.target.value });
-  };
-
   const handleRubriqueChange = (event) => {
     onFormChange({ ...formData, rubriques: event.target.value });
-  };
-
-  const handleSelectAllDisciplines = (e) => {
-    e.stopPropagation();
-    setSelectedDisciplines(allDisciplines);
-    const allCodes = Object.values(perseeData).flatMap(d => Object.keys(d));
-    onFormChange({ ...formData, revues: [...new Set(allCodes)] });
-  };
-
-  const handleUnselectAllDisciplines = (e) => {
-    e.stopPropagation();
-    setSelectedDisciplines([]);
-    onFormChange({ ...formData, revues: [] });
-  };
-
-  const handleSelectAllJournals = (e) => {
-    e.stopPropagation();
-    onFormChange({ ...formData, revues: availableJournals.map(j => j.code) });
-  };
-
-  const handleUnselectAllJournals = (e) => {
-    e.stopPropagation();
-    onFormChange({ ...formData, revues: [] });
   };
 
   const handleSubmit = (e) => {
@@ -156,11 +359,11 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
     // If current resolution is not supported, fall back to a valid one
     if (resolution === 'jour' && !supportsDaily) {
       const newResolution = supportsMonthly ? 'mois' : 'annee';
-      onFormChange({ ...formData, resolution: newResolution });
+      onFormChange({ id: formData.id, resolution: newResolution });
     } else if (resolution === 'mois' && !supportsMonthly) {
-      onFormChange({ ...formData, resolution: 'annee' });
+      onFormChange({ id: formData.id, resolution: 'annee' });
     }
-  }, [corpus, selectedCorpus, maxResolution, resolution, formData, onFormChange]);
+  }, [corpus, selectedCorpus, maxResolution, resolution, formData.id, onFormChange]);
 
   // Available search modes with descriptions
   const searchModes = [
@@ -243,22 +446,13 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
         </Tooltip>
       </div>
       <div className="form-group" style={{ marginBottom: '1rem' }}>
-        <FormControl fullWidth>
-          <InputLabel id="corpus-select-label">{t('Corpus:')}</InputLabel>
-          <Select
-            labelId="corpus-select-label"
-            id="corpus-select"
-            value={corpus}
-            label={t('Corpus:')}
-            name="corpus"
-            onChange={handleChange}
-            sx={{ fontFamily: 'serif' }}
-          >
-            {corpora.map(c => (
-              <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <CorpusMenu
+          corpora={corpora}
+          categories={categories}
+          corpus={corpus}
+          currentCategory={currentCategory}
+          onSelect={(value) => onFormChange({ ...formData, corpus: value })}
+        />
       </div>
 
       {(searchModes.length > 1) && (
@@ -397,77 +591,16 @@ const FormComponent = ({ formData, onFormChange, onPlot, perseeData }) => {
         </FormControl>
       )}
 
-      {corpus === 'route à part (query_persee)' && (
-        <>
-          <FormControl fullWidth style={{ marginBottom: '1rem' }}>
-            <InputLabel id="disciplines-label">{t('Disciplines')}</InputLabel>
-            <Select
-              labelId="disciplines-label"
-              multiple
-              value={selectedDisciplines}
-              onChange={handleDisciplineChange}
-              input={<OutlinedInput label={t('Disciplines')} />}
-              renderValue={(selected) => selected.length === allDisciplines.length ? t('All Disciplines') : `${selected.length} ${t('selected')}`}
-            >
-              <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
-                <Button fullWidth size="small" variant="outlined" onClick={handleSelectAllDisciplines}>{t('All')}</Button>
-                <Button fullWidth size="small" variant="outlined" onClick={handleUnselectAllDisciplines}>{t('None')}</Button>
-              </Box>
-              <Box sx={{ p: 1 }}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder={t('Search disciplines...')}
-                  value={disciplineSearch}
-                  onChange={(e) => setDisciplineSearch(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </Box>
-              <Divider />
-              {filteredDisciplines.map((name) => (
-                <MenuItem key={name} value={name}>
-                  <Checkbox checked={selectedDisciplines.indexOf(name) > -1} />
-                  <ListItemText primary={name} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth style={{ marginBottom: '1rem' }}>
-            <InputLabel id="journals-label">{t('Journals')}</InputLabel>
-            <Select
-              labelId="journals-label"
-              multiple
-              value={revues || []}
-              onChange={handleJournalChange}
-              input={<OutlinedInput label={t('Journals')} />}
-              renderValue={(selected) => selected.length === availableJournals.length ? t('All Journals') : `${selected.length} ${t('selected')}`}
-            >
-              <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
-                <Button fullWidth size="small" variant="outlined" onClick={handleSelectAllJournals}>{t('All')}</Button>
-                <Button fullWidth size="small" variant="outlined" onClick={handleUnselectAllJournals}>{t('None')}</Button>
-              </Box>
-              <Box sx={{ p: 1 }}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder={t('Search journals...')}
-                  value={journalSearch}
-                  onChange={(e) => setJournalSearch(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </Box>
-              <Divider />
-              {filteredJournals.map((j) => (
-                <MenuItem key={j.code} value={j.code}>
-                  <Checkbox checked={(revues || []).indexOf(j.code) > -1} />
-                  <ListItemText primary={j.name} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </>
-      )}
+      {revueParts.map(part => (
+        <RevuePicker
+          key={part}
+          corpus={part}
+          revueMap={revuesData?.[part]}
+          selection={getSelection(formData, part)}
+          onSelectionChange={handleSelectionChange}
+          showCorpusName={revueParts.length > 1}
+        />
+      ))}
 
       <div className="form-group">
         <label>{t('Resolution:')}</label>

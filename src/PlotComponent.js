@@ -55,6 +55,31 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       })
       : data;
 
+  // The series is padded with nulls across every date of the requested years, so a corpus
+  // covering only part of that span (the TV transcripts start in June 2026) would be drawn
+  // against a mostly empty axis. Clamp the x range to where data actually exists. Where a
+  // corpus does cover the whole period this resolves to the requested range, so nothing
+  // changes; user zoom still wins, because uirevision makes Plotly keep the viewed range.
+  const dataExtent = React.useMemo(() => {
+    let min = Infinity, max = -Infinity;
+    (data || []).forEach(trace => {
+      if (!Array.isArray(trace?.x) || !Array.isArray(trace?.y)) return;
+      trace.x.forEach((d, i) => {
+        const v = trace.y[i];
+        if (v === null || v === undefined) return;
+        const ms = d instanceof Date ? d.getTime() : new Date(d).getTime();
+        if (Number.isNaN(ms)) return;
+        if (ms < min) min = ms;
+        if (ms > max) max = ms;
+      });
+    });
+    if (min > max) return null;
+    // A single point would give a zero-width axis; give it a day on each side.
+    if (min === max) { min -= 86400000; max += 86400000; }
+    const pad = (max - min) * 0.02;
+    return [new Date(min - pad), new Date(max + pad)];
+  }, [data]);
+
   // Apply color palette (colorblind or default)
   const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
 
@@ -81,6 +106,11 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       if (!trace.y || !trace.n || !trace.total || !trace.x) {
         return; // Skip if no data available
       }
+
+      // Cap the band so a huge relative error on rare words (e.g. daily
+      // resolution) can't blow up the auto-scaled y range and dwarf the signal.
+      const maxFreq = trace.y.reduce((m, v) => (v !== null && v !== undefined && v > m ? v : m), 0);
+      const ciUpperCap = maxFreq > 0 ? 1.5 * maxFreq : Infinity;
 
       // Split into segments at gaps (where total is null/0)
       // Each segment becomes a separate pair of traces
@@ -115,6 +145,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
             ciLower = freq;
             ciUpper = freq;
           }
+
+          ciUpper = Math.min(ciUpper, ciUpperCap);
 
           currentSegment.x.push(trace.x[i]);
           currentSegment.lower.push(ciLower);
@@ -239,7 +271,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       title: showTotalBarplot ? undefined : t('Date'),
       fixedrange: isTouchScreen,
       tickfont: { size: 14 },
-      ...(plotlyTheme.xaxis || {})
+      ...(plotlyTheme.xaxis || {}),
+      ...(dataExtent ? { range: dataExtent, autorange: false } : {})
     },
     yaxis: {
       title: yAxisTitle,

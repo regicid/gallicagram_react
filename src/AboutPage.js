@@ -39,6 +39,13 @@ function AboutPage() {
             <p>{t('about_ack_p2')}</p>
             <p>{t('about_ack_p3')}</p>
             <p>{t('about_ack_p4')}</p>
+            <p>
+                {t('about_ack_corpora_1')}
+                <a href="https://culturalanalytics.org/article/id/1164/" target="_blank" rel="noreferrer">{t('about_ack_corpora_link')}</a>
+                {t('about_ack_corpora_2')}
+                <a href="https://github.com/Yanndb974/laudisi_observatory" target="_blank" rel="noreferrer">{t('about_ack_corpora_link2')}</a>
+                {t('about_ack_corpora_3')}
+            </p>
         </div>
     );
 }

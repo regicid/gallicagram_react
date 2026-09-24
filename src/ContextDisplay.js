@@ -5,6 +5,20 @@ import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
+import { CAIRN_CORPUS, isTvCorpus, cairnSearchUrl, cairnProxyUrl, parseCairnResults } from './revueCorpora';
+
+// Cached across renders: both files are static and only needed for Cairn context.
+let cairnMetaPromise = null;
+const loadCairnMeta = () => {
+  if (!cairnMetaPromise) {
+    cairnMetaPromise = Promise.all([
+      fetch('/revues_cairn.json').then(r => r.json()),
+      fetch('/cairn_disciplines.json').then(r => r.json()),
+    ]).then(([revueMap, disciplineIds]) => ({ revueMap, disciplineIds }))
+      .catch(() => ({ revueMap: null, disciplineIds: null }));
+  }
+  return cairnMetaPromise;
+};
 
 const SpecialContextDisplay = ({ record, corpus }) => {
   const { t } = useTranslation();
@@ -123,6 +137,26 @@ const SpecialContextDisplay = ({ record, corpus }) => {
           });
           setData({ type: 'persee', content: results });
 
+        } else if (corpus === CAIRN_CORPUS) {
+          const { revueMap, disciplineIds } = await loadCairnMeta();
+          const args = { word, year, revues: record.revues, revueMap, disciplineIds };
+
+          // The link we hand the user keeps the year: Cairn applies it once the page runs
+          // its own scripts. The proxied fetch below cannot, so its results span all years.
+          setExternalUrl({ url: cairnSearchUrl(args), label: t('All documents') });
+
+          const response = await fetch(cairnProxyUrl(args));
+          if (!response.ok) throw new Error('Failed to fetch Cairn content');
+          const text = await response.text();
+
+          const doc = new DOMParser().parseFromString(text, 'text/html');
+          setData({ type: 'cairn', content: parseCairnResults(doc) });
+
+        } else if (isTvCorpus(corpus)) {
+          // No per-occurrence context for the transcripts; what matters to a reader
+          // looking at a dip is that the recording itself has gaps.
+          setData({ type: 'tv_note', content: null });
+
         } else if (corpus === 'rap') {
           const searchUrl = `https://shiny.ens-paris-saclay.fr/guni/source_rap?mot=${encodeURIComponent(word.replace(/’/g, "'"))}&year=${year}`;
           setExternalUrl({ url: 'https://huggingface.co/datasets/regicid/LRFAF', label: t('Corpus') });
@@ -222,6 +256,38 @@ const SpecialContextDisplay = ({ record, corpus }) => {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {data.type === 'tv_note' && (
+        <div style={{ fontSize: '0.95em', lineHeight: 1.5 }}>
+          {t('tv_corpus_gaps_note')}
+        </div>
+      )}
+
+      {data.type === 'cairn' && (
+        <div className="persee-list">
+          {data.content.length === 0 ? <div>{t('No data')}</div> : (
+            <>
+              <div style={{ fontSize: '0.85em', color: '#777', marginBottom: '10px', fontStyle: 'italic' }}>
+                {t('cairn_context_all_years')}
+              </div>
+              {data.content.map((item, i) => (
+                <div key={i} className="persee-item" style={{ marginBottom: '10px', borderBottom: '1px solid #eee', paddingBottom: '5px' }}>
+                  <div>
+                    <a href={item.href} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 'bold' }}>{item.title}</a>
+                  </div>
+                  <div style={{ fontSize: '0.9em', color: '#555' }}>
+                    {item.authors.length > 0 && <span>{item.authors.join(', ')} - </span>}
+                    {item.source && <span>{item.source}</span>}
+                  </div>
+                  {item.snippet && (
+                    <div className="searchContext" dangerouslySetInnerHTML={{ __html: item.snippet }} style={{ fontSize: '0.9em', marginTop: '5px' }} />
+                  )}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 

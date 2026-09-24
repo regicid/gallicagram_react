@@ -5,6 +5,7 @@ import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './Plot
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
+import { REVUE_CORPORA, TV_CORPORA, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection } from './revueCorpora';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -217,6 +218,62 @@ const AGORA_CORPORA = new Set([
   'voiles_et_voiliers',
 ]);
 
+// Builds the `&discipline=…&revue=…` filter for query_persee / query_cairn.
+// The API unions the two parameters, and the server rejects request lines over ~4 KB —
+// Cairn's 672 codes alone are ~4.7 KB — so whole disciplines are collapsed into
+// `discipline=`, which keeps the URL an order of magnitude shorter.
+export const buildRevueFilter = (revues, revueMap, supportsDiscipline) => {
+  // Never initialised: no filter at all, i.e. the whole corpus.
+  if (!Array.isArray(revues)) return '';
+  // Explicitly empty: send a code that matches nothing, otherwise an empty `revue`
+  // would be read as "no filter" and silently plot the whole corpus.
+  if (revues.length === 0) return '&revue=__aucune__';
+  if (!revueMap) return `&revue=${encodeURIComponent(revues.join(' '))}`;
+
+  const selected = new Set(revues);
+  const allCodes = new Set(Object.values(revueMap).flatMap(d => Object.keys(d)));
+  if ([...allCodes].every(c => selected.has(c))) return '';
+  if (!supportsDiscipline) return `&revue=${encodeURIComponent(revues.join(' '))}`;
+
+  const covered = new Set();
+  const disciplines = [];
+  Object.entries(revueMap).forEach(([name, journals]) => {
+    // The API splits `discipline` on commas, so a name containing one is unusable;
+    // its journals stay in the `revue` list instead.
+    if (name.includes(',')) return;
+    const codes = Object.keys(journals);
+    if (codes.length > 0 && codes.every(c => selected.has(c))) {
+      disciplines.push(name);
+      codes.forEach(c => covered.add(c));
+    }
+  });
+
+  const leftover = revues.filter(c => !covered.has(c));
+  return (disciplines.length > 0 ? `&discipline=${encodeURIComponent(disciplines.join(','))}` : '')
+    + (leftover.length > 0 ? `&revue=${encodeURIComponent(leftover.join(' '))}` : '');
+};
+
+// Adds several yearly series together. Both the occurrences and the corpus size have to
+// be summed, so that the frequency of the whole is (n1 + n2) / (total1 + total2) — unlike
+// the multi-word combiner downstream, where every word shares a single denominator.
+export const sumRevueSeries = (seriesList) => {
+  const byYear = new Map();
+  seriesList.forEach(rows => {
+    (rows || []).forEach(row => {
+      const year = row.annee ?? row.date ?? row.year;
+      if (year === null || year === undefined || Number.isNaN(Number(year))) return;
+      const acc = byYear.get(year);
+      if (acc) {
+        acc.n += Number(row.n) || 0;
+        acc.total += Number(row.total) || 0;
+      } else {
+        byYear.set(year, { ...row, annee: year, n: Number(row.n) || 0, total: Number(row.total) || 0 });
+      }
+    });
+  });
+  return [...byYear.values()].sort((a, b) => a.annee - b.annee);
+};
+
 function App() {
   const { t, i18n } = useTranslation();
 
@@ -286,7 +343,7 @@ function App() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [corpusPeriods, setCorpusPeriods] = useState({});
   const [corpusConfigs, setCorpusConfigs] = useState({});
-  const [perseeData, setPerseeData] = useState(null);
+  const [revuesData, setRevuesData] = useState({});
   const [dateWarnings, setDateWarnings] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -324,11 +381,13 @@ function App() {
       })
       .catch(error => console.error('Error loading corpus periods:', error));
 
-    // Load Persee revues
-    fetch('/revues_persee.json')
-      .then(res => res.json())
-      .then(data => setPerseeData(data))
-      .catch(err => console.error("Error loading persee revues", err));
+    // Load the revue/discipline lists of every corpus that supports filtering by revue
+    Object.entries(REVUE_CORPORA).forEach(([corpus, { revues }]) => {
+      fetch(revues)
+        .then(res => res.json())
+        .then(data => setRevuesData(prev => ({ ...prev, [corpus]: data })))
+        .catch(err => console.error(`Error loading revues for ${corpus}`, err));
+    });
   }, []);
 
   useEffect(() => {
@@ -779,7 +838,9 @@ function App() {
         url: '#',
         terms: [query.word],
         dummy: true,
-        resolution: query.resolution
+        resolution: query.resolution,
+        // Lets a revue corpus narrow its context to the same journals as the curve.
+        revues: getSelection(query, corpusCode).revues
       };
       setOccurrences([dummyRecord]);
       setTotalOccurrences(1);
@@ -863,10 +924,22 @@ function App() {
     }
   }, [plotData, fetchContextAfterPlot, queries, activeQueryId, fetchOccurrences]);
 
-  const handleFormChange = (updatedQuery) => {
-    const newQueries = queries.map(q => q.id === updatedQuery.id ? updatedQuery : q);
-    setQueries(newQueries);
-  };
+  // Merges into the *latest* query rather than replacing it: several effects in
+  // FormComponent fire in the same commit and each carries its own snapshot of
+  // formData, so a plain replace lets the last one silently undo the others
+  // (this is what dropped the revue filter right after it was set).
+  const handleFormChange = useCallback((patch) => {
+    setQueries(prev => prev.map(q => q.id === patch.id ? { ...q, ...patch } : q));
+  }, []);
+
+  // Discipline/revue selections are nested per corpus, so they need a deeper merge than
+  // handleFormChange: a combined corpus mounts one picker per part and they seed
+  // themselves in the same commit, which a shallow patch would collapse to one part.
+  const handleRevueSelectionChange = useCallback((queryId, corpus, partial) => {
+    setQueries(prev => prev.map(q => q.id === queryId
+      ? { ...q, revueSelection: { ...q.revueSelection, [corpus]: { ...(q.revueSelection || {})[corpus], ...partial } } }
+      : q));
+  }, []);
 
   const handleSliderChange = (event, newValue) => {
     // Ensure start date doesn't exceed end date
@@ -1106,16 +1179,27 @@ function App() {
     fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
   }
 
-  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, revues, rubriques, byRubrique) => {
+  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, query, rubriques, byRubrique) => {
     const apiResolution = resolution === 'decennie' ? 'annee' : resolution;
+    // A combined corpus is the sum of its parts: query each route with its own
+    // discipline/revue selection, then add the series together.
+    if (isCombinedCorpus(corpus)) {
+      return Promise.all(revueCorpusParts(corpus).map(part =>
+        fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query, rubriques, byRubrique)
+      )).then(sumRevueSeries);
+    }
     let url;
-    if (corpus === 'route à part (query_persee)') {
-      const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
-      url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
+    if (isRevueCorpus(corpus)) {
+      const { revues } = getSelection(query, corpus);
+      const filter = buildRevueFilter(revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline);
+      url = `${GALLICA_PROXY_API_URL}/${REVUE_CORPORA[corpus].route}?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&from=${startDate}&to=${endDate}&by_revue=False${filter}`;
     } else if (corpus === 'lemonde_rubriques') {
       const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
       const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
+    } else if (TV_CORPORA[corpus]) {
+      // from/to take AAAA, AAAAMM or AAAAMMJJ, so plain years pass through unchanged.
+      url = `${GALLICA_PROXY_API_URL}/query_tv?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${TV_CORPORA[corpus]}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else if (AGORA_CORPORA.has(corpus)) {
       url = `${AGORA_API_URL}/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else {
@@ -1362,7 +1446,7 @@ function App() {
 
   const fetchDataForQuery = (query, globalStartDate, globalEndDate) => {
     return new Promise((resolve, reject) => {
-      const { word, corpus, resolution, revues, rubriques, byRubrique, searchMode } = query;
+      const { word, corpus, resolution, rubriques, byRubrique, searchMode } = query;
       if (!word) {
         resolve([{ data: [], query: { ...query, startDate: globalStartDate, endDate: globalEndDate } }]);
         return;
@@ -1394,7 +1478,7 @@ function App() {
       if (corpus === 'google') {
         fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, globalStartDate, globalEndDate));
       } else {
-        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, revues, rubriques, byRubrique));
+        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, query, rubriques, byRubrique));
       }
 
       Promise.all(fetchPromises)
@@ -2151,7 +2235,8 @@ function App() {
                         formData={activeQuery}
                         onFormChange={handleFormChange}
                         onPlot={handlePlot}
-                        perseeData={perseeData}
+                        revuesData={revuesData}
+                        onRevueSelectionChange={handleRevueSelectionChange}
                       />
                       <div className="form-group">
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>

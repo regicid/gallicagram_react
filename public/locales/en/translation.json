@@ -189,5 +189,13 @@
   "tv_corpus_asr_note": "The transcripts are produced automatically by speech recognition (Whisper). Everyday vocabulary is recognised well, proper nouns less so, especially recent ones: a name that has only just entered the news may be misspelt or replaced by a more common word, and is therefore undercounted. Curves for recent proper nouns should be read with caution.",
   "Search on Cairn": "Search on Cairn",
   "cairn_context_link_note": "Cairn does not allow occurrences to be read from within Gallicagram, so the search opens on their site instead, with the word and the selected journals. Cairn can only filter by relative period (current year, last 3, 5 or 10 years), so the results are not restricted to the year you clicked.",
-  "Credit": "Credit:"
+  "Credit": "Credit:",
+  "Search on Google": "Search on Google",
+  "Read on {{name}}": "Read on {{name}}",
+  "press_search_warning": "These articles come from the search engine of {{name}}, restricted to the period you clicked. They are a sample of what the newspaper published, not the occurrences counted in the curve.",
+  "press_loose_matching_note": "This engine also returns near matches (“retraites” can bring up “retrait”).",
+  "press_up_to_end_note": "Its results come newest first, so for a long period only its last days appear.",
+  "press_no_results": "The newspaper's search engine found nothing for this period. Google may do better: see the link above.",
+  "press_link_note": "The search engine of {{site}} cannot be restricted to a date from Gallicagram, so the search opens on Google instead, limited to {{site}} and to the period you clicked. Google's date filter is approximate.",
+  "press_failed_note": "The search on {{name}} could not be loaded. It can be run on Google instead, limited to {{site}} and to the period you clicked."
 }

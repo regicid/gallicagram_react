@@ -1,6 +1,10 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const pressSearch = require('../api/press');
 
 module.exports = function (app) {
+  // On Vercel this is the api/press.js function; the dev server runs the same handler.
+  app.get('/api/press', pressSearch);
+
   app.use(
     '/ngrams',
     createProxyMiddleware({

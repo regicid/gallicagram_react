@@ -6,6 +6,7 @@ import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
 import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl } from './revueCorpora';
+import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -209,10 +210,10 @@ const AGORA_API_URL = 'https://shiny.ens-paris-saclay.fr/guni/agora';
 // Corpus IDs served by the Agoragram API (distinct URL prefix from the main Gallicagram API)
 const AGORA_CORPORA = new Set([
   '20minutes', 'atlantico', 'bfmtv', 'challenges', 'cnews', 'francesoir',
-  'gala', 'l_opinion', 'la_croix', 'la_depeche', 'laprovence', 'latribune',
+  'gala', 'l_opinion', 'la_depeche', 'laprovence', 'latribune',
   'le_capital', 'le_courrier_de_l_ouest', 'le_figaro', 'le_journal_du_dimanche',
   'le_maine_libre', 'le_marin', 'le_monde', 'le_nouvel_observateur',
-  'le_telegramme', 'leparisien', 'les_echos', 'marianne', 'mediapart',
+  'le_telegramme', 'les_echos', 'marianne', 'mediapart',
   'midilibre', 'nice_matin', 'ouest_france2', 'paris_match', 'paris_normandie',
   'presse_ocean', 'sud_ouest', 'telerama', 'valeurs_actuelles', 'voici',
   'voiles_et_voiliers',
@@ -1237,6 +1238,11 @@ function App() {
           revueMap: revuesData[CAIRN_CORPUS],
           disciplineIds: cairnDisciplines,
         });
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+      // Same for the press corpora whose context is a Google search on the site.
+      if (isPressLinkOutCorpus(query.corpus)) {
+        const url = pressLinkOutUrl(query.corpus, (query.word || '').split('+')[0].trim(), date.toISOString(), query.resolution);
         window.open(url, '_blank', 'noopener,noreferrer');
       }
 

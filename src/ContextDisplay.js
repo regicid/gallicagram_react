@@ -6,6 +6,7 @@ import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
 import { CAIRN_CORPUS, isTvCorpus, cairnSearchUrl, CATEGORY_CREDITS } from './revueCorpora';
+import { PRESS_PANEL, PRESS_LINK_OUT, isPressPanelCorpus, isPressLinkOutCorpus, pressPeriod, googleSiteSearchUrl, pressLinkOutUrl } from './pressCorpora';
 
 // Cached across renders: both files are static and only needed for Cairn context.
 let cairnMetaPromise = null;
@@ -19,6 +20,42 @@ const loadCairnMeta = () => {
   }
   return cairnMetaPromise;
 };
+
+// One article from a newspaper's search engine: Le Monde, and the modern press corpora.
+const ArticleCard = ({ item, buttonLabel }) => (
+  <div className="occurrence-card" style={{
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    padding: '15px',
+    backgroundColor: '#fff',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+  }}>
+    <h4 style={{ marginTop: 0, marginBottom: '10px' }}>
+      <a href={item.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#2c3e50' }}>
+        {item.title}
+      </a>
+    </h4>
+    {(item.date || item.section) && (
+      <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px', fontStyle: 'italic' }}>
+        {[item.date, item.section].filter(Boolean).join(' · ')}
+      </p>
+    )}
+    {item.description && (
+      <p style={{ marginBottom: '15px' }}>
+        {item.description}
+      </p>
+    )}
+    <Button
+      variant="contained"
+      color="success"
+      href={item.href}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {buttonLabel}
+    </Button>
+  </div>
+);
 
 const SpecialContextDisplay = ({ record, corpus, category }) => {
   const { t } = useTranslation();
@@ -70,7 +107,8 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
         const word = rawWord.split('+')[0].trim();
         const { year } = getDates();
 
-        if (corpus === 'lemonde_rubriques') {
+        // le_monde is the Agoragram corpus of the same paper; its context is the same search.
+        if (corpus === 'lemonde_rubriques' || corpus === 'le_monde') {
           const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&start_at=01/01/${record.date.split('-')[0]}&end_at=31/12/${record.date.split('-')[0]}`;
           const externalSearchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
           const fetchUrl = `/api/lemonde${queryParams}`;
@@ -149,6 +187,27 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           const url = cairnSearchUrl({ word, year, revues: record.revues, revueMap, disciplineIds });
           setData({ type: 'cairn_link', content: url });
 
+        } else if (isPressPanelCorpus(corpus)) {
+          const source = PRESS_PANEL[corpus];
+          const period = pressPeriod(record.date, record.resolution);
+          const googleUrl = googleSiteSearchUrl({ site: source.site, word, ...period });
+          try {
+            const items = await source.search({ word, ...period });
+            setExternalUrl({ url: googleUrl, label: t('Search on Google') });
+            setData({ type: 'press', content: items, source });
+          } catch (err) {
+            // The keys and page layouts used here belong to the newspapers and can change
+            // without notice; a failure should still leave the reader somewhere useful.
+            console.warn(`Press context for ${corpus} failed:`, err);
+            setData({ type: 'press_link', content: googleUrl, name: source.name, site: source.site, failed: true });
+          }
+
+        } else if (isPressLinkOutCorpus(corpus)) {
+          // The click handler already opened this in a new tab; the panel repeats the link
+          // for the case where a pop-up blocker stopped it.
+          const url = pressLinkOutUrl(corpus, word, record.date, record.resolution);
+          setData({ type: 'press_link', content: url, site: PRESS_LINK_OUT[corpus] });
+
         } else if (isTvCorpus(corpus)) {
           // No per-occurrence context for the transcripts; what matters to a reader
           // looking at a dip is that the recording itself has gaps.
@@ -181,7 +240,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
   }, [record, corpus, t]);
 
   // Shown on every path, including the "no context for this corpus" message, which is
-  // exactly where the modern press and Majinbook corpora end up.
+  // where the Majinbook corpora end up.
   // The label is a separate string from the name so the name can be a link; the French
   // translation carries its own space before the colon.
   const credit = CATEGORY_CREDITS[category];
@@ -202,7 +261,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
 
   // These corpora show no occurrences at all — a note, or a link out — so heading them
   // "Context for <word> (<date>)" would announce something that is not there.
-  const hasOccurrences = data.type !== 'tv_note' && data.type !== 'cairn_link';
+  const hasOccurrences = data.type !== 'tv_note' && data.type !== 'cairn_link' && data.type !== 'press_link';
 
   return (
     <div className="special-context-display">
@@ -223,41 +282,42 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           <p style={{ fontStyle: 'italic', fontSize: '0.9em', marginBottom: '1rem' }}>{t('le_monde_warning')}</p>
           <div className="records-list">
             {data.content.map((item, i) => (
-              <div key={i} className="occurrence-card" style={{
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                padding: '15px',
-                backgroundColor: '#fff',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}>
-                <h4 style={{ marginTop: 0, marginBottom: '10px' }}>
-                  <a href={item.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#2c3e50' }}>
-                    {item.title}
-                  </a>
-                </h4>
-                {item.date && (
-                  <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px', fontStyle: 'italic' }}>
-                    {item.date}
-                  </p>
-                )}
-                {item.description && (
-                  <p style={{ marginBottom: '15px' }}>
-                    {item.description}
-                  </p>
-                )}
-                <Button
-                  variant="contained"
-                  color="success"
-                  href={item.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('Read on Le Monde')}
-                </Button>
-              </div>
+              <ArticleCard key={i} item={item} buttonLabel={t('Read on Le Monde')} />
             ))}
           </div>
         </>
+      )}
+
+      {data.type === 'press' && (
+        <>
+          <p style={{ fontStyle: 'italic', fontSize: '0.9em', marginBottom: '1rem' }}>
+            {t('press_search_warning', { name: data.source.name })}
+            {data.source.looseMatching && <> {t('press_loose_matching_note')}</>}
+            {data.source.upToEnd && <> {t('press_up_to_end_note')}</>}
+          </p>
+          {data.content.length === 0
+            ? <p>{t('press_no_results')}</p>
+            : (
+              <div className="records-list">
+                {data.content.map((item, i) => (
+                  <ArticleCard key={i} item={item} buttonLabel={t('Read on {{name}}', { name: data.source.name })} />
+                ))}
+              </div>
+            )}
+        </>
+      )}
+
+      {data.type === 'press_link' && (
+        <div style={{ fontSize: '0.95em', lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0 }}>
+            {data.failed
+              ? t('press_failed_note', { name: data.name, site: data.site })
+              : t('press_link_note', { site: data.site })}
+          </p>
+          <a href={data.content} target="_blank" rel="noopener noreferrer" className="external-link-button">
+            {t('Search on Google')}
+          </a>
+        </div>
       )}
 
       {data.type === 'persee' && (

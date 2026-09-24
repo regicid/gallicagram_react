@@ -189,5 +189,13 @@
   "tv_corpus_asr_note": "Les transcriptions sont produites automatiquement, par reconnaissance vocale (Whisper). Le vocabulaire courant est bien reconnu, mais les noms propres le sont moins, surtout lorsqu’ils sont récents : un nom apparu dans l’actualité depuis peu peut être mal orthographié ou rendu par un mot plus courant, et se trouve donc sous-compté. Les courbes de noms propres récents sont à lire avec prudence.",
   "Search on Cairn": "Chercher sur Cairn",
   "cairn_context_link_note": "Cairn ne permet pas de consulter les occurrences depuis Gallicagram : la recherche s’ouvre directement sur leur site, avec le mot et les revues sélectionnées. Cairn ne sait filtrer que par période relative (année en cours, 3, 5 ou 10 dernières années) : les résultats ne sont donc pas limités à l’année cliquée.",
-  "Credit": "Crédit :"
+  "Credit": "Crédit :",
+  "Search on Google": "Chercher sur Google",
+  "Read on {{name}}": "Lire sur {{name}}",
+  "press_search_warning": "Ces articles viennent du moteur de recherche de {{name}}, limité à la période cliquée. C’est un échantillon de ce que le journal a publié, pas les occurrences comptées dans la courbe.",
+  "press_loose_matching_note": "Ce moteur renvoie aussi des correspondances approchées (« retraites » peut faire remonter « retrait »).",
+  "press_up_to_end_note": "Ses résultats sont classés du plus récent au plus ancien : sur une longue période, seuls ses derniers jours apparaissent.",
+  "press_no_results": "Le moteur de recherche du journal ne trouve rien sur cette période. Google fera peut-être mieux : voir le lien ci-dessus.",
+  "press_link_note": "Le moteur de recherche de {{site}} ne peut pas être limité à une date depuis Gallicagram : la recherche s’ouvre donc sur Google, limitée à {{site}} et à la période cliquée. Le filtre de date de Google est approximatif.",
+  "press_failed_note": "La recherche sur {{name}} n’a pas pu être chargée. Elle peut être lancée sur Google, limitée à {{site}} et à la période cliquée."
 }

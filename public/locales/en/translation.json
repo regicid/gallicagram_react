@@ -172,7 +172,6 @@
   "about_ack_corpora_1": "Finally, thanks to those we owe several corpora to: Antoine Mazières, for the Majinbook corpora (see ",
   "about_ack_corpora_link": "Mazières & Poibeau",
   "about_ack_corpora_2": "); Elias Echikr, for the modern press corpora; and Yann de Boisvilliers, for the television transcripts (see ",
-  "cairn_context_all_years": "Cairn does not support server-side year filtering: these results span all years. Use the link above for the year-filtered search.",
   "about_ack_corpora_link2": "Laudisi Observatory",
   "about_ack_corpora_3": ").",
   "All": "All",
@@ -187,5 +186,7 @@
   "TV transcripts": "TV transcripts",
   "tv_corpus_gaps_note": "This corpus is built by continuously recording rolling-news channels. The recording is occasionally interrupted, so some days are missing from the corpus. They do not show up as a drop but as a break in the line: where there is no line, there is no data.",
   "Semaine": "Week",
-  "tv_corpus_asr_note": "The transcripts are produced automatically by speech recognition (Whisper). Everyday vocabulary is recognised well, proper nouns less so, especially recent ones: a name that has only just entered the news may be misspelt or replaced by a more common word, and is therefore undercounted. Curves for recent proper nouns should be read with caution."
+  "tv_corpus_asr_note": "The transcripts are produced automatically by speech recognition (Whisper). Everyday vocabulary is recognised well, proper nouns less so, especially recent ones: a name that has only just entered the news may be misspelt or replaced by a more common word, and is therefore undercounted. Curves for recent proper nouns should be read with caution.",
+  "Search on Cairn": "Search on Cairn",
+  "cairn_context_link_note": "Cairn does not allow occurrences to be read from within Gallicagram. The link below opens the matching search on Cairn, with the word, the year and the selected journals."
 }

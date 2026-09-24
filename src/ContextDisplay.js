@@ -5,7 +5,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
-import { CAIRN_CORPUS, isTvCorpus, cairnSearchUrl, cairnProxyUrl, parseCairnResults } from './revueCorpora';
+import { CAIRN_CORPUS, isTvCorpus, cairnSearchUrl } from './revueCorpora';
 
 // Cached across renders: both files are static and only needed for Cairn context.
 let cairnMetaPromise = null;
@@ -138,19 +138,14 @@ const SpecialContextDisplay = ({ record, corpus }) => {
           setData({ type: 'persee', content: results });
 
         } else if (corpus === CAIRN_CORPUS) {
+          // Cairn sits behind bot protection, which started serving CAPTCHA challenges to
+          // the proxy, so the results are not fetched here. The search is handed over as a
+          // link instead: opened in the browser it also applies the year, which the
+          // server-rendered page ignores.
           const { revueMap, disciplineIds } = await loadCairnMeta();
-          const args = { word, year, revues: record.revues, revueMap, disciplineIds };
-
-          // The link we hand the user keeps the year: Cairn applies it once the page runs
-          // its own scripts. The proxied fetch below cannot, so its results span all years.
-          setExternalUrl({ url: cairnSearchUrl(args), label: t('All documents') });
-
-          const response = await fetch(cairnProxyUrl(args));
-          if (!response.ok) throw new Error('Failed to fetch Cairn content');
-          const text = await response.text();
-
-          const doc = new DOMParser().parseFromString(text, 'text/html');
-          setData({ type: 'cairn', content: parseCairnResults(doc) });
+          const url = cairnSearchUrl({ word, year, revues: record.revues, revueMap, disciplineIds });
+          setExternalUrl({ url, label: t('Search on Cairn') });
+          setData({ type: 'cairn_link', content: url });
 
         } else if (isTvCorpus(corpus)) {
           // No per-occurrence context for the transcripts; what matters to a reader
@@ -266,29 +261,12 @@ const SpecialContextDisplay = ({ record, corpus }) => {
         </div>
       )}
 
-      {data.type === 'cairn' && (
-        <div className="persee-list">
-          {data.content.length === 0 ? <div>{t('No data')}</div> : (
-            <>
-              <div style={{ fontSize: '0.85em', color: '#777', marginBottom: '10px', fontStyle: 'italic' }}>
-                {t('cairn_context_all_years')}
-              </div>
-              {data.content.map((item, i) => (
-                <div key={i} className="persee-item" style={{ marginBottom: '10px', borderBottom: '1px solid #eee', paddingBottom: '5px' }}>
-                  <div>
-                    <a href={item.href} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 'bold' }}>{item.title}</a>
-                  </div>
-                  <div style={{ fontSize: '0.9em', color: '#555' }}>
-                    {item.authors.length > 0 && <span>{item.authors.join(', ')} - </span>}
-                    {item.source && <span>{item.source}</span>}
-                  </div>
-                  {item.snippet && (
-                    <div className="searchContext" dangerouslySetInnerHTML={{ __html: item.snippet }} style={{ fontSize: '0.9em', marginTop: '5px' }} />
-                  )}
-                </div>
-              ))}
-            </>
-          )}
+      {data.type === 'cairn_link' && (
+        <div style={{ fontSize: '0.95em', lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0 }}>{t('cairn_context_link_note')}</p>
+          <a href={data.content} target="_blank" rel="noopener noreferrer" className="external-link-button">
+            {t('Search on Cairn')}
+          </a>
         </div>
       )}
 

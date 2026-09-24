@@ -282,6 +282,13 @@ export const PRESS_LINK_OUT = {
   marianne: 'marianne.net',
   telerama: 'telerama.fr',
   '20minutes': '20minutes.fr',
+  nice_matin: 'nicematin.com',
+  // No search of their own: Challenges only has a daily archive, France Soir's search box
+  // is Google's, and Paris Match and BFM TV have none.
+  challenges: 'challenges.fr',
+  paris_match: 'parismatch.com',
+  francesoir: 'francesoir.fr',
+  bfmtv: 'bfmtv.com',
   // Behind bot protection.
   cnews: 'cnews.fr',
   le_journal_du_dimanche: 'lejdd.fr',
@@ -292,12 +299,6 @@ export const PRESS_LINK_OUT = {
   presse_ocean: 'presseocean.fr',
   voiles_et_voiliers: 'voilesetvoiliers.com',
   le_marin: 'lemarin.fr',
-  // Search not found yet.
-  challenges: 'challenges.fr',
-  paris_match: 'parismatch.com',
-  francesoir: 'francesoir.fr',
-  bfmtv: 'bfmtv.com',
-  nice_matin: 'nicematin.com',
 };
 
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);

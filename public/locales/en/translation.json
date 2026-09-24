@@ -186,5 +186,6 @@
   "Journals": "Journals",
   "TV transcripts": "TV transcripts",
   "tv_corpus_gaps_note": "This corpus is built by continuously recording rolling-news channels. The recording is occasionally interrupted, so some days are missing from the corpus. They do not show up as a drop but as a break in the line: where there is no line, there is no data.",
-  "Semaine": "Week"
+  "Semaine": "Week",
+  "tv_corpus_asr_note": "The transcripts are produced automatically by speech recognition (Whisper). Everyday vocabulary is recognised well, proper nouns less so, especially recent ones: a name that has only just entered the news may be misspelt or replaced by a more common word, and is therefore undercounted. Curves for recent proper nouns should be read with caution."
 }

@@ -261,7 +261,8 @@ const SpecialContextDisplay = ({ record, corpus }) => {
 
       {data.type === 'tv_note' && (
         <div style={{ fontSize: '0.95em', lineHeight: 1.5 }}>
-          {t('tv_corpus_gaps_note')}
+          <p style={{ marginTop: 0 }}>{t('tv_corpus_gaps_note')}</p>
+          <p style={{ marginBottom: 0 }}>{t('tv_corpus_asr_note')}</p>
         </div>
       )}
 

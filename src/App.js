@@ -362,7 +362,10 @@ function App() {
           const columns = line.split('\t');
           if (columns[0] && columns[1] && columns[3]) {
             const periodRange = columns[1].trim();
-            const periodMatch = periodRange.match(/^(\d{4})-(\d{4})$/);
+            // Tolerate an approximation marker ("~1930-2023"): without this Persée had no
+            // period at all, so neither the date warnings nor the automatic date
+            // adjustment could ever fire for it.
+            const periodMatch = periodRange.match(/^~?\s*(\d{4})\s*-\s*(\d{4})$/);
             if (periodMatch) {
               periods[columns[3].trim()] = {
                 start: parseInt(periodMatch[1]),
@@ -1002,13 +1005,13 @@ function App() {
   // Auto-adjust dates when corpus changes within a tab (not when switching tabs)
   useEffect(() => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
-    if (!activeQuery || !corpusPeriods[activeQuery.corpus]) return;
+    if (!activeQuery) return;
 
     const currentCorpus = activeQuery.corpus;
+    const period = corpusPeriods[currentCorpus];
 
     // Detect if the corpus actually changed (not just a tab switch)
-    if (prevCorpusRef.current !== null && prevCorpusRef.current !== currentCorpus) {
-      const period = corpusPeriods[currentCorpus];
+    if (period && prevCorpusRef.current !== null && prevCorpusRef.current !== currentCorpus) {
       // If either start or end date is outside the recommended range, reset to recommended
       if (startDate < period.start || endDate > period.end) {
         setStartDate(period.start);
@@ -1016,6 +1019,8 @@ function App() {
       }
     }
 
+    // Tracked even for a corpus with no known period, otherwise going A -> that corpus
+    // -> A would look like "no change" and skip the adjustment on the way back.
     prevCorpusRef.current = currentCorpus;
   }, [queries, activeQueryId, corpusPeriods, startDate, endDate]);
 

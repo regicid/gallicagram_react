@@ -185,5 +185,5 @@
   "Disciplines": "Disciplines",
   "Journals": "Revues",
   "TV transcripts": "Transcriptions TV",
-  "tv_corpus_gaps_note": "Ce corpus est constitué par enregistrement continu des chaînes d’information. La captation connaît des interruptions ponctuelles : certaines journées sont absentes du corpus, et apparaissent donc comme des creux sur la courbe. Ces trous sont dus à des problèmes de captation, et non à une baisse réelle de l’usage du mot."
+  "tv_corpus_gaps_note": "Ce corpus est constitué par enregistrement continu des chaînes d’information. La captation connaît des interruptions : certaines journées sont absentes du corpus. Ces lacunes sont dues à des problèmes de captation, et non à une baisse réelle de l’usage du mot."
 }

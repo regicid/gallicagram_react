@@ -30,7 +30,7 @@ export const COMBINED_CORPORA = {
 export const CATEGORY_CREDITS = {
   'Modern press': { name: 'Elias Echikr' },
   'Majinbook': { name: 'Antoine Mazières', url: 'https://antonomase.fr/' },
-  'TV transcripts': { name: 'Yann de Boisvilliers' },
+  'TV transcripts': { name: 'Yann de Boisvilliers', url: 'https://www.linkedin.com/in/yann-de-boisvilliers-875ab8275/' },
 };
 
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);

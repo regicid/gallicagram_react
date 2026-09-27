@@ -20,9 +20,9 @@ Rap français (Genius)	1995-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024			Mi
 Persée	~1930-2023	1 milliard	route à part (query_persee)	2	Annuelle	Aucun	Décembre 2023			Academic journals
 Cairn	2001-2025	?	route à part (query_cairn)	3	Annuelle	Aucun	Septembre 2026			Academic journals
 Persée + Cairn	1930-2025	?	route à part (persee+cairn)	2	Annuelle	Aucun	Septembre 2026			Academic journals
-BFM TV (transcriptions)	2026-2026	?	tv_bfmtv	3	Journalière	Aucun	Septembre 2026			TV transcripts
-CNews (transcriptions)	2026-2026	?	tv_cnews	3	Journalière	Aucun	Septembre 2026			TV transcripts
-France Info (transcriptions)	2026-2026	?	tv_franceinfo	3	Journalière	Aucun	Septembre 2026			TV transcripts
+BFM TV (transcriptions)	2026-2026	?	tv_bfmtv	3	Journalière	Aucun	Septembre 2026		joker|nearby	TV transcripts
+CNews (transcriptions)	2026-2026	?	tv_cnews	3	Journalière	Aucun	Septembre 2026		joker|nearby	TV transcripts
+France Info (transcriptions)	2026-2026	?	tv_franceinfo	3	Journalière	Aucun	Septembre 2026		joker|nearby	TV transcripts
 Ouest-France (Gallica)	1899-2025	?	ouest	2	Annuelle	Aucun	Octobre 2025			Gallica
 Prénoms INSEE	1900-2024	?	prenoms	1	Annuelle	Aucun	2025			Miscellaneous
 Libération	1998-2025	?	libe	3	Journalière	Aucun	Novembre 2025			Modern press

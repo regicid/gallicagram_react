@@ -199,5 +199,22 @@
   "press_no_results": "The newspaper's search engine found nothing for this period. Google may do better: see the link above.",
   "press_link_note": "The search engine of {{site}} cannot be restricted to a date from Gallicagram, so the search opens on Google instead, limited to {{site}} and to the period you clicked. Google's date filter is approximate.",
   "press_failed_note": "The search on {{name}} could not be loaded. It can be run on Google instead, limited to {{site}} and to the period you clicked.",
-  "presse_moderne_help": "This corpus adds up every modern press outlet (except Le Marin, a trade paper). For each date, the occurrences in all outlets are summed, then divided by the total word count of all outlets: each outlet weighs according to how much it publishes, so dailies weigh more than weeklies. Not every outlet covers the whole period, so the make-up of the corpus changes over time."
+  "presse_moderne_help": "This corpus adds up every modern press outlet (except Le Marin, a trade paper). For each date, the occurrences in all outlets are summed, then divided by the total word count of all outlets: each outlet weighs according to how much it publishes, so dailies weigh more than weeklies. Not every outlet covers the whole period, so the make-up of the corpus changes over time.",
+  "wildcard_help": "Use * to add up, in one line, every word that starts this way (? stands for a single letter)",
+  "any_word_help": "Use _ for any word: every phrase with a word in that place is added up in one line",
+  "joker_syntax_help": "Put _ where you are looking for a word: “guerre _ allemagne” gives the most frequent words between “guerre” and “allemagne”. Without _, the joker goes after the words typed, as many times as Length asks. On the Gallica press, the search cannot start with _.",
+  "Ranking": "Ranking",
+  "score_count": "Frequency",
+  "score_count_help": "The words found most often.",
+  "score_llr": "Log-likelihood",
+  "score_llr_help": "The most significantly associated words, given how frequent they are on their own (Dunning's test). Favours frequent, solid associations.",
+  "score_pmi": "Mutual information (PMI)",
+  "score_pmi_help": "How many times more often than chance the word appears there. Favours rare, exclusive associations: pair it with a high minimum count.",
+  "score_logdice": "logDice",
+  "score_logdice_help": "Association score (at most 14) that does not depend on corpus size: comparable across periods and corpora.",
+  "Minimum count": "Minimum count",
+  "min_count_help": "Words seen less often are left out: association scores are unstable on rare words.",
+  "joker_underscore_help": "Put _ where you are looking for a word: the most frequent words in that place are listed. Without _, one is added after the words typed. On the Gallica press, the search cannot start with _.",
+  "joker_wildcard_help": "A word that starts this way: each form is listed separately",
+  "nearby_syntax_help": "Type one or two exact words (no * or _): the most frequent words nearby are listed, within a window set by Length. On the Gallica press, only the words that follow are counted."
 }

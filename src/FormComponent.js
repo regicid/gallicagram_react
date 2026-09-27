@@ -12,6 +12,7 @@ import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextFie
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { REVUE_CORPORA, revueCorpusParts, getSelection, isTvCorpus } from './revueCorpora';
+import { usesNgramRoute, SCORE_METHODS } from './ngramRoute';
 
 // Order of the category dropdown. Values match the "Catégorie" column of corpus.tsv
 // and are translation keys, like every other user-facing string.
@@ -286,7 +287,7 @@ const RevuePicker = ({ corpus, revueMap, selection, onSelectionChange, showCorpu
 
 const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSelectionChange }) => {
   const { t } = useTranslation();
-  const { word, corpus, resolution, rubriques, byRubrique, searchMode, word2, distance, n_joker, length, stopwords } = formData;
+  const { word, corpus, resolution, rubriques, byRubrique, searchMode, word2, distance, n_joker, length, stopwords, score, min_count } = formData;
   const [corpora, setCorpora] = useState([]);
 
   // One discipline+revue picker per revue corpus: a single one for Persée or Cairn,
@@ -429,21 +430,65 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
     searchModes.push({ value: 'associated_article', label: 'By word in the same article', description: 'Search mode associated article description' });
   }
 
+  // The syntax depends on the mode: in the list modes of the ngram routes, & and + do
+  // nothing, while _ and * mean something else than in n-gram mode.
+  const listModeSyntax = usesNgramRoute(corpus) && (searchMode === 'joker' || searchMode === 'nearby');
   const helpTooltipContent = (
     <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
       <strong>{t('Query Syntax:')}</strong>
       <br />
       <br />
-      <strong>&:</strong> {t('Use & to plot multiple words as separate lines')}
-      <br />
-      <em>{t('Example:')} liberté&égalité</em>
-      <br />
-      <br />
-      <strong>+:</strong> {t('Use + to combine multiple words into one line')}
-      <br />
-      <em>{t('Example:')} liberté+égalité</em>
-      <br />
-      <br />
+      {searchMode === 'joker' && listModeSyntax && (
+        <>
+          <strong>_:</strong> {t('joker_underscore_help')}
+          <br />
+          <em>{t('Example:')} guerre _ allemagne</em>
+          <br />
+          <br />
+          <strong>*:</strong> {t('joker_wildcard_help')}
+          <br />
+          <em>{t('Example:')} addict*</em>
+          <br />
+          <br />
+        </>
+      )}
+      {searchMode === 'nearby' && listModeSyntax && (
+        <>
+          {t('nearby_syntax_help')}
+          <br />
+          <em>{t('Example:')} camarade</em>
+          <br />
+          <br />
+        </>
+      )}
+      {!listModeSyntax && (
+        <>
+          <strong>&:</strong> {t('Use & to plot multiple words as separate lines')}
+          <br />
+          <em>{t('Example:')} liberté&égalité</em>
+          <br />
+          <br />
+          <strong>+:</strong> {t('Use + to combine multiple words into one line')}
+          <br />
+          <em>{t('Example:')} liberté+égalité</em>
+          <br />
+          <br />
+        </>
+      )}
+      {usesNgramRoute(corpus) && (!searchMode || searchMode === 'ngram') && (
+        <>
+          <strong>*:</strong> {t('wildcard_help')}
+          <br />
+          <em>{t('Example:')} addict*</em>
+          <br />
+          <br />
+          <strong>_:</strong> {t('any_word_help')}
+          <br />
+          <em>{t('Example:')} guerre _ allemagne</em>
+          <br />
+          <br />
+        </>
+      )}
       <strong>+ {t('button:')}</strong> {t('Add a new tab to compare different corpora or resolutions')}
     </div>
   );
@@ -542,23 +587,26 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
               ),
             }}
           />
-          <TextField
-            label={t('Length')}
-            name="length"
-            type="number"
-            value={length ?? ''}
-            onChange={handleChange}
-            sx={{ flex: 1 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <Tooltip title={t('length_help')} arrow placement="right">
-                    <HelpOutlineIcon fontSize="small" sx={{ color: 'action.secondary', fontSize: '16px', cursor: 'help' }} />
-                  </Tooltip>
-                </InputAdornment>
-              ),
-            }}
-          />
+          {/* With '_' in the words, the pattern sets the n-gram size and length is unused. */}
+          {!(searchMode === 'joker' && usesNgramRoute(corpus) && /(^|\s)_(\s|$)/.test(word || '')) && (
+            <TextField
+              label={t('Length')}
+              name="length"
+              type="number"
+              value={length ?? ''}
+              onChange={handleChange}
+              sx={{ flex: 1 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Tooltip title={t('length_help')} arrow placement="right">
+                      <HelpOutlineIcon fontSize="small" sx={{ color: 'action.secondary', fontSize: '16px', cursor: 'help' }} />
+                    </Tooltip>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          )}
           <TextField
             label={t('Stopwords')}
             name="stopwords"
@@ -577,6 +625,57 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
             }}
           />
         </div>
+      )}
+
+      {(searchMode === 'joker' || searchMode === 'nearby') && usesNgramRoute(corpus) && (
+        <>
+          {searchMode === 'joker' && (
+            <Alert severity="info" sx={{ marginBottom: '1rem', textAlign: 'left' }}>
+              {t('joker_syntax_help')}
+            </Alert>
+          )}
+          <div className="form-group" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <FormControl sx={{ flex: 2, minWidth: '12rem' }}>
+              <InputLabel id="score-select-label">{t('Ranking')}</InputLabel>
+              <Select
+                labelId="score-select-label"
+                name="score"
+                value={score || 'count'}
+                label={t('Ranking')}
+                onChange={handleChange}
+                sx={{ fontFamily: 'serif' }}
+              >
+                {SCORE_METHODS.map(m => (
+                  <MenuItem key={m} value={m} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{t(`score_${m}`)}</span>
+                    <Tooltip title={t(`score_${m}_help`)} arrow placement="right">
+                      <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: 'action.secondary', fontSize: '16px' }} />
+                    </Tooltip>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {score && score !== 'count' && (
+              <TextField
+                label={t('Minimum count')}
+                name="min_count"
+                type="number"
+                value={min_count ?? ''}
+                onChange={handleChange}
+                sx={{ flex: 1 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title={t('min_count_help')} arrow placement="right">
+                        <HelpOutlineIcon fontSize="small" sx={{ color: 'action.secondary', fontSize: '16px', cursor: 'help' }} />
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {(corpus === 'lemonde_rubriques' && (!searchMode || searchMode === 'ngram')) && (

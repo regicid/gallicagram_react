@@ -7,6 +7,8 @@ import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
 import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl } from './revueCorpora';
 import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
+import { sumSeries } from './series';
+import { usesNgramRoute, ngramDbName } from './ngramRoute';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -43,6 +45,8 @@ const initialQuery = {
   n_joker: 10,
   length: 2, // Will be updated based on word length
   stopwords: 500,
+  score: 'count',
+  min_count: 20,
   advancedOptions: {
     rescale: false,
     showConfidenceInterval: true,
@@ -219,10 +223,6 @@ const AGORA_CORPORA = new Set([
   'voiles_et_voiliers',
 ]);
 
-// Corpora served by the query_ngram route, which reads a token-indexed database and
-// answers far faster than /query. Same CSV columns, so nothing else changes.
-const NGRAM_ROUTE_CORPORA = new Set(['presse']);
-
 // The whole modern press as one corpus: every Agoragram outlet, queried on its own and
 // added together (occurrences and corpus size), so the big outlets weigh the most.
 // Le Parisien and La Croix are the Agoragram copies, not the guni corpora the app
@@ -324,29 +324,11 @@ export const rollUpToWeeks = (rows) => {
   return [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
 };
 
-// Adds several series together, matching rows on their date (year, and month and day
-// when the resolution has them). Both the occurrences and the corpus size have to be
-// summed, so that the frequency of the whole is (n1 + n2) / (total1 + total2) — unlike
-// the multi-word combiner downstream, where every word shares a single denominator.
-export const sumSeries = (seriesList) => {
-  const byDate = new Map();
-  seriesList.forEach(rows => {
-    (rows || []).forEach(row => {
-      const year = row.annee ?? row.date ?? row.year;
-      if (year === null || year === undefined || Number.isNaN(Number(year))) return;
-      const key = `${year}-${row.mois ?? ''}-${row.jour ?? ''}`;
-      const acc = byDate.get(key);
-      if (acc) {
-        acc.n += Number(row.n) || 0;
-        acc.total += Number(row.total) || 0;
-      } else {
-        byDate.set(key, { ...row, annee: year, n: Number(row.n) || 0, total: Number(row.total) || 0 });
-      }
-    });
-  });
-  return [...byDate.values()].sort((a, b) =>
-    (a.annee - b.annee) || ((a.mois ?? 0) - (b.mois ?? 0)) || ((a.jour ?? 0) - (b.jour ?? 0)));
-};
+// Search modes that return a ranked list of words instead of a time series.
+const LIST_MODES = ['joker', 'nearby', 'associated_article'];
+// Their counterparts on the ngram routes (see ngramRoute.js), which also take stopwords
+// and an association score.
+const NGRAM_LIST_ROUTES = { joker: 'joker_ngram', associated: 'associated_ngram' };
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -405,6 +387,21 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [smoothing, setSmoothing] = useState(initialUrlState ? initialUrlState.smoothing : 0);
   const [plotType, setPlotType] = useState(initialUrlState ? initialUrlState.plotType : 'line');
+  // Set when the app, not the user, changed the visualization: the type to go back to and
+  // why it changed ('list' for the list modes, 'lowData' for few occurrences). Choosing a
+  // type by hand clears it.
+  const autoPlotTypeRef = useRef(null);
+  const switchPlotTypeAuto = useCallback((type, reason) => {
+    // Chained switches (few occurrences, then joker) still return to the user's own choice.
+    const from = autoPlotTypeRef.current ? autoPlotTypeRef.current.from : plotType;
+    autoPlotTypeRef.current = { from, reason };
+    setPlotType(type);
+  }, [plotType]);
+  const restorePlotType = useCallback((reason) => {
+    if (autoPlotTypeRef.current?.reason !== reason) return;
+    setPlotType(autoPlotTypeRef.current.from);
+    autoPlotTypeRef.current = null;
+  }, []);
   const [occurrences, setOccurrences] = useState([]);
   const [totalOccurrences, setTotalOccurrences] = useState(0);
   const [totalPlotOccurrences, setTotalPlotOccurrences] = useState(0);
@@ -869,15 +866,18 @@ function App() {
     }
   }, [apiResponses, plotType, queries, activeQueryId, processData, t, corpusPeriods]);
 
-  // Effect to switch to 'sums' view for list modes
+  // Effect to switch to 'sums' view for list modes, and back when leaving them
   useEffect(() => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
-    if (activeQuery && (activeQuery.searchMode === 'joker' || activeQuery.searchMode === 'nearby' || activeQuery.searchMode === 'associated_article')) {
+    if (!activeQuery) return;
+    if (LIST_MODES.includes(activeQuery.searchMode)) {
       if (plotType !== 'sums' && plotType !== 'wordcloud') {
-        setPlotType('sums');
+        switchPlotTypeAuto('sums', 'list');
       }
+    } else {
+      restorePlotType('list');
     }
-  }, [queries, activeQueryId, plotType]);
+  }, [queries, activeQueryId, plotType, switchPlotTypeAuto, restorePlotType]);
 
   useEffect(() => {
     if (plotType !== 'line' && plotType !== 'area') {
@@ -1320,11 +1320,13 @@ function App() {
       const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
       const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
+    } else if (usesNgramRoute(corpus)) {
+      // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
+      // pattern is summed into one series on the server.
+      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else if (TV_CORPORA[corpus]) {
       // from/to take AAAA, AAAAMM or AAAAMMJJ, so plain years pass through unchanged.
       url = `${GALLICA_PROXY_API_URL}/query_tv?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${TV_CORPORA[corpus]}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
-    } else if (NGRAM_ROUTE_CORPORA.has(corpus)) {
-      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else if (AGORA_CORPORA.has(corpus) || corpus.startsWith(AGORA_PART_PREFIX)) {
       url = `${AGORA_API_URL}/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus.replace(AGORA_PART_PREFIX, '')}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else {
@@ -1332,8 +1334,11 @@ function App() {
     }
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
-      .then(response => {
+      .then(async response => {
         if (!response.ok) {
+          // The ngram routes explain their refusals (too many forms for a pattern, '_' or
+          // * at the start on a big corpus).
+          if (usesNgramRoute(corpus)) throw new Error(`${word} : ${await response.text()}`);
           throw new Error(`Network response was not ok for "${word}"`);
         }
         const contentType = response.headers.get("content-type");
@@ -1523,17 +1528,34 @@ function App() {
   };
 
   const fetchListMode = (query, globalStartDate, globalEndDate, route) => {
-    const { word, corpus, n_joker, length, stopwords } = query;
+    const { word, corpus, n_joker, length, stopwords, score, min_count } = query;
     // Handle Le Monde corpus specificities
     let actualCorpus = corpus;
     if (corpus === 'lemonde_rubriques' || corpus === 'lemonde') {
       actualCorpus = 'lemonde';
     }
 
-    const url = `https://shiny.ens-paris-saclay.fr/guni/${route}?mot=${word.replace(/’/g, "'")}&corpus=${actualCorpus}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}&length=${length || 2}&stopwords=${stopwords || 500}`;
+    let url = `https://shiny.ens-paris-saclay.fr/guni/${route}?mot=${word.replace(/’/g, "'")}&corpus=${actualCorpus}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}&length=${length || 2}&stopwords=${stopwords || 500}`;
+    const ngramRoute = usesNgramRoute(corpus) && NGRAM_LIST_ROUTES[route];
+    const ranked = ngramRoute && score && score !== 'count';
+    if (ngramRoute) {
+      // length is the size of the whole n-gram and must exceed the number of words given;
+      // below that, the server default (one word more) applies.
+      const wordCount = word.trim().split(/\s+/).length;
+      const lengthParam = Number(length) > wordCount ? `&length=${length}` : '';
+      // An emptied field falls back to the default rather than being sent as ''.
+      const orDefault = (value, fallback) => ((value ?? '') === '' ? fallback : value);
+      const scoreParam = ranked ? `&score=${score}&min_count=${orDefault(min_count, 20)}` : '';
+      url = `${GALLICA_PROXY_API_URL}/${ngramRoute}?mot=${encodeURIComponent(word.trim().replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}${lengthParam}&stopwords=${orDefault(stopwords, 500)}${scoreParam}`;
+    }
 
     return fetch(url)
-      .then(res => res.text())
+      .then(res => res.text().then(text => {
+        // The server explains its refusals in plain text; parsed as CSV they would plot
+        // as nonsense words.
+        if (!res.ok) throw new Error(`${word} : ${text}`);
+        return text;
+      }))
       .then(csvText => {
         return new Promise(resolve => {
           Papa.parse(csvText, {
@@ -1558,11 +1580,14 @@ function App() {
                 });
               }
 
+              // Ranked by an association score, the bars show the score; the count stays
+              // alongside for the CSV.
               const data = processedData.map(row => ({
                 word: row.gram,
-                total: row.tot
+                total: ranked ? row.score : row.tot,
+                ...(ranked ? { count: row.tot, freq: row.freq, score: row.score } : {}),
               }));
-              resolve([{ data, query: { ...query, startDate: globalStartDate, endDate: globalEndDate, isListMode: true } }]);
+              resolve([{ data, query: { ...query, startDate: globalStartDate, endDate: globalEndDate, isListMode: true, rankedBy: ranked ? score : null } }]);
             }
           });
         });
@@ -1766,11 +1791,14 @@ function App() {
         const total = flatResponses.reduce((acc, res) => acc + (res.total || 0), 0);
         setTotalPlotOccurrences(total);
 
-        // Auto-switch to barplot if total occurrences < 100 and currently in line mode
+        // Auto-switch to barplot if total occurrences < 100 and currently in line mode,
+        // and back once a plot has enough occurrences again
         if (plotType === 'line' && total < 100 && total > 0) {
-          setPlotType('bar');
+          switchPlotTypeAuto('bar', 'lowData');
           setSnackbarMessage(t('Low data warning', { count: total }));
           setSnackbarOpen(true);
+        } else if (total >= 100) {
+          restorePlotType('lowData');
         }
       })
       .catch(err => {
@@ -2186,10 +2214,10 @@ function App() {
 
   const handleDownloadCSV = () => {
     if ((plotType === 'sums' || plotType === 'wordcloud') && sumsData.length > 0) {
-      const csv = Papa.unparse({
-        fields: ['Word', 'Count'],
-        data: sumsData.map(d => ({ Word: d.word, Count: d.total }))
-      });
+      const ranked = sumsData.some(d => d.score !== undefined);
+      const csv = Papa.unparse(ranked
+        ? { fields: ['Word', 'Count', 'Frequency', 'Score'], data: sumsData.map(d => ({ Word: d.word, Count: d.count, Frequency: d.freq, Score: d.score })) }
+        : { fields: ['Word', 'Count'], data: sumsData.map(d => ({ Word: d.word, Count: d.total })) });
       downloadCSV(csv);
       return;
     }
@@ -2442,6 +2470,7 @@ function App() {
                       {plotType === 'sums' ? (
                         <SumsComponent
                           data={sumsData}
+                          rankedBy={apiResponses.find(res => res.query?.isListMode)?.query.rankedBy}
                           darkMode={darkMode}
                           advancedOptions={activeQuery?.advancedOptions}
                         />
@@ -2468,7 +2497,10 @@ function App() {
                             id="plot-type-select"
                             value={plotType}
                             label={t('Visualization:')}
-                            onChange={(e) => setPlotType(e.target.value)}
+                            onChange={(e) => {
+                              autoPlotTypeRef.current = null;
+                              setPlotType(e.target.value);
+                            }}
                             sx={{ fontFamily: 'serif' }}
                           >
                             <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>

@@ -199,5 +199,22 @@
   "press_no_results": "Le moteur de recherche du journal ne trouve rien sur cette période. Google fera peut-être mieux : voir le lien ci-dessus.",
   "press_link_note": "Le moteur de recherche de {{site}} ne peut pas être limité à une date depuis Gallicagram : la recherche s’ouvre donc sur Google, limitée à {{site}} et à la période cliquée. Le filtre de date de Google est approximatif.",
   "press_failed_note": "La recherche sur {{name}} n’a pas pu être chargée. Elle peut être lancée sur Google, limitée à {{site}} et à la période cliquée.",
-  "presse_moderne_help": "Ce corpus additionne tous les titres de la presse moderne (sauf Le Marin, journal professionnel). Pour chaque date, les occurrences de tous les titres sont additionnées, puis divisées par le nombre total de mots de tous les titres : chaque titre pèse selon le volume qu’il publie, si bien que les quotidiens pèsent plus que les hebdomadaires. Tous les titres ne couvrent pas toute la période : la composition du corpus change avec le temps."
+  "presse_moderne_help": "Ce corpus additionne tous les titres de la presse moderne (sauf Le Marin, journal professionnel). Pour chaque date, les occurrences de tous les titres sont additionnées, puis divisées par le nombre total de mots de tous les titres : chaque titre pèse selon le volume qu’il publie, si bien que les quotidiens pèsent plus que les hebdomadaires. Tous les titres ne couvrent pas toute la période : la composition du corpus change avec le temps.",
+  "wildcard_help": "Utilisez * pour additionner en une seule ligne tous les mots qui commencent ainsi (? remplace une seule lettre)",
+  "any_word_help": "Utilisez _ pour n'importe quel mot : toutes les expressions avec un mot à cet endroit sont additionnées en une seule ligne",
+  "joker_syntax_help": "Placez _ là où vous cherchez un mot : « guerre _ allemagne » donne les mots les plus fréquents entre « guerre » et « allemagne ». Sans _, le joker est placé après les mots saisis, autant de fois que le demande Longueur. Sur la presse de Gallica, la recherche ne peut pas commencer par _.",
+  "Ranking": "Classement",
+  "score_count": "Fréquence",
+  "score_count_help": "Les mots trouvés le plus souvent.",
+  "score_llr": "Log-vraisemblance",
+  "score_llr_help": "Les mots les plus significativement associés, compte tenu de leur fréquence propre (test de Dunning). Favorise les associations fréquentes et solides.",
+  "score_pmi": "Information mutuelle (PMI)",
+  "score_pmi_help": "Combien de fois plus souvent que le hasard le mot apparaît à cet endroit. Favorise les associations rares et exclusives : à combiner avec un compte minimal élevé.",
+  "score_logdice": "logDice",
+  "score_logdice_help": "Score d'association (maximum 14) qui ne dépend pas de la taille du corpus : comparable d'une période ou d'un corpus à l'autre.",
+  "Minimum count": "Compte minimal",
+  "min_count_help": "Les mots vus moins souvent sont écartés : les scores d'association sont instables sur les mots rares.",
+  "joker_underscore_help": "Placez _ là où vous cherchez un mot : les mots les plus fréquents à cet endroit sont listés. Sans _, il est ajouté après les mots saisis. Sur la presse de Gallica, la recherche ne peut pas commencer par _.",
+  "joker_wildcard_help": "Un mot qui commence ainsi : chaque forme est listée séparément",
+  "nearby_syntax_help": "Saisissez un ou deux mots exacts (sans * ni _) : les mots les plus fréquents à proximité sont listés, dans une fenêtre fixée par Longueur. Sur la presse de Gallica, seuls les mots qui suivent sont comptés."
 }

@@ -198,5 +198,6 @@
   "press_up_to_end_note": "Ses résultats sont classés du plus récent au plus ancien : sur une longue période, seuls ses derniers jours apparaissent.",
   "press_no_results": "Le moteur de recherche du journal ne trouve rien sur cette période. Google fera peut-être mieux : voir le lien ci-dessus.",
   "press_link_note": "Le moteur de recherche de {{site}} ne peut pas être limité à une date depuis Gallicagram : la recherche s’ouvre donc sur Google, limitée à {{site}} et à la période cliquée. Le filtre de date de Google est approximatif.",
-  "press_failed_note": "La recherche sur {{name}} n’a pas pu être chargée. Elle peut être lancée sur Google, limitée à {{site}} et à la période cliquée."
+  "press_failed_note": "La recherche sur {{name}} n’a pas pu être chargée. Elle peut être lancée sur Google, limitée à {{site}} et à la période cliquée.",
+  "presse_moderne_help": "Ce corpus additionne tous les titres de la presse moderne (sauf Le Marin, journal professionnel). Pour chaque date, les occurrences de tous les titres sont additionnées, puis divisées par le nombre total de mots de tous les titres : chaque titre pèse selon le volume qu’il publie, si bien que les quotidiens pèsent plus que les hebdomadaires. Tous les titres ne couvrent pas toute la période : la composition du corpus change avec le temps."
 }

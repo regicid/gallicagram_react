@@ -219,6 +219,39 @@ const AGORA_CORPORA = new Set([
   'voiles_et_voiliers',
 ]);
 
+// Corpora served by the query_ngram route, which reads a token-indexed database and
+// answers far faster than /query. Same CSV columns, so nothing else changes.
+const NGRAM_ROUTE_CORPORA = new Set(['presse']);
+
+// The whole modern press as one corpus: every Agoragram outlet, queried on its own and
+// added together (occurrences and corpus size), so the big outlets weigh the most.
+// Le Parisien and La Croix are the Agoragram copies, not the guni corpora the app
+// otherwise uses for them. Le Marin is left out: it is a trade paper, not news.
+const PRESSE_MODERNE = 'presse_moderne';
+const PRESSE_MODERNE_PARTS = [
+  ...[...AGORA_CORPORA].filter(corpus => corpus !== 'le_marin'),
+  'leparisien', 'la_croix',
+];
+// The parts are fetched under this prefix so they always go to Agoragram: the plain
+// leparisien corpus is the guni one.
+const AGORA_PART_PREFIX = 'agora:';
+// The Agoragram server is shared; more requests than this at once only queue there.
+const PRESSE_MODERNE_CONCURRENCY = 5;
+
+// Like Promise.all over items.map(fn), with at most `limit` calls in flight.
+const mapWithConcurrency = async (items, limit, fn) => {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+};
+
 // Builds the `&discipline=…&revue=…` filter for query_persee / query_cairn.
 // The API unions the two parameters, and the server rejects request lines over ~4 KB —
 // Cairn's 672 codes alone are ~4.7 KB — so whole disciplines are collapsed into
@@ -291,25 +324,28 @@ export const rollUpToWeeks = (rows) => {
   return [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
 };
 
-// Adds several yearly series together. Both the occurrences and the corpus size have to
-// be summed, so that the frequency of the whole is (n1 + n2) / (total1 + total2) — unlike
+// Adds several series together, matching rows on their date (year, and month and day
+// when the resolution has them). Both the occurrences and the corpus size have to be
+// summed, so that the frequency of the whole is (n1 + n2) / (total1 + total2) — unlike
 // the multi-word combiner downstream, where every word shares a single denominator.
-export const sumRevueSeries = (seriesList) => {
-  const byYear = new Map();
+export const sumSeries = (seriesList) => {
+  const byDate = new Map();
   seriesList.forEach(rows => {
     (rows || []).forEach(row => {
       const year = row.annee ?? row.date ?? row.year;
       if (year === null || year === undefined || Number.isNaN(Number(year))) return;
-      const acc = byYear.get(year);
+      const key = `${year}-${row.mois ?? ''}-${row.jour ?? ''}`;
+      const acc = byDate.get(key);
       if (acc) {
         acc.n += Number(row.n) || 0;
         acc.total += Number(row.total) || 0;
       } else {
-        byYear.set(year, { ...row, annee: year, n: Number(row.n) || 0, total: Number(row.total) || 0 });
+        byDate.set(key, { ...row, annee: year, n: Number(row.n) || 0, total: Number(row.total) || 0 });
       }
     });
   });
-  return [...byYear.values()].sort((a, b) => a.annee - b.annee);
+  return [...byDate.values()].sort((a, b) =>
+    (a.annee - b.annee) || ((a.mois ?? 0) - (b.mois ?? 0)) || ((a.jour ?? 0) - (b.jour ?? 0)));
 };
 
 function App() {
@@ -1268,7 +1304,12 @@ function App() {
     if (isCombinedCorpus(corpus)) {
       return Promise.all(revueCorpusParts(corpus).map(part =>
         fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query, rubriques, byRubrique)
-      )).then(sumRevueSeries);
+      )).then(sumSeries);
+    }
+    if (corpus === PRESSE_MODERNE) {
+      return mapWithConcurrency(PRESSE_MODERNE_PARTS, PRESSE_MODERNE_CONCURRENCY, part =>
+        fetchSingleWordGallicagram(word, `${AGORA_PART_PREFIX}${part}`, startDate, endDate, resolution, query)
+      ).then(sumSeries);
     }
     let url;
     if (isRevueCorpus(corpus)) {
@@ -1282,8 +1323,10 @@ function App() {
     } else if (TV_CORPORA[corpus]) {
       // from/to take AAAA, AAAAMM or AAAAMMJJ, so plain years pass through unchanged.
       url = `${GALLICA_PROXY_API_URL}/query_tv?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${TV_CORPORA[corpus]}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
-    } else if (AGORA_CORPORA.has(corpus)) {
-      url = `${AGORA_API_URL}/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
+    } else if (NGRAM_ROUTE_CORPORA.has(corpus)) {
+      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
+    } else if (AGORA_CORPORA.has(corpus) || corpus.startsWith(AGORA_PART_PREFIX)) {
+      url = `${AGORA_API_URL}/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus.replace(AGORA_PART_PREFIX, '')}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else {
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     }

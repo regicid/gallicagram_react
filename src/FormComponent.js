@@ -8,7 +8,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import { useTranslation } from 'react-i18next';
-import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment, Menu, MenuList, Popper, Paper } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment, Menu, MenuList, Popper, Paper, Alert } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { REVUE_CORPORA, revueCorpusParts, getSelection, isTvCorpus } from './revueCorpora';
@@ -468,6 +468,12 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
           onSelect={(value) => onFormChange({ ...formData, corpus: value })}
         />
       </div>
+
+      {corpus === 'presse_moderne' && (
+        <Alert severity="info" sx={{ marginBottom: '1rem', textAlign: 'left' }}>
+          {t('presse_moderne_help')}
+        </Alert>
+      )}
 
       {(searchModes.length > 1) && (
         <div className="form-group" style={{ marginBottom: '1rem' }}>

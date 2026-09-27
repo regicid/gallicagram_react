@@ -52,13 +52,16 @@ describe('registry', () => {
   // link-out, or the Le Monde search. A corpus added to the TSV without one would
   // silently fall back to "no context", so it fails here instead.
   const LE_MONDE = ['lemonde_rubriques', 'le_monde'];
+  // The sum of all the outlets has no single search to send a click to.
+  const NO_CONTEXT = ['presse_moderne'];
 
   test('covers every modern press corpus exactly once', () => {
     const tsv = fs.readFileSync(path.join(__dirname, '..', 'public', 'corpus.tsv'), 'utf8');
     const codes = tsv.trim().split('\n').slice(1)
       .map(line => line.split('\t'))
       .filter(cols => (cols[10] || '').trim() === 'Modern press')
-      .map(cols => cols[3].trim());
+      .map(cols => cols[3].trim())
+      .filter(code => !NO_CONTEXT.includes(code));
 
     expect(codes.length).toBeGreaterThan(0);
     codes.forEach(code => {

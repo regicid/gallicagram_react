@@ -5,10 +5,10 @@ import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './Plot
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
-import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl } from './revueCorpora';
+import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter } from './revueCorpora';
 import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
-import { usesNgramRoute, ngramDbName } from './ngramRoute';
+import { usesNgramRoute, ngramDbName, ngramFieldParams } from './ngramRoute';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -250,41 +250,6 @@ const mapWithConcurrency = async (items, limit, fn) => {
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return results;
-};
-
-// Builds the `&discipline=…&revue=…` filter for query_persee / query_cairn.
-// The API unions the two parameters, and the server rejects request lines over ~4 KB —
-// Cairn's 672 codes alone are ~4.7 KB — so whole disciplines are collapsed into
-// `discipline=`, which keeps the URL an order of magnitude shorter.
-export const buildRevueFilter = (revues, revueMap, supportsDiscipline) => {
-  // Never initialised: no filter at all, i.e. the whole corpus.
-  if (!Array.isArray(revues)) return '';
-  // Explicitly empty: send a code that matches nothing, otherwise an empty `revue`
-  // would be read as "no filter" and silently plot the whole corpus.
-  if (revues.length === 0) return '&revue=__aucune__';
-  if (!revueMap) return `&revue=${encodeURIComponent(revues.join(' '))}`;
-
-  const selected = new Set(revues);
-  const allCodes = new Set(Object.values(revueMap).flatMap(d => Object.keys(d)));
-  if ([...allCodes].every(c => selected.has(c))) return '';
-  if (!supportsDiscipline) return `&revue=${encodeURIComponent(revues.join(' '))}`;
-
-  const covered = new Set();
-  const disciplines = [];
-  Object.entries(revueMap).forEach(([name, journals]) => {
-    // The API splits `discipline` on commas, so a name containing one is unusable;
-    // its journals stay in the `revue` list instead.
-    if (name.includes(',')) return;
-    const codes = Object.keys(journals);
-    if (codes.length > 0 && codes.every(c => selected.has(c))) {
-      disciplines.push(name);
-      codes.forEach(c => covered.add(c));
-    }
-  });
-
-  const leftover = revues.filter(c => !covered.has(c));
-  return (disciplines.length > 0 ? `&discipline=${encodeURIComponent(disciplines.join(','))}` : '')
-    + (leftover.length > 0 ? `&revue=${encodeURIComponent(leftover.join(' '))}` : '');
 };
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
@@ -1294,6 +1259,18 @@ function App() {
     fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
   }
 
+  // Filters on the corpus's own fields for the ngram routes: rubriques on lemonde_rubriques,
+  // disciplines/revues on Cairn. `split` asks for one series per rubrique (query_ngram only).
+  const ngramFilter = (query, corpus, split = false) => {
+    if (isRevueCorpus(corpus)) {
+      return buildRevueFilter(getSelection(query, corpus).revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline, true);
+    }
+    if (corpus === 'lemonde_rubriques') {
+      return ngramFieldParams({ rubrique: query.rubriques }, split && query.byRubrique ? ['rubrique'] : []);
+    }
+    return '';
+  };
+
   const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, query, rubriques, byRubrique) => {
     // Neither decade nor week exists upstream: both are aggregated from a finer series.
     const apiResolution = resolution === 'decennie' ? 'annee'
@@ -1312,18 +1289,14 @@ function App() {
       ).then(sumSeries);
     }
     let url;
-    if (isRevueCorpus(corpus)) {
+    if (usesNgramRoute(corpus)) {
+      // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
+      // pattern is summed into one series on the server.
+      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
+    } else if (isRevueCorpus(corpus)) {
       const { revues } = getSelection(query, corpus);
       const filter = buildRevueFilter(revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline);
       url = `${GALLICA_PROXY_API_URL}/${REVUE_CORPORA[corpus].route}?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&from=${startDate}&to=${endDate}&by_revue=False${filter}`;
-    } else if (corpus === 'lemonde_rubriques') {
-      const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
-      const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
-      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
-    } else if (usesNgramRoute(corpus)) {
-      // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
-      // pattern is summed into one series on the server.
-      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else if (TV_CORPORA[corpus]) {
       // from/to take AAAA, AAAAMM or AAAAMMJJ, so plain years pass through unchanged.
       url = `${GALLICA_PROXY_API_URL}/query_tv?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${TV_CORPORA[corpus]}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
@@ -1546,7 +1519,7 @@ function App() {
       // An emptied field falls back to the default rather than being sent as ''.
       const orDefault = (value, fallback) => ((value ?? '') === '' ? fallback : value);
       const scoreParam = ranked ? `&score=${score}&min_count=${orDefault(min_count, 20)}` : '';
-      url = `${GALLICA_PROXY_API_URL}/${ngramRoute}?mot=${encodeURIComponent(word.trim().replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}${lengthParam}&stopwords=${orDefault(stopwords, 500)}${scoreParam}`;
+      url = `${GALLICA_PROXY_API_URL}/${ngramRoute}?mot=${encodeURIComponent(word.trim().replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}${lengthParam}&stopwords=${orDefault(stopwords, 500)}${scoreParam}${ngramFilter(query, corpus)}`;
     }
 
     return fetch(url)

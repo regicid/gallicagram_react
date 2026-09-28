@@ -678,7 +678,8 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
         </>
       )}
 
-      {(corpus === 'lemonde_rubriques' && (!searchMode || searchMode === 'ngram')) && (
+      {/* The ngram routes filter on rubriques in every mode; the split is for curves only. */}
+      {(corpus === 'lemonde_rubriques' && (!searchMode || ['ngram', 'joker', 'nearby'].includes(searchMode))) && (
         <FormControl fullWidth style={{ marginBottom: '1rem' }}>
           <InputLabel id="rubriques-label">{t('Rubriques')}</InputLabel>
           <Select
@@ -696,7 +697,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
               </MenuItem>
             ))}
           </Select>
-          <FormControlLabel
+          {(!searchMode || searchMode === 'ngram') && <FormControlLabel
             control={
               <Checkbox
                 checked={!!byRubrique}
@@ -706,7 +707,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
             }
             label={t('By rubrique')}
             style={{ marginTop: '0.5rem' }}
-          />
+          />}
         </FormControl>
       )}
 

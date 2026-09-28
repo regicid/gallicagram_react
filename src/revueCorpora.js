@@ -1,11 +1,12 @@
-// Corpora served by their own API route and filterable by discipline / revue.
+// Corpora filterable by discipline / revue. Persée has its own API route; Cairn goes
+// through the ngram routes (see ngramRoute.js), which filter on its revue field.
 // `revues` points at a public JSON file shaped { discipline: { code: nom } }.
 // `supportsDiscipline` marks the routes that accept a `discipline` parameter; where it
 // is false the codes must be listed one by one. query_persee accepts the parameter
 // syntactically but ignores it and returns the whole corpus, so it must stay false.
 export const REVUE_CORPORA = {
   'route à part (query_persee)': { route: 'query_persee', revues: '/revues_persee.json', supportsDiscipline: false, label: 'Persée' },
-  'route à part (query_cairn)': { route: 'query_cairn', revues: '/revues_cairn.json', supportsDiscipline: true, label: 'Cairn' },
+  'route à part (query_cairn)': { revues: '/revues_cairn.json', supportsDiscipline: true, label: 'Cairn' },
 };
 
 // Rolling-news transcripts. All three share the /query_tv route and name their channel in
@@ -50,6 +51,44 @@ export const revueCorpusParts = (corpus) => {
 // only share 10 of their names, and 41 revue codes collide case-insensitively between
 // Persée (lowercase) and Cairn (uppercase).
 export const getSelection = (query, corpus) => (query.revueSelection || {})[corpus] || {};
+
+// Builds the `&discipline=…&revue=…` filter for query_persee and the ngram routes (Cairn).
+// The API unions the two parameters, and the server rejects request lines over ~4 KB —
+// Cairn's 672 codes alone are ~4.7 KB — so whole disciplines are collapsed into
+// `discipline=`, which keeps the URL an order of magnitude shorter.
+// query_persee separates revue codes with spaces; the ngram routes (`ngram`) take commas
+// and recognise the discipline names that contain one ('Info, Communication').
+export const buildRevueFilter = (revues, revueMap, supportsDiscipline, ngram = false) => {
+  const revueParam = codes => `&revue=${encodeURIComponent(codes.join(ngram ? ',' : ' '))}`;
+  // Never initialised: no filter at all, i.e. the whole corpus.
+  if (!Array.isArray(revues)) return '';
+  // Explicitly empty: send a code that matches nothing, otherwise an empty `revue`
+  // would be read as "no filter" and silently plot the whole corpus.
+  if (revues.length === 0) return '&revue=__aucune__';
+  if (!revueMap) return revueParam(revues);
+
+  const selected = new Set(revues);
+  const allCodes = new Set(Object.values(revueMap).flatMap(d => Object.keys(d)));
+  if ([...allCodes].every(c => selected.has(c))) return '';
+  if (!supportsDiscipline) return revueParam(revues);
+
+  const covered = new Set();
+  const disciplines = [];
+  Object.entries(revueMap).forEach(([name, journals]) => {
+    // query_persee splits `discipline` on commas, so there a name containing one is
+    // unusable; its journals stay in the `revue` list instead.
+    if (!ngram && name.includes(',')) return;
+    const codes = Object.keys(journals);
+    if (codes.length > 0 && codes.every(c => selected.has(c))) {
+      disciplines.push(name);
+      codes.forEach(c => covered.add(c));
+    }
+  });
+
+  const leftover = revues.filter(c => !covered.has(c));
+  return (disciplines.length > 0 ? `&discipline=${encodeURIComponent(disciplines.join(','))}` : '')
+    + (leftover.length > 0 ? revueParam(leftover) : '');
+};
 
 export const CAIRN_CORPUS = 'route à part (query_cairn)';
 const CAIRN_SEARCH = 'https://shs.cairn.info/recherche';

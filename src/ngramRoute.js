@@ -14,9 +14,33 @@ export const NGRAM_ROUTE_CORPORA = {
   [CAIRN_CORPUS]: 'cairn',
 };
 
-export const usesNgramRoute = (corpus) => Object.prototype.hasOwnProperty.call(NGRAM_ROUTE_CORPORA, corpus);
+// The contemporary web press (Elias Echikr's databases, once served by the Agoragram API)
+// goes through the same routes with elias=true; the app corpus code is the database name.
+export const ELIAS_CORPORA = new Set([
+  '20minutes', 'atlantico', 'bfmtv', 'challenges', 'cnews', 'francesoir',
+  'gala', 'l_opinion', 'la_depeche', 'laprovence', 'latribune',
+  'le_capital', 'le_courrier_de_l_ouest', 'le_figaro', 'le_journal_du_dimanche',
+  'le_maine_libre', 'le_marin', 'le_monde', 'le_nouvel_observateur',
+  'le_telegramme', 'les_echos', 'marianne', 'mediapart',
+  'midilibre', 'nice_matin', 'ouest_france2', 'paris_match', 'paris_normandie',
+  'presse_ocean', 'sud_ouest', 'telerama', 'valeurs_actuelles', 'voici',
+  'voiles_et_voiliers',
+]);
+// Databases fetched under this prefix always come from the Elias set: its leparisien and
+// la_croix are not the guni corpora the app otherwise uses for those papers.
+export const ELIAS_PREFIX = 'elias:';
 
-export const ngramDbName = (corpus) => NGRAM_ROUTE_CORPORA[corpus];
+const isElias = (corpus) => ELIAS_CORPORA.has(corpus) || corpus.startsWith(ELIAS_PREFIX);
+
+export const usesNgramRoute = (corpus) =>
+  Object.prototype.hasOwnProperty.call(NGRAM_ROUTE_CORPORA, corpus) || isElias(corpus);
+
+export const ngramDbName = (corpus) =>
+  isElias(corpus) ? corpus.replace(ELIAS_PREFIX, '') : NGRAM_ROUTE_CORPORA[corpus];
+
+// The corpus parameters of an ngram route URL.
+export const ngramCorpusParams = (corpus) =>
+  `corpus=${ngramDbName(corpus)}${isElias(corpus) ? '&elias=true' : ''}`;
 
 // Filters on a corpus's own fields, as the ngram routes take them: `<field>=a,b` restricts
 // both the counts and the totals to those values, `by_<field>=True` splits the series

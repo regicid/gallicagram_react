@@ -1,5 +1,5 @@
 import { sumSeries } from './series';
-import { usesNgramRoute, ngramDbName, ngramFieldParams } from './ngramRoute';
+import { usesNgramRoute, ngramDbName, ngramCorpusParams, ngramFieldParams } from './ngramRoute';
 import { CAIRN_CORPUS, buildRevueFilter } from './revueCorpora';
 
 describe('ngram route', () => {
@@ -9,6 +9,14 @@ describe('ngram route', () => {
     expect(ngramDbName('lemonde_rubriques')).toBe('lemonde_rubriques');
     expect(ngramDbName(CAIRN_CORPUS)).toBe('cairn');
     expect(usesNgramRoute('lemonde')).toBe(false);
+  });
+
+  // The web press databases sit elsewhere on the server, which elias=true selects.
+  test('sends the web press corpora with elias=true', () => {
+    expect(ngramCorpusParams('le_figaro')).toBe('corpus=le_figaro&elias=true');
+    expect(ngramCorpusParams('elias:leparisien')).toBe('corpus=leparisien&elias=true');
+    expect(ngramCorpusParams('tv_bfmtv')).toBe('corpus=bfmtv');
+    expect(usesNgramRoute('leparisien')).toBe(false);
   });
 
   test('builds the field filters, leaving empty selections out', () => {

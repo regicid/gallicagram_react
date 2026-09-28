@@ -8,7 +8,7 @@ import ContextDisplay from './ContextDisplay';
 import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter } from './revueCorpora';
 import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
-import { usesNgramRoute, ngramDbName, ngramFieldParams } from './ngramRoute';
+import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX } from './ngramRoute';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -209,33 +209,17 @@ function movingSum(data, windowSize) {
 }
 
 const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
-const AGORA_API_URL = 'https://shiny.ens-paris-saclay.fr/guni/agora';
 
-// Corpus IDs served by the Agoragram API (distinct URL prefix from the main Gallicagram API)
-const AGORA_CORPORA = new Set([
-  '20minutes', 'atlantico', 'bfmtv', 'challenges', 'cnews', 'francesoir',
-  'gala', 'l_opinion', 'la_depeche', 'laprovence', 'latribune',
-  'le_capital', 'le_courrier_de_l_ouest', 'le_figaro', 'le_journal_du_dimanche',
-  'le_maine_libre', 'le_marin', 'le_monde', 'le_nouvel_observateur',
-  'le_telegramme', 'les_echos', 'marianne', 'mediapart',
-  'midilibre', 'nice_matin', 'ouest_france2', 'paris_match', 'paris_normandie',
-  'presse_ocean', 'sud_ouest', 'telerama', 'valeurs_actuelles', 'voici',
-  'voiles_et_voiliers',
-]);
-
-// The whole modern press as one corpus: every Agoragram outlet, queried on its own and
-// added together (occurrences and corpus size), so the big outlets weigh the most.
-// Le Parisien and La Croix are the Agoragram copies, not the guni corpora the app
+// The whole modern press as one corpus: every web outlet (see ELIAS_CORPORA), queried on
+// its own and added together (occurrences and corpus size), so the big outlets weigh the
+// most. Le Parisien and La Croix are the Elias copies, not the guni corpora the app
 // otherwise uses for them. Le Marin is left out: it is a trade paper, not news.
 const PRESSE_MODERNE = 'presse_moderne';
 const PRESSE_MODERNE_PARTS = [
-  ...[...AGORA_CORPORA].filter(corpus => corpus !== 'le_marin'),
+  ...[...ELIAS_CORPORA].filter(corpus => corpus !== 'le_marin'),
   'leparisien', 'la_croix',
-];
-// The parts are fetched under this prefix so they always go to Agoragram: the plain
-// leparisien corpus is the guni one.
-const AGORA_PART_PREFIX = 'agora:';
-// The Agoragram server is shared; more requests than this at once only queue there.
+].map(part => `${ELIAS_PREFIX}${part}`);
+// The server is shared; more requests than this at once only queue there.
 const PRESSE_MODERNE_CONCURRENCY = 5;
 
 // Like Promise.all over items.map(fn), with at most `limit` calls in flight.
@@ -1285,14 +1269,14 @@ function App() {
     }
     if (corpus === PRESSE_MODERNE) {
       return mapWithConcurrency(PRESSE_MODERNE_PARTS, PRESSE_MODERNE_CONCURRENCY, part =>
-        fetchSingleWordGallicagram(word, `${AGORA_PART_PREFIX}${part}`, startDate, endDate, resolution, query)
+        fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
       ).then(sumSeries);
     }
     let url;
     if (usesNgramRoute(corpus)) {
       // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
       // pattern is summed into one series on the server.
-      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
+      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
     } else if (isRevueCorpus(corpus)) {
       const { revues } = getSelection(query, corpus);
       const filter = buildRevueFilter(revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline);
@@ -1300,8 +1284,6 @@ function App() {
     } else if (TV_CORPORA[corpus]) {
       // from/to take AAAA, AAAAMM or AAAAMMJJ, so plain years pass through unchanged.
       url = `${GALLICA_PROXY_API_URL}/query_tv?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${TV_CORPORA[corpus]}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
-    } else if (AGORA_CORPORA.has(corpus) || corpus.startsWith(AGORA_PART_PREFIX)) {
-      url = `${AGORA_API_URL}/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus.replace(AGORA_PART_PREFIX, '')}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else {
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     }
@@ -1519,7 +1501,7 @@ function App() {
       // An emptied field falls back to the default rather than being sent as ''.
       const orDefault = (value, fallback) => ((value ?? '') === '' ? fallback : value);
       const scoreParam = ranked ? `&score=${score}&min_count=${orDefault(min_count, 20)}` : '';
-      url = `${GALLICA_PROXY_API_URL}/${ngramRoute}?mot=${encodeURIComponent(word.trim().replace(/’/g, "'"))}&corpus=${ngramDbName(corpus)}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}${lengthParam}&stopwords=${orDefault(stopwords, 500)}${scoreParam}${ngramFilter(query, corpus)}`;
+      url = `${GALLICA_PROXY_API_URL}/${ngramRoute}?mot=${encodeURIComponent(word.trim().replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}${lengthParam}&stopwords=${orDefault(stopwords, 500)}${scoreParam}${ngramFilter(query, corpus)}`;
     }
 
     return fetch(url)

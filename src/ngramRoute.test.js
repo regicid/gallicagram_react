@@ -8,7 +8,10 @@ describe('ngram route', () => {
     expect(ngramDbName('tv_bfmtv')).toBe('bfmtv');
     expect(ngramDbName('lemonde_rubriques')).toBe('lemonde_rubriques');
     expect(ngramDbName(CAIRN_CORPUS)).toBe('cairn');
+    expect(ngramDbName('livres')).toBe('livres');
     expect(usesNgramRoute('lemonde')).toBe(false);
+    // Its converted database has no counts yet: it stays on /query.
+    expect(usesNgramRoute('journal_des_debats')).toBe(false);
   });
 
   // The web press databases sit elsewhere on the server, which elias=true selects.

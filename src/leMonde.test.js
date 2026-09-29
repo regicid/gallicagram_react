@@ -10,6 +10,16 @@ describe('Le Monde', () => {
     expect(leMondeSource({ corpus: 'presse', rubriques: ['sport'] })).toBe('presse');
   });
 
+  test('sends n-grams longer than 2 to lemonde_rubriques', () => {
+    expect(leMondeSource({ corpus: 'le_monde', word: 'grève générale' })).toBe('le_monde');
+    expect(leMondeSource({ corpus: 'le_monde', word: 'grève+la grève générale' })).toBe('lemonde_rubriques');
+    expect(leMondeSource({ corpus: 'le_monde', word: 'mont-de-piété' })).toBe('lemonde_rubriques');
+    // joker looks one word further.
+    expect(leMondeSource({ corpus: 'le_monde', word: 'grève', searchMode: 'joker' })).toBe('le_monde');
+    expect(leMondeSource({ corpus: 'le_monde', word: 'la grève', searchMode: 'joker' })).toBe('lemonde_rubriques');
+    expect(leMondeSource({ corpus: 'le_monde', word: 'grève', searchMode: 'joker', length: 3 })).toBe('lemonde_rubriques');
+  });
+
   test('shows the two databases as one entry offering the modes of both', () => {
     const merged = mergeLeMonde([
       { value: 'lemonde_rubriques', availableModes: ['article', 'joker', 'nearby'] },

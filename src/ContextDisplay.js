@@ -5,7 +5,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
-import { CAIRN_CORPUS, isTvCorpus, cairnSearchUrl, CATEGORY_CREDITS } from './revueCorpora';
+import { CAIRN_CORPUS, PERSEE_CORPUS, isTvCorpus, cairnSearchUrl, CATEGORY_CREDITS } from './revueCorpora';
 import { PRESS_PANEL, PRESS_LINK_OUT, isPressPanelCorpus, isPressLinkOutCorpus, pressPeriod, googleSiteSearchUrl, pressLinkOutUrl } from './pressCorpora';
 
 // Cached across renders: both files are static and only needed for Cairn context.
@@ -144,7 +144,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           });
           setData({ type: 'lemonde', content: results });
 
-        } else if (corpus === 'route à part (query_persee)') {
+        } else if (corpus === PERSEE_CORPUS) {
           const queryParams = `?l=fre&da=${year}&q=%22${encodeURIComponent(word)}%22`;
           const externalSearchUrl = `https://www.persee.fr/search${queryParams}`;
           const fetchUrl = `/api/persee${queryParams}`;

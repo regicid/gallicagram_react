@@ -1,6 +1,6 @@
 import { sumSeries } from './series';
 import { usesNgramRoute, ngramDbName, ngramCorpusParams, ngramFieldParams } from './ngramRoute';
-import { CAIRN_CORPUS, buildRevueFilter } from './revueCorpora';
+import { CAIRN_CORPUS, PERSEE_CORPUS, buildRevueFilter } from './revueCorpora';
 
 describe('ngram route', () => {
   test('maps the app corpus codes to the server database names', () => {
@@ -8,6 +8,7 @@ describe('ngram route', () => {
     expect(ngramDbName('tv_bfmtv')).toBe('bfmtv');
     expect(ngramDbName('lemonde_rubriques')).toBe('lemonde_rubriques');
     expect(ngramDbName(CAIRN_CORPUS)).toBe('cairn');
+    expect(ngramDbName(PERSEE_CORPUS)).toBe('persee');
     expect(ngramDbName('livres')).toBe('livres');
     expect(usesNgramRoute('lemonde')).toBe(false);
     // Its converted database has no counts yet: it stays on /query.
@@ -32,10 +33,11 @@ describe('ngram route', () => {
   // The ngram routes take commas between revues and know the discipline names with one.
   test('writes the revue filter in the ngram syntax', () => {
     const revueMap = { 'Info, Communication': { RFSIC: 'x', COMMU: 'y' }, Sociologie: { RFS: 'z', ARSS: 'w' } };
-    expect(buildRevueFilter(['RFSIC', 'COMMU', 'RFS'], revueMap, true, true))
-      .toBe('&discipline=Info%2C%20Communication&revue=RFS');
     expect(buildRevueFilter(['RFSIC', 'COMMU', 'RFS'], revueMap, true))
-      .toBe('&revue=RFSIC%20COMMU%20RFS');
+      .toBe('&discipline=Info%2C%20Communication&revue=RFS');
+    // Persée ignores `discipline`: its codes are always listed.
+    expect(buildRevueFilter(['RFSIC', 'COMMU', 'RFS'], revueMap, false))
+      .toBe('&revue=RFSIC%2CCOMMU%2CRFS');
   });
 });
 

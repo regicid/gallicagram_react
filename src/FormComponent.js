@@ -13,6 +13,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { REVUE_CORPORA, revueCorpusParts, getSelection, isTvCorpus } from './revueCorpora';
 import { usesNgramRoute, SCORE_METHODS } from './ngramRoute';
+import { LE_MONDE, LE_MONDE_RUBRIQUES, leMondeSource, mergeLeMonde } from './leMonde';
 
 // Order of the category dropdown. Values match the "Catégorie" column of corpus.tsv
 // and are translation keys, like every other user-facing string.
@@ -311,7 +312,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
             category: (columns[10] || '').trim() || MISC_CATEGORY
           };
         }).filter(c => c.value);
-        setCorpora([...corporaData, { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle', category: MISC_CATEGORY }]);
+        setCorpora([...mergeLeMonde(corporaData), { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle', category: MISC_CATEGORY }]);
       });
   }, [t]);
 
@@ -346,7 +347,11 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
   };
 
   const selectedCorpus = corpora.find(c => c.value === corpus);
-  const maxResolution = selectedCorpus ? selectedCorpus.resolution : 'Journalière';
+  // A rubrique filter on Le Monde sends the query to lemonde_rubriques, which has no
+  // daily counts (see leMonde.js).
+  const maxResolution = !selectedCorpus ? 'Journalière'
+    : leMondeSource(formData) === LE_MONDE_RUBRIQUES ? 'Mensuelle'
+      : selectedCorpus.resolution;
   const availableModes = selectedCorpus?.availableModes || [];
 
   const supportsMonthly = maxResolution === 'Mensuelle' || maxResolution === 'Journalière';
@@ -679,7 +684,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
       )}
 
       {/* The ngram routes filter on rubriques in every mode; the split is for curves only. */}
-      {(corpus === 'lemonde_rubriques' && (!searchMode || ['ngram', 'joker', 'nearby'].includes(searchMode))) && (
+      {([LE_MONDE, LE_MONDE_RUBRIQUES].includes(corpus) && (!searchMode || ['ngram', 'joker', 'nearby'].includes(searchMode))) && (
         <FormControl fullWidth style={{ marginBottom: '1rem' }}>
           <InputLabel id="rubriques-label">{t('Rubriques')}</InputLabel>
           <Select

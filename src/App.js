@@ -5,9 +5,10 @@ import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './Plot
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
-import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter } from './revueCorpora';
+import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter, LEGACY_CORPUS_CODES } from './revueCorpora';
 import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
+import { leMondeSource } from './leMonde';
 import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX } from './ngramRoute';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
@@ -222,6 +223,11 @@ const PRESSE_MODERNE_PARTS = [
 // The server is shared; more requests than this at once only queue there.
 const PRESSE_MODERNE_CONCURRENCY = 5;
 
+// Gallica's press and books as one corpus, summed the same way. Books only have yearly
+// counts, so corpus.tsv caps it at the yearly resolution.
+const PRESSE_LIVRES = 'presse_livres';
+const PRESSE_LIVRES_PARTS = ['presse', 'livres'];
+
 // Like Promise.all over items.map(fn), with at most `limit` calls in flight.
 const mapWithConcurrency = async (items, limit, fn) => {
   const results = new Array(items.length);
@@ -286,7 +292,8 @@ function App() {
     if (typeof window === 'undefined') return null;
     const searchParams = new URLSearchParams(window.location.search);
     const word = searchParams.get('word');
-    const corpus = searchParams.get('corpus');
+    const corpusParam = searchParams.get('corpus');
+    const corpus = LEGACY_CORPUS_CODES[corpusParam] || corpusParam;
     const start = searchParams.get('start');
     const end = searchParams.get('end');
     const mode = searchParams.get('mode');
@@ -1008,7 +1015,9 @@ function App() {
   };
 
   const validateDatesAgainstCorpus = useCallback(() => {
-    const currentActiveQuery = queries.find(q => q.id === activeQueryId);
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    // Checked against the database the query is sent to (see leMonde.js).
+    const currentActiveQuery = activeQuery && { ...activeQuery, corpus: leMondeSource(activeQuery) };
     if (!currentActiveQuery || !corpusPeriods[currentActiveQuery.corpus]) {
       setDateWarnings([]);
       return;
@@ -1067,7 +1076,8 @@ function App() {
   const [wordCountWarnings, setWordCountWarnings] = useState([]);
 
   const validateWordCounts = useCallback(() => {
-    const currentActiveQuery = queries.find(q => q.id === activeQueryId);
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    const currentActiveQuery = activeQuery && { ...activeQuery, corpus: leMondeSource(activeQuery) };
     if (!currentActiveQuery || !corpusConfigs[currentActiveQuery.corpus]) {
       setWordCountWarnings([]);
       return;
@@ -1244,10 +1254,10 @@ function App() {
   }
 
   // Filters on the corpus's own fields for the ngram routes: rubriques on lemonde_rubriques,
-  // disciplines/revues on Cairn. `split` asks for one series per rubrique (query_ngram only).
+  // disciplines/revues on Cairn and Persée. `split` asks for one series per rubrique (query_ngram only).
   const ngramFilter = (query, corpus, split = false) => {
     if (isRevueCorpus(corpus)) {
-      return buildRevueFilter(getSelection(query, corpus).revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline, true);
+      return buildRevueFilter(getSelection(query, corpus).revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline);
     }
     if (corpus === 'lemonde_rubriques') {
       return ngramFieldParams({ rubrique: query.rubriques }, split && query.byRubrique ? ['rubrique'] : []);
@@ -1272,15 +1282,16 @@ function App() {
         fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
       ).then(sumSeries);
     }
+    if (corpus === PRESSE_LIVRES) {
+      return Promise.all(PRESSE_LIVRES_PARTS.map(part =>
+        fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
+      )).then(sumSeries);
+    }
     let url;
     if (usesNgramRoute(corpus)) {
       // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
       // pattern is summed into one series on the server.
       url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
-    } else if (isRevueCorpus(corpus)) {
-      const { revues } = getSelection(query, corpus);
-      const filter = buildRevueFilter(revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline);
-      url = `${GALLICA_PROXY_API_URL}/${REVUE_CORPORA[corpus].route}?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&from=${startDate}&to=${endDate}&by_revue=False${filter}`;
     } else if (TV_CORPORA[corpus]) {
       // from/to take AAAA, AAAAMM or AAAAMMJJ, so plain years pass through unchanged.
       url = `${GALLICA_PROXY_API_URL}/query_tv?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${TV_CORPORA[corpus]}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
@@ -1549,7 +1560,9 @@ function App() {
       });
   };
 
-  const fetchDataForQuery = (query, globalStartDate, globalEndDate) => {
+  const fetchDataForQuery = (displayedQuery, globalStartDate, globalEndDate) => {
+    // Le Monde is picked as one corpus but served by two databases (see leMonde.js).
+    const query = { ...displayedQuery, corpus: leMondeSource(displayedQuery) };
     return new Promise((resolve, reject) => {
       const { word, corpus, resolution, rubriques, byRubrique, searchMode } = query;
       if (!word) {

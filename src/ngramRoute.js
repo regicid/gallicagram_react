@@ -1,10 +1,10 @@
-import { CAIRN_CORPUS } from './revueCorpora';
+import { CAIRN_CORPUS, PERSEE_CORPUS } from './revueCorpora';
 
 // Corpora served by the query_ngram / joker_ngram / associated_ngram routes, which read a
 // token-indexed database ({name}_ngram.db) and answer far faster than /query and /joker.
 // Same CSV columns. App corpus code -> database name on the server.
 // Every route also filters on the corpus's own fields (rubrique on lemonde_rubriques,
-// revue on Cairn): see ngramFieldParams.
+// revue on Cairn and Persée): see ngramFieldParams.
 export const NGRAM_ROUTE_CORPORA = {
   presse: 'presse',
   livres: 'livres',
@@ -25,6 +25,7 @@ export const NGRAM_ROUTE_CORPORA = {
   tv_franceinfo: 'franceinfo',
   lemonde_rubriques: 'lemonde_rubriques',
   [CAIRN_CORPUS]: 'cairn',
+  [PERSEE_CORPUS]: 'persee',
 };
 
 // The contemporary web press (Elias Echikr's databases, once served by the Agoragram API)

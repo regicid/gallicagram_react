@@ -3,7 +3,8 @@ import Plot from 'react-plotly.js';
 import { useTranslation } from 'react-i18next';
 import { defaultPalette, colorblindPalette } from './PlotComponent';
 
-const SumsComponent = ({ data, darkMode, advancedOptions }) => {
+// rankedBy: the association score the list was ranked by (score_llr…), when not by count.
+const SumsComponent = ({ data, darkMode, advancedOptions, rankedBy }) => {
   const { t } = useTranslation();
 
   if (!data || data.length === 0) {
@@ -42,7 +43,7 @@ const SumsComponent = ({ data, darkMode, advancedOptions }) => {
       data={plotData}
       layout={{
         autosize: true,
-        title: t('Total Occurrences per Query'),
+        title: rankedBy ? t(`score_${rankedBy}`) : t('Total Occurrences per Query'),
         ...plotlyTheme,
         margin: {
           l: 150,
@@ -52,7 +53,7 @@ const SumsComponent = ({ data, darkMode, advancedOptions }) => {
           pad: 4
         },
         xaxis: {
-          title: t('Total Occurrences'),
+          title: rankedBy ? t(`score_${rankedBy}`) : t('Total Occurrences'),
           tickfont: { size: 14 },
           gridcolor: darkMode ? '#0f3460' : undefined
         },

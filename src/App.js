@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './App.css';
 import FormComponent, { AdvancedOptionsComponent } from './FormComponent';
-import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './PlotComponent';
+import PlotComponent, { defaultPalette, colorblindPalette, zscore, fromPlotlyDate } from './PlotComponent';
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
+import { REVUE_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter } from './revueCorpora';
+import { encodeUrlState, decodeUrlState, QUERY_DEFAULTS, ADVANCED_DEFAULTS } from './urlState';
+import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
+import { sumSeries } from './series';
+import { leMondeSource } from './leMonde';
+import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX } from './ngramRoute';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -34,22 +40,20 @@ let nextId = 2;
 const initialQuery = {
   word: 'liberté',
   corpus: 'presse',
-  resolution: 'annee',
-  searchMode: 'ngram',
-  word2: '',
-  distance: 10,
-  n_joker: 10,
-  length: 2, // Will be updated based on word length
-  stopwords: 500,
-  advancedOptions: {
-    rescale: false,
-    showConfidenceInterval: true,
-    showTotalBarplot: false,
-    extendYScale: false,
-    corpusBundle: false,
-    base100: false,
-    base100Year: null,
-  }
+  ...QUERY_DEFAULTS,
+  advancedOptions: { ...ADVANCED_DEFAULTS },
+};
+
+// The tabs a URL describes (see urlState.js): the defaults, then what the URL says, all
+// with the options it gives.
+const queriesFromUrl = (state) => {
+  nextId = Math.max(nextId, state.queries.length + 1);
+  return state.queries.map((query, i) => ({
+    id: i + 1,
+    ...initialQuery,
+    ...query,
+    advancedOptions: { ...initialQuery.advancedOptions, ...state.advancedOptions },
+  }));
 };
 
 function movingAverage(data, windowSize) {
@@ -204,33 +208,85 @@ function movingSum(data, windowSize) {
 
 const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 
+// The whole modern press as one corpus: every web outlet (see ELIAS_CORPORA), queried on
+// its own and added together (occurrences and corpus size), so the big outlets weigh the
+// most. Le Parisien and La Croix are the Elias copies, not the guni corpora the app
+// otherwise uses for them. Le Marin is left out: it is a trade paper, not news.
+const PRESSE_MODERNE = 'presse_moderne';
+const PRESSE_MODERNE_PARTS = [
+  ...[...ELIAS_CORPORA].filter(corpus => corpus !== 'le_marin'),
+  'leparisien', 'la_croix',
+].map(part => `${ELIAS_PREFIX}${part}`);
+// The server is shared; more requests than this at once only queue there.
+const PRESSE_MODERNE_CONCURRENCY = 5;
+
+// Gallica's press and books as one corpus, summed the same way. Books only have yearly
+// counts, so corpus.tsv caps it at the yearly resolution.
+const PRESSE_LIVRES = 'presse_livres';
+const PRESSE_LIVRES_PARTS = ['presse', 'livres'];
+
+// Like Promise.all over items.map(fn), with at most `limit` calls in flight.
+const mapWithConcurrency = async (items, limit, fn) => {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+};
+
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+// Monday of the week containing the given date, in UTC.
+const weekStartUTC = (year, month, day) => {
+  const d = new Date(Date.UTC(year, (month || 1) - 1, day || 1));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d;
+};
+
+// The API has no weekly resolution, so weeks are rolled up here from daily rows, and each
+// row is re-dated to its Monday. Both the occurrences and the corpus size are summed,
+// because every day carries its own denominator — this has to happen per word, before the
+// multi-word combiner downstream, which deliberately keeps one total per date.
+export const rollUpToWeeks = (rows) => {
+  const byWeek = new Map();
+  (rows || []).forEach(row => {
+    const year = Number(row.annee ?? row.date ?? row.year);
+    if (!year || Number.isNaN(year)) return;
+    const start = weekStartUTC(year, Number(row.mois), Number(row.jour));
+    const acc = byWeek.get(start.getTime());
+    if (acc) {
+      acc.n += Number(row.n) || 0;
+      acc.total += Number(row.total) || 0;
+    } else {
+      byWeek.set(start.getTime(), {
+        ...row,
+        n: Number(row.n) || 0,
+        total: Number(row.total) || 0,
+        annee: start.getUTCFullYear(),
+        mois: start.getUTCMonth() + 1,
+        jour: start.getUTCDate(),
+      });
+    }
+  });
+  return [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+};
+
+// Search modes that return a ranked list of words instead of a time series.
+const LIST_MODES = ['joker', 'nearby', 'associated_article'];
+// Their counterparts on the ngram routes (see ngramRoute.js), which also take stopwords
+// and an association score.
+const NGRAM_LIST_ROUTES = { joker: 'joker_ngram', associated: 'associated_ngram' };
+
 function App() {
   const { t, i18n } = useTranslation();
 
-  const initialUrlState = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    const searchParams = new URLSearchParams(window.location.search);
-    const word = searchParams.get('word');
-    const corpus = searchParams.get('corpus');
-    const start = searchParams.get('start');
-    const end = searchParams.get('end');
-    const mode = searchParams.get('mode');
-    const smoothingParam = searchParams.get('smoothing');
-    const plotTypeParam = searchParams.get('plotType');
-
-    if (word && corpus && start && end && mode) {
-      return {
-        word,
-        corpus,
-        start: parseInt(start, 10),
-        end: parseInt(end, 10),
-        mode,
-        smoothing: smoothingParam ? parseInt(smoothingParam, 10) : 0,
-        plotType: plotTypeParam || 'line'
-      };
-    }
-    return null;
-  }, []);
+  const initialUrlState = useMemo(
+    () => (typeof window === 'undefined' ? null : decodeUrlState(window.location.search)), []);
 
   useEffect(() => {
     // Detect language from browser settings
@@ -243,16 +299,12 @@ function App() {
       i18n.changeLanguage('en');
     }
   }, [i18n]);
-  const [queries, setQueries] = useState(initialUrlState ? [{
-    id: 1,
-    ...initialQuery,
-    word: initialUrlState.word,
-    corpus: initialUrlState.corpus,
-    searchMode: initialUrlState.mode
-  }] : [{ id: 1, ...initialQuery }]);
-  const [activeQueryId, setActiveQueryId] = useState(1);
-  const [startDate, setStartDate] = useState(initialUrlState ? initialUrlState.start : 1789);
-  const [endDate, setEndDate] = useState(initialUrlState ? initialUrlState.end : 1950);
+  const [queries, setQueries] = useState(() => (initialUrlState
+    ? queriesFromUrl(initialUrlState)
+    : [{ id: 1, ...initialQuery }]));
+  const [activeQueryId, setActiveQueryId] = useState(initialUrlState ? initialUrlState.activeIndex + 1 : 1);
+  const [startDate, setStartDate] = useState(initialUrlState?.startDate ?? 1789);
+  const [endDate, setEndDate] = useState(initialUrlState?.endDate ?? 1950);
   const [apiResponses, setApiResponses] = useState([]);
   const [rawPlotData, setRawPlotData] = useState([]);
   const [plotData, setPlotData] = useState([]);
@@ -261,6 +313,21 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [smoothing, setSmoothing] = useState(initialUrlState ? initialUrlState.smoothing : 0);
   const [plotType, setPlotType] = useState(initialUrlState ? initialUrlState.plotType : 'line');
+  // Set when the app, not the user, changed the visualization: the type to go back to and
+  // why it changed ('list' for the list modes, 'lowData' for few occurrences). Choosing a
+  // type by hand clears it.
+  const autoPlotTypeRef = useRef(null);
+  const switchPlotTypeAuto = useCallback((type, reason) => {
+    // Chained switches (few occurrences, then joker) still return to the user's own choice.
+    const from = autoPlotTypeRef.current ? autoPlotTypeRef.current.from : plotType;
+    autoPlotTypeRef.current = { from, reason };
+    setPlotType(type);
+  }, [plotType]);
+  const restorePlotType = useCallback((reason) => {
+    if (autoPlotTypeRef.current?.reason !== reason) return;
+    setPlotType(autoPlotTypeRef.current.from);
+    autoPlotTypeRef.current = null;
+  }, []);
   const [occurrences, setOccurrences] = useState([]);
   const [totalOccurrences, setTotalOccurrences] = useState(0);
   const [totalPlotOccurrences, setTotalPlotOccurrences] = useState(0);
@@ -273,7 +340,9 @@ function App() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [corpusPeriods, setCorpusPeriods] = useState({});
   const [corpusConfigs, setCorpusConfigs] = useState({});
-  const [perseeData, setPerseeData] = useState(null);
+  const [revuesData, setRevuesData] = useState({});
+  // Needed synchronously when a Cairn point is clicked, so it is loaded up front.
+  const [cairnDisciplines, setCairnDisciplines] = useState(null);
   const [dateWarnings, setDateWarnings] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -292,7 +361,10 @@ function App() {
           const columns = line.split('\t');
           if (columns[0] && columns[1] && columns[3]) {
             const periodRange = columns[1].trim();
-            const periodMatch = periodRange.match(/^(\d{4})-(\d{4})$/);
+            // Tolerate an approximation marker ("~1930-2023"): without this Persée had no
+            // period at all, so neither the date warnings nor the automatic date
+            // adjustment could ever fire for it.
+            const periodMatch = periodRange.match(/^~?\s*(\d{4})\s*-\s*(\d{4})$/);
             if (periodMatch) {
               periods[columns[3].trim()] = {
                 start: parseInt(periodMatch[1]),
@@ -303,7 +375,8 @@ function App() {
             const code = columns[3].trim();
             const filter = columns[8] ? columns[8].trim() : '';
             const maxLength = columns[4] ? parseInt(columns[4].trim(), 10) : 2;
-            configs[code] = { filter, maxLength };
+            const category = columns[10] ? columns[10].trim() : '';
+            configs[code] = { filter, maxLength, category };
           }
         });
         setCorpusPeriods(periods);
@@ -311,11 +384,18 @@ function App() {
       })
       .catch(error => console.error('Error loading corpus periods:', error));
 
-    // Load Persee revues
-    fetch('/revues_persee.json')
+    fetch('/cairn_disciplines.json')
       .then(res => res.json())
-      .then(data => setPerseeData(data))
-      .catch(err => console.error("Error loading persee revues", err));
+      .then(setCairnDisciplines)
+      .catch(err => console.error('Error loading Cairn disciplines', err));
+
+    // Load the revue/discipline lists of every corpus that supports filtering by revue
+    Object.entries(REVUE_CORPORA).forEach(([corpus, { revues }]) => {
+      fetch(revues)
+        .then(res => res.json())
+        .then(data => setRevuesData(prev => ({ ...prev, [corpus]: data })))
+        .catch(err => console.error(`Error loading revues for ${corpus}`, err));
+    });
   }, []);
 
   useEffect(() => {
@@ -379,18 +459,48 @@ function App() {
   }, [initialUrlState]); // Add dependency to be safe that it only reads latest definition
 
   const hasAutoPlotted = useRef(false);
+  // Set when the state has just been loaded from the URL (a link opened, or the back and
+  // forward buttons): the next render plots it, once that state is in place.
+  const [plotFromUrl, setPlotFromUrl] = useState(false);
 
   useEffect(() => {
     // Only auto-plot after corpusPeriods loads (to ensure plot names are correct)
     if (initialUrlState && !hasAutoPlotted.current && Object.keys(corpusPeriods).length > 0) {
       hasAutoPlotted.current = true;
-      // Use a timeout to ensure state settles before handlePlot uses it
-      setTimeout(() => {
-        handlePlot();
-      }, 0);
+      // A link without dates gets the period of its first corpus.
+      const period = corpusPeriods[initialUrlState.queries[0].corpus];
+      if (period && initialUrlState.startDate === null) setStartDate(period.start);
+      if (period && initialUrlState.endDate === null) setEndDate(period.end);
+      setPlotFromUrl(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [corpusPeriods]);
+
+  useEffect(() => {
+    if (!plotFromUrl) return;
+    setPlotFromUrl(false);
+    handlePlot({ fromUrl: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plotFromUrl]);
+
+  // Back and forward draw the plot their URL describes.
+  useEffect(() => {
+    const onPopState = () => {
+      const state = decodeUrlState(window.location.search);
+      if (!state) return;
+      const restored = queriesFromUrl(state);
+      setQueries(restored);
+      setActiveQueryId(restored[state.activeIndex].id);
+      if (state.startDate !== null) setStartDate(state.startDate);
+      if (state.endDate !== null) setEndDate(state.endDate);
+      setSmoothing(state.smoothing);
+      autoPlotTypeRef.current = null;
+      setPlotType(state.plotType);
+      setPlotFromUrl(true);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const processNgramData = useCallback((apiResponse, allSameCorpus, plotType, index) => {
     const { data, query } = apiResponse;
@@ -400,7 +510,7 @@ function App() {
 
     const years = [];
     for (let year = start; year <= end; year++) {
-      years.push(new Date(year, 0));
+      years.push(new Date(Date.UTC(year, 0)));
     }
 
     const traces = data.map(ngramData => {
@@ -449,6 +559,14 @@ function App() {
         for (let m = 0; m < 12; m++) {
           dataMap.set(Date.UTC(y, m), null);
         }
+      }
+    } else if (resolution === 'semaine') {
+      // Seeded on Mondays, matching the keys rollUpToWeeks produces.
+      let current = weekStartUTC(start, 1, 1).getTime();
+      const finalDate = Date.UTC(end, 11, 31);
+      while (current <= finalDate) {
+        dataMap.set(current, null);
+        current += WEEK_MS;
       }
     } else if (resolution === 'jour') {
       let currentDate = new Date(Date.UTC(start, 0, 1));
@@ -704,15 +822,18 @@ function App() {
     }
   }, [apiResponses, plotType, queries, activeQueryId, processData, t, corpusPeriods]);
 
-  // Effect to switch to 'sums' view for list modes
+  // Effect to switch to 'sums' view for list modes, and back when leaving them
   useEffect(() => {
     const activeQuery = queries.find(q => q.id === activeQueryId);
-    if (activeQuery && (activeQuery.searchMode === 'joker' || activeQuery.searchMode === 'nearby' || activeQuery.searchMode === 'associated_article')) {
+    if (!activeQuery) return;
+    if (LIST_MODES.includes(activeQuery.searchMode)) {
       if (plotType !== 'sums' && plotType !== 'wordcloud') {
-        setPlotType('sums');
+        switchPlotTypeAuto('sums', 'list');
       }
+    } else {
+      restorePlotType('list');
     }
-  }, [queries, activeQueryId, plotType]);
+  }, [queries, activeQueryId, plotType, switchPlotTypeAuto, restorePlotType]);
 
   useEffect(() => {
     if (plotType !== 'line' && plotType !== 'area') {
@@ -762,11 +883,13 @@ function App() {
       // Handle non-Gallica corpora by creating a dummy record
       const dummyRecord = {
         date: date.toISOString(),
-        paper_title: `${t('Context for')} ${query.word} (${date.getFullYear()})`,
+        paper_title: `${t('Context for')} ${query.word} (${date.getUTCFullYear()})`,
         url: '#',
         terms: [query.word],
         dummy: true,
-        resolution: query.resolution
+        resolution: query.resolution,
+        // Lets a revue corpus narrow its context to the same journals as the curve.
+        revues: getSelection(query, corpusCode).revues
       };
       setOccurrences([dummyRecord]);
       setTotalOccurrences(1);
@@ -776,19 +899,19 @@ function App() {
 
     const params = new URLSearchParams({
       terms: query.word.split('+')[0].replace(/’/g, "'"),
-      year: date.getFullYear(),
+      year: date.getUTCFullYear(),
       limit: searchParams.limit,
       cursor: searchParams.cursor,
       sort: 'relevance'
     });
 
-    // Add resolution specific parameters (month, day)
+    // Add resolution specific parameters (month, day). Points are dated at UTC midnight.
     const resolution = query.resolution;
     if (resolution === 'mois' || resolution === 'jour') {
       if (!isNaN(date.getTime())) {
-        params.append('month', date.getMonth() + 1); // getMonth is 0-indexed
+        params.append('month', date.getUTCMonth() + 1); // getUTCMonth is 0-indexed
         if (resolution === 'jour') {
-          params.append('day', date.getDate());
+          params.append('day', date.getUTCDate());
         }
       }
     }
@@ -850,10 +973,22 @@ function App() {
     }
   }, [plotData, fetchContextAfterPlot, queries, activeQueryId, fetchOccurrences]);
 
-  const handleFormChange = (updatedQuery) => {
-    const newQueries = queries.map(q => q.id === updatedQuery.id ? updatedQuery : q);
-    setQueries(newQueries);
-  };
+  // Merges into the *latest* query rather than replacing it: several effects in
+  // FormComponent fire in the same commit and each carries its own snapshot of
+  // formData, so a plain replace lets the last one silently undo the others
+  // (this is what dropped the revue filter right after it was set).
+  const handleFormChange = useCallback((patch) => {
+    setQueries(prev => prev.map(q => q.id === patch.id ? { ...q, ...patch } : q));
+  }, []);
+
+  // Discipline/revue selections are nested per corpus, so they need a deeper merge than
+  // handleFormChange: a combined corpus mounts one picker per part and they seed
+  // themselves in the same commit, which a shallow patch would collapse to one part.
+  const handleRevueSelectionChange = useCallback((queryId, corpus, partial) => {
+    setQueries(prev => prev.map(q => q.id === queryId
+      ? { ...q, revueSelection: { ...q.revueSelection, [corpus]: { ...(q.revueSelection || {})[corpus], ...partial } } }
+      : q));
+  }, []);
 
   const handleSliderChange = (event, newValue) => {
     // Ensure start date doesn't exceed end date
@@ -880,7 +1015,9 @@ function App() {
   };
 
   const validateDatesAgainstCorpus = useCallback(() => {
-    const currentActiveQuery = queries.find(q => q.id === activeQueryId);
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    // Checked against the database the query is sent to (see leMonde.js).
+    const currentActiveQuery = activeQuery && { ...activeQuery, corpus: leMondeSource(activeQuery) };
     if (!currentActiveQuery || !corpusPeriods[currentActiveQuery.corpus]) {
       setDateWarnings([]);
       return;
@@ -910,34 +1047,24 @@ function App() {
     validateDatesAgainstCorpus();
   }, [validateDatesAgainstCorpus]);
 
-  // Track previous corpus to detect actual corpus changes (not just tab switches)
-  const prevCorpusRef = React.useRef(null);
-
-  // Auto-adjust dates when corpus changes within a tab (not when switching tabs)
-  useEffect(() => {
-    const activeQuery = queries.find(q => q.id === activeQueryId);
-    if (!activeQuery || !corpusPeriods[activeQuery.corpus]) return;
-
-    const currentCorpus = activeQuery.corpus;
-
-    // Detect if the corpus actually changed (not just a tab switch)
-    if (prevCorpusRef.current !== null && prevCorpusRef.current !== currentCorpus) {
-      const period = corpusPeriods[currentCorpus];
-      // If either start or end date is outside the recommended range, reset to recommended
-      if (startDate < period.start || endDate > period.end) {
-        setStartDate(period.start);
-        setEndDate(period.end);
-      }
+  // Picking a corpus from the menu resets the dates to its period when they fall outside
+  // it. Only a pick does: switching tabs also changes the corpus on display, but the
+  // dates belong to the whole plot and must not move with it.
+  const handleCorpusPick = useCallback((patch) => {
+    handleFormChange(patch);
+    const period = corpusPeriods[patch.corpus];
+    if (period && (startDate < period.start || endDate > period.end)) {
+      setStartDate(period.start);
+      setEndDate(period.end);
     }
-
-    prevCorpusRef.current = currentCorpus;
-  }, [queries, activeQueryId, corpusPeriods, startDate, endDate]);
+  }, [handleFormChange, corpusPeriods, startDate, endDate]);
 
 
   const [wordCountWarnings, setWordCountWarnings] = useState([]);
 
   const validateWordCounts = useCallback(() => {
-    const currentActiveQuery = queries.find(q => q.id === activeQueryId);
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    const currentActiveQuery = activeQuery && { ...activeQuery, corpus: leMondeSource(activeQuery) };
     if (!currentActiveQuery || !corpusConfigs[currentActiveQuery.corpus]) {
       setWordCountWarnings([]);
       return;
@@ -957,8 +1084,9 @@ function App() {
     const warnings = [];
 
     if (currentActiveQuery.word) {
-      // Split by space, plus, or ampersand
-      const wordCount = currentActiveQuery.word.trim().split(/[\s+&]+/).length;
+      // '+' and '&' join separate n-grams, so the longest one is what has to fit.
+      const wordCount = Math.max(...currentActiveQuery.word.split(/[+&]/)
+        .map(part => part.trim().split(/\s+/).filter(Boolean).length));
       if (wordCount > maxLength) {
         let messageKey = 'Long query warning';
         if ((currentActiveQuery.corpus === 'lemonde' || currentActiveQuery.corpus === 'lemonde_rubriques') &&
@@ -1079,13 +1207,33 @@ function App() {
 
       const query = apiResponses[responseIndex].query;
       setSelectedQuery(query);
-      const date = new Date(point.x);
+      const date = fromPlotlyDate(point.x);
       setSelectedDate(date);
+
+      // Cairn cannot be read from inside the app, so a click goes straight to its search.
+      // This has to happen here, synchronously in the click handler: opening it later from
+      // the context panel's effect is no longer tied to the gesture and gets blocked.
+      if (query.corpus === CAIRN_CORPUS) {
+        const url = cairnSearchUrl({
+          word: (query.word || '').split('+')[0].trim(),
+          year: date.getUTCFullYear(),
+          revues: getSelection(query, CAIRN_CORPUS).revues,
+          revueMap: revuesData[CAIRN_CORPUS],
+          disciplineIds: cairnDisciplines,
+        });
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+      // Same for the press corpora whose context is a Google search on the site.
+      if (isPressLinkOutCorpus(query.corpus)) {
+        const url = pressLinkOutUrl(query.corpus, (query.word || '').split('+')[0].trim(), date.toISOString(), query.resolution);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+
       const newSearchParams = { limit: 10, cursor: 0 };
       setContextSearchParams(newSearchParams);
       fetchOccurrences(date, newSearchParams, query, false);
     }
-  }, [queries, activeQueryId, plotType, apiResponses, fetchOccurrences]);
+  }, [queries, activeQueryId, plotType, apiResponses, fetchOccurrences, revuesData, cairnDisciplines]);
 
   const handleContextPageChange = (pageIndex) => {
     const newSearchParams = { ...contextSearchParams, cursor: pageIndex * contextSearchParams.limit };
@@ -1093,23 +1241,55 @@ function App() {
     fetchOccurrences(selectedDate, newSearchParams, selectedQuery, true);
   }
 
-  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, revues, rubriques, byRubrique) => {
-    const apiResolution = resolution === 'decennie' ? 'annee' : resolution;
+  // Filters on the corpus's own fields for the ngram routes: rubriques on lemonde_rubriques,
+  // disciplines/revues on Cairn and Persée. `split` asks for one series per rubrique (query_ngram only).
+  const ngramFilter = (query, corpus, split = false) => {
+    if (isRevueCorpus(corpus)) {
+      return buildRevueFilter(getSelection(query, corpus).revues, revuesData[corpus], REVUE_CORPORA[corpus].supportsDiscipline);
+    }
+    if (corpus === 'lemonde_rubriques') {
+      return ngramFieldParams({ rubrique: query.rubriques }, split && query.byRubrique ? ['rubrique'] : []);
+    }
+    return '';
+  };
+
+  const fetchSingleWordGallicagram = (word, corpus, startDate, endDate, resolution, query, rubriques, byRubrique) => {
+    // Neither decade nor week exists upstream: both are aggregated from a finer series.
+    const apiResolution = resolution === 'decennie' ? 'annee'
+      : resolution === 'semaine' ? 'jour'
+        : resolution;
+    // A combined corpus is the sum of its parts: query each route with its own
+    // discipline/revue selection, then add the series together.
+    if (isCombinedCorpus(corpus)) {
+      return Promise.all(revueCorpusParts(corpus).map(part =>
+        fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query, rubriques, byRubrique)
+      )).then(sumSeries);
+    }
+    if (corpus === PRESSE_MODERNE) {
+      return mapWithConcurrency(PRESSE_MODERNE_PARTS, PRESSE_MODERNE_CONCURRENCY, part =>
+        fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
+      ).then(sumSeries);
+    }
+    if (corpus === PRESSE_LIVRES) {
+      return Promise.all(PRESSE_LIVRES_PARTS.map(part =>
+        fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
+      )).then(sumSeries);
+    }
     let url;
-    if (corpus === 'route à part (query_persee)') {
-      const revueParam = revues && revues.length > 0 ? `&revue=${revues.join('+')}` : '';
-      url = `https://shiny.ens-paris-saclay.fr/guni/query_persee?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&from=${startDate}&to=${endDate}&by_revue=False${revueParam}`;
-    } else if (corpus === 'lemonde_rubriques') {
-      const rubriqueParam = rubriques && rubriques.length > 0 ? `&rubrique=${rubriques.join('+')}` : '';
-      const byRubriqueParam = byRubrique ? '&by_rubrique=True' : '';
-      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${rubriqueParam}${byRubriqueParam}`;
+    if (usesNgramRoute(corpus)) {
+      // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
+      // pattern is summed into one series on the server.
+      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
     } else {
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     }
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
-      .then(response => {
+      .then(async response => {
         if (!response.ok) {
+          // The ngram routes explain their refusals (too many forms for a pattern, '_' or
+          // * at the start on a big corpus).
+          if (usesNgramRoute(corpus)) throw new Error(`${word} : ${await response.text()}`);
           throw new Error(`Network response was not ok for "${word}"`);
         }
         const contentType = response.headers.get("content-type");
@@ -1139,7 +1319,7 @@ function App() {
               if (results.errors.length) {
                 console.error(`CSV Parsing errors for "${word}":`, results.errors);
               }
-              papaResolve(results.data);
+              papaResolve(resolution === 'semaine' ? rollUpToWeeks(results.data) : results.data);
             }
           });
         });
@@ -1299,17 +1479,34 @@ function App() {
   };
 
   const fetchListMode = (query, globalStartDate, globalEndDate, route) => {
-    const { word, corpus, n_joker, length, stopwords } = query;
+    const { word, corpus, n_joker, length, stopwords, score, min_count } = query;
     // Handle Le Monde corpus specificities
     let actualCorpus = corpus;
     if (corpus === 'lemonde_rubriques' || corpus === 'lemonde') {
       actualCorpus = 'lemonde';
     }
 
-    const url = `https://shiny.ens-paris-saclay.fr/guni/${route}?mot=${word.replace(/’/g, "'")}&corpus=${actualCorpus}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}&length=${length || 2}&stopwords=${stopwords || 500}`;
+    let url = `https://shiny.ens-paris-saclay.fr/guni/${route}?mot=${word.replace(/’/g, "'")}&corpus=${actualCorpus}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}&length=${length || 2}&stopwords=${stopwords || 500}`;
+    const ngramRoute = usesNgramRoute(corpus) && NGRAM_LIST_ROUTES[route];
+    const ranked = ngramRoute && score && score !== 'count';
+    if (ngramRoute) {
+      // length is the size of the whole n-gram and must exceed the number of words given;
+      // below that, the server default (one word more) applies.
+      const wordCount = word.trim().split(/\s+/).length;
+      const lengthParam = Number(length) > wordCount ? `&length=${length}` : '';
+      // An emptied field falls back to the default rather than being sent as ''.
+      const orDefault = (value, fallback) => ((value ?? '') === '' ? fallback : value);
+      const scoreParam = ranked ? `&score=${score}&min_count=${orDefault(min_count, 20)}` : '';
+      url = `${GALLICA_PROXY_API_URL}/${ngramRoute}?mot=${encodeURIComponent(word.trim().replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}${lengthParam}&stopwords=${orDefault(stopwords, 500)}${scoreParam}${ngramFilter(query, corpus)}`;
+    }
 
     return fetch(url)
-      .then(res => res.text())
+      .then(res => res.text().then(text => {
+        // The server explains its refusals in plain text; parsed as CSV they would plot
+        // as nonsense words.
+        if (!res.ok) throw new Error(`${word} : ${text}`);
+        return text;
+      }))
       .then(csvText => {
         return new Promise(resolve => {
           Papa.parse(csvText, {
@@ -1334,20 +1531,25 @@ function App() {
                 });
               }
 
+              // Ranked by an association score, the bars show the score; the count stays
+              // alongside for the CSV.
               const data = processedData.map(row => ({
                 word: row.gram,
-                total: row.tot
+                total: ranked ? row.score : row.tot,
+                ...(ranked ? { count: row.tot, freq: row.freq, score: row.score } : {}),
               }));
-              resolve([{ data, query: { ...query, startDate: globalStartDate, endDate: globalEndDate, isListMode: true } }]);
+              resolve([{ data, query: { ...query, startDate: globalStartDate, endDate: globalEndDate, isListMode: true, rankedBy: ranked ? score : null } }]);
             }
           });
         });
       });
   };
 
-  const fetchDataForQuery = (query, globalStartDate, globalEndDate) => {
+  const fetchDataForQuery = (displayedQuery, globalStartDate, globalEndDate) => {
+    // Le Monde is picked as one corpus but served by two databases (see leMonde.js).
+    const query = { ...displayedQuery, corpus: leMondeSource(displayedQuery) };
     return new Promise((resolve, reject) => {
-      const { word, corpus, resolution, revues, rubriques, byRubrique, searchMode } = query;
+      const { word, corpus, resolution, rubriques, byRubrique, searchMode } = query;
       if (!word) {
         resolve([{ data: [], query: { ...query, startDate: globalStartDate, endDate: globalEndDate } }]);
         return;
@@ -1379,7 +1581,7 @@ function App() {
       if (corpus === 'google') {
         fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, globalStartDate, globalEndDate));
       } else {
-        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, revues, rubriques, byRubrique));
+        fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, query, rubriques, byRubrique));
       }
 
       Promise.all(fetchPromises)
@@ -1488,7 +1690,39 @@ function App() {
     });
   };
 
-  const handlePlot = () => {
+  // The tabs and dates of the plot on screen, which its URL describes along with the
+  // display settings of the moment.
+  const plottedRef = useRef(null);
+  const plotSearch = () => {
+    const plotted = plottedRef.current;
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    return encodeUrlState({
+      queries: plotted.queries,
+      activeIndex: Math.max(0, plotted.queries.findIndex(q => q.id === activeQueryId)),
+      startDate: plotted.startDate,
+      endDate: plotted.endDate,
+      smoothing,
+      // The type the user chose, not one the app switched to for a list mode or few data.
+      plotType: autoPlotTypeRef.current ? autoPlotTypeRef.current.from : plotType,
+      advancedOptions: activeQuery?.advancedOptions,
+    }, revuesData);
+  };
+  const writeUrl = (search, replace) => {
+    if (search === new URLSearchParams(window.location.search).toString()) return;
+    const url = `${window.location.pathname}?${search}`;
+    if (replace) window.history.replaceState({}, '', url);
+    else window.history.pushState({}, '', url);
+  };
+
+  // What changes the look of the plot without fetching again (smoothing, plot type,
+  // options, the tab shown) updates its URL, without a history entry of its own.
+  const activeAdvancedOptions = queries.find(q => q.id === activeQueryId)?.advancedOptions;
+  useEffect(() => {
+    if (plottedRef.current) writeUrl(plotSearch(), true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smoothing, plotType, activeQueryId, activeAdvancedOptions]);
+
+  const handlePlot = ({ fromUrl = false } = {}) => {
     setError(null);
     setApiResponses([]);
     setRawPlotData([]);
@@ -1497,24 +1731,16 @@ function App() {
     setTotalOccurrences(0);
     setTotalPlotOccurrences(0);
     setSelectedDate(null);
+    // Otherwise the context panel keeps the corpus of the last point clicked, and a new
+    // plot on another corpus shows that corpus's articles.
+    setSelectedQuery(null);
     setIsLoading(true);
     setFetchContextAfterPlot(true);
 
-    // Update URL with first query parameters
-    if (queries.length > 0) {
-      const firstQuery = queries[0];
-      if (firstQuery && firstQuery.word && firstQuery.corpus) {
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.set('word', firstQuery.word);
-        newUrl.searchParams.set('corpus', firstQuery.corpus);
-        newUrl.searchParams.set('start', startDate);
-        newUrl.searchParams.set('end', endDate);
-        newUrl.searchParams.set('mode', firstQuery.searchMode || 'ngram');
-        newUrl.searchParams.set('smoothing', smoothing);
-        newUrl.searchParams.set('plotType', plotType);
-        window.history.pushState({}, '', newUrl);
-      }
-    }
+    // The URL describes the whole plot, so that its link draws it again. A plot replayed
+    // from the URL (a link just opened, back or forward) keeps its history entry.
+    plottedRef.current = { queries, startDate, endDate };
+    writeUrl(plotSearch(), fromUrl);
 
     // Expand queries with '&' separator into multiple queries
     const expandedQueries = queries.flatMap(q => {
@@ -1542,11 +1768,14 @@ function App() {
         const total = flatResponses.reduce((acc, res) => acc + (res.total || 0), 0);
         setTotalPlotOccurrences(total);
 
-        // Auto-switch to barplot if total occurrences < 100 and currently in line mode
+        // Auto-switch to barplot if total occurrences < 100 and currently in line mode,
+        // and back once a plot has enough occurrences again
         if (plotType === 'line' && total < 100 && total > 0) {
-          setPlotType('bar');
+          switchPlotTypeAuto('bar', 'lowData');
           setSnackbarMessage(t('Low data warning', { count: total }));
           setSnackbarOpen(true);
+        } else if (total >= 100) {
+          restorePlotType('lowData');
         }
       })
       .catch(err => {
@@ -1688,7 +1917,7 @@ function App() {
             const baseYear = advancedOptions.base100Year;
             const baseIndex = trace.x ? trace.x.findIndex(d => {
               const date = new Date(d);
-              return date.getFullYear() === baseYear;
+              return date.getUTCFullYear() === baseYear;
             }) : -1;
             if (baseIndex !== -1 && y[baseIndex] !== null && y[baseIndex] !== undefined && y[baseIndex] !== 0) {
               const baseValue = y[baseIndex];
@@ -1786,10 +2015,10 @@ function App() {
         ctx.font = `${20 * scale}px 'EB Garamond', Georgia, serif`;
         const yearSpan = (maxDate - minDate) / (1000 * 60 * 60 * 24 * 365.25);
         const tickInterval = yearSpan > 100 ? 20 : (yearSpan > 50 ? 10 : 5);
-        const startYear = new Date(minDate).getFullYear();
-        const endYear = new Date(maxDate).getFullYear();
+        const startYear = new Date(minDate).getUTCFullYear();
+        const endYear = new Date(maxDate).getUTCFullYear();
         for (let y = Math.ceil(startYear / tickInterval) * tickInterval; y <= endYear; y += tickInterval) {
-          const date = new Date(y, 0, 1);
+          const date = new Date(Date.UTC(y, 0, 1));
           const x = xScale(date);
           ctx.beginPath();
           ctx.moveTo(x, height - margin.bottom);
@@ -1962,10 +2191,10 @@ function App() {
 
   const handleDownloadCSV = () => {
     if ((plotType === 'sums' || plotType === 'wordcloud') && sumsData.length > 0) {
-      const csv = Papa.unparse({
-        fields: ['Word', 'Count'],
-        data: sumsData.map(d => ({ Word: d.word, Count: d.total }))
-      });
+      const ranked = sumsData.some(d => d.score !== undefined);
+      const csv = Papa.unparse(ranked
+        ? { fields: ['Word', 'Count', 'Frequency', 'Score'], data: sumsData.map(d => ({ Word: d.word, Count: d.count, Frequency: d.freq, Score: d.score })) }
+        : { fields: ['Word', 'Count'], data: sumsData.map(d => ({ Word: d.word, Count: d.total })) });
       downloadCSV(csv);
       return;
     }
@@ -2135,8 +2364,10 @@ function App() {
                       <FormComponent
                         formData={activeQuery}
                         onFormChange={handleFormChange}
+                        onCorpusPick={handleCorpusPick}
                         onPlot={handlePlot}
-                        perseeData={perseeData}
+                        revuesData={revuesData}
+                        onRevueSelectionChange={handleRevueSelectionChange}
                       />
                       <div className="form-group">
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
@@ -2177,7 +2408,7 @@ function App() {
                       />
                     </>
                   )}
-                  <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
+                  <Button variant="contained" color="success" onClick={() => handlePlot()} disabled={isLoading}>
                     {isLoading ? t('Loading...') : t('Plot')}
                   </Button>
                   {dateWarnings.length > 0 && (
@@ -2217,6 +2448,7 @@ function App() {
                       {plotType === 'sums' ? (
                         <SumsComponent
                           data={sumsData}
+                          rankedBy={apiResponses.find(res => res.query?.isListMode)?.query.rankedBy}
                           darkMode={darkMode}
                           advancedOptions={activeQuery?.advancedOptions}
                         />
@@ -2243,7 +2475,10 @@ function App() {
                             id="plot-type-select"
                             value={plotType}
                             label={t('Visualization:')}
-                            onChange={(e) => setPlotType(e.target.value)}
+                            onChange={(e) => {
+                              autoPlotTypeRef.current = null;
+                              setPlotType(e.target.value);
+                            }}
                             sx={{ fontFamily: 'serif' }}
                           >
                             <MenuItem value={"line"}>{t('Line Plot (Frequency)')}</MenuItem>

@@ -2,10 +2,38 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import { useTranslation } from 'react-i18next';
 
+// Dates without data stay gaps: counted as zeros they would skew the mean and be drawn.
 export const zscore = (data) => {
-  const mean = data.reduce((a, b) => a + b, 0) / data.length;
-  const stdDev = Math.sqrt(data.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / data.length);
-  return data.map(x => (x - mean) / stdDev);
+  const values = data.filter(v => v !== null && v !== undefined);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const stdDev = Math.sqrt(values.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / values.length);
+  return data.map(x => (x === null || x === undefined ? null : (x - mean) / stdDev));
+};
+
+// Plotly draws a Date object at its local time, which west of UTC puts every point on the
+// day before: 1883 shows as December 1882, and a click on it asks for 1882's context. The
+// series are dated at UTC midnight, so they go to Plotly as timezone-free date strings,
+// and the dates it reports back are read as UTC.
+export const toPlotlyDate = (d) => (d instanceof Date ? d.toISOString().replace('T', ' ').replace('Z', '') : d);
+export const fromPlotlyDate = (value) => {
+  if (value instanceof Date) return value;
+  const [day, time = '00:00:00'] = String(value).split(' ');
+  return new Date(`${day}T${time}Z`);
+};
+
+// Drops the dates without data at either end of a series. They only pad it out to the
+// requested years, and Plotly's autoscale (double click, the modebar buttons) would show
+// them as an empty stretch of axis, e.g. the months before the TV transcripts begin.
+const trimEmptyEnds = (trace) => {
+  if (!Array.isArray(trace?.x) || !Array.isArray(trace?.y)) return trace;
+  const hasData = v => v !== null && v !== undefined;
+  const first = trace.y.findIndex(hasData);
+  if (first === -1) return trace;
+  let last = trace.y.length - 1;
+  while (!hasData(trace.y[last])) last--;
+  if (first === 0 && last === trace.y.length - 1) return trace;
+  const cut = arr => (Array.isArray(arr) ? arr.slice(first, last + 1) : arr);
+  return { ...trace, x: cut(trace.x), y: cut(trace.y), n: cut(trace.n), total: cut(trace.total) };
 };
 
 // Set1 palette
@@ -34,8 +62,9 @@ export const colorblindPalette = [
   '#EE9944', // orange
 ];
 
-const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode, plotRevision }) => {
+const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, darkMode, plotRevision }) => {
   const { t } = useTranslation();
+  const data = React.useMemo(() => (series || []).map(trimEmptyEnds), [series]);
 
   let plotData = advancedOptions?.rescale && data.length > 0 && plotType === 'line'
     ? data.map(trace => ({ ...trace, y: zscore(trace.y) }))
@@ -45,7 +74,7 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
         // Find the index where the year matches base100Year
         const baseIndex = trace.x ? trace.x.findIndex(d => {
           const date = new Date(d);
-          return date.getFullYear() === baseYear;
+          return date.getUTCFullYear() === baseYear;
         }) : -1;
         if (baseIndex !== -1 && trace.y[baseIndex] !== null && trace.y[baseIndex] !== undefined && trace.y[baseIndex] !== 0) {
           const baseValue = trace.y[baseIndex];
@@ -55,12 +84,38 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       })
       : data;
 
+  // The series is padded with nulls across every date of the requested years, so a corpus
+  // covering only part of that span (the TV transcripts start in June 2026) would be drawn
+  // against a mostly empty axis. Clamp the x range to where data actually exists. Where a
+  // corpus does cover the whole period this resolves to the requested range, so nothing
+  // changes; user zoom still wins, because uirevision makes Plotly keep the viewed range.
+  const dataExtent = React.useMemo(() => {
+    let min = Infinity, max = -Infinity;
+    (data || []).forEach(trace => {
+      if (!Array.isArray(trace?.x) || !Array.isArray(trace?.y)) return;
+      trace.x.forEach((d, i) => {
+        const v = trace.y[i];
+        if (v === null || v === undefined) return;
+        const ms = d instanceof Date ? d.getTime() : new Date(d).getTime();
+        if (Number.isNaN(ms)) return;
+        if (ms < min) min = ms;
+        if (ms > max) max = ms;
+      });
+    });
+    if (min > max) return null;
+    // A single point would give a zero-width axis; give it a day on each side.
+    if (min === max) { min -= 86400000; max += 86400000; }
+    const pad = (max - min) * 0.02;
+    return [new Date(min - pad), new Date(max + pad)].map(toPlotlyDate);
+  }, [data]);
+
   // Apply color palette (colorblind or default)
   const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
 
   if (plotData.length > 0) {
     plotData = plotData.map((trace, index) => ({
       ...trace,
+      x: Array.isArray(trace.x) ? trace.x.map(toPlotlyDate) : trace.x,
       line: trace.line ? { ...trace.line, color: palette[index % palette.length] } : { color: palette[index % palette.length] },
       marker: trace.marker ? { ...trace.marker, color: palette[index % palette.length] } : { color: palette[index % palette.length] },
       legendgroup: `group${index}`
@@ -81,6 +136,11 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       if (!trace.y || !trace.n || !trace.total || !trace.x) {
         return; // Skip if no data available
       }
+
+      // Cap the band so a huge relative error on rare words (e.g. daily
+      // resolution) can't blow up the auto-scaled y range and dwarf the signal.
+      const maxFreq = trace.y.reduce((m, v) => (v !== null && v !== undefined && v > m ? v : m), 0);
+      const ciUpperCap = maxFreq > 0 ? 1.5 * maxFreq : Infinity;
 
       // Split into segments at gaps (where total is null/0)
       // Each segment becomes a separate pair of traces
@@ -115,6 +175,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
             ciLower = freq;
             ciUpper = freq;
           }
+
+          ciUpper = Math.min(ciUpper, ciUpperCap);
 
           currentSegment.x.push(trace.x[i]);
           currentSegment.lower.push(ciLower);
@@ -239,7 +301,8 @@ const PlotComponent = ({ data, onPointClick, advancedOptions, plotType, darkMode
       title: showTotalBarplot ? undefined : t('Date'),
       fixedrange: isTouchScreen,
       tickfont: { size: 14 },
-      ...(plotlyTheme.xaxis || {})
+      ...(plotlyTheme.xaxis || {}),
+      ...(dataExtent ? { range: dataExtent, autorange: false } : {})
     },
     yaxis: {
       title: yAxisTitle,

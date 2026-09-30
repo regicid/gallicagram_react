@@ -5,8 +5,59 @@ import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
+import { CAIRN_CORPUS, PERSEE_CORPUS, isTvCorpus, cairnSearchUrl, CATEGORY_CREDITS } from './revueCorpora';
+import { PRESS_PANEL, PRESS_LINK_OUT, isPressPanelCorpus, isPressLinkOutCorpus, hasOwnSearch, pressPeriod, googleSiteSearchUrl, pressLinkOutUrl } from './pressCorpora';
 
-const SpecialContextDisplay = ({ record, corpus }) => {
+// Cached across renders: both files are static and only needed for Cairn context.
+let cairnMetaPromise = null;
+const loadCairnMeta = () => {
+  if (!cairnMetaPromise) {
+    cairnMetaPromise = Promise.all([
+      fetch('/revues_cairn.json').then(r => r.json()),
+      fetch('/cairn_disciplines.json').then(r => r.json()),
+    ]).then(([revueMap, disciplineIds]) => ({ revueMap, disciplineIds }))
+      .catch(() => ({ revueMap: null, disciplineIds: null }));
+  }
+  return cairnMetaPromise;
+};
+
+// One article from a newspaper's search engine: Le Monde, and the modern press corpora.
+const ArticleCard = ({ item, buttonLabel }) => (
+  <div className="occurrence-card" style={{
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    padding: '15px',
+    backgroundColor: '#fff',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+  }}>
+    <h4 style={{ marginTop: 0, marginBottom: '10px' }}>
+      <a href={item.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#2c3e50' }}>
+        {item.title}
+      </a>
+    </h4>
+    {(item.date || item.section) && (
+      <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px', fontStyle: 'italic' }}>
+        {[item.date, item.section].filter(Boolean).join(' · ')}
+      </p>
+    )}
+    {item.description && (
+      <p style={{ marginBottom: '15px' }}>
+        {item.description}
+      </p>
+    )}
+    <Button
+      variant="contained"
+      color="success"
+      href={item.href}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {buttonLabel}
+    </Button>
+  </div>
+);
+
+const SpecialContextDisplay = ({ record, corpus, category }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,10 +69,11 @@ const SpecialContextDisplay = ({ record, corpus }) => {
       let year, month, day;
       const dateObj = new Date(record.date);
 
+      // Points are dated at UTC midnight: local getters would give the day before west of UTC.
       if (!isNaN(dateObj.getTime())) {
-        year = dateObj.getFullYear();
-        month = dateObj.getMonth() + 1;
-        day = dateObj.getDate();
+        year = dateObj.getUTCFullYear();
+        month = dateObj.getUTCMonth() + 1;
+        day = dateObj.getUTCDate();
       } else {
         year = parseInt(record.date);
         month = 1;
@@ -56,7 +108,8 @@ const SpecialContextDisplay = ({ record, corpus }) => {
         const word = rawWord.split('+')[0].trim();
         const { year } = getDates();
 
-        if (corpus === 'lemonde_rubriques') {
+        // le_monde is the Agoragram corpus of the same paper; its context is the same search.
+        if (corpus === 'lemonde_rubriques' || corpus === 'le_monde') {
           const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&start_at=01/01/${record.date.split('-')[0]}&end_at=31/12/${record.date.split('-')[0]}`;
           const externalSearchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
           const fetchUrl = `/api/lemonde${queryParams}`;
@@ -92,7 +145,7 @@ const SpecialContextDisplay = ({ record, corpus }) => {
           });
           setData({ type: 'lemonde', content: results });
 
-        } else if (corpus === 'route à part (query_persee)') {
+        } else if (corpus === PERSEE_CORPUS) {
           const queryParams = `?l=fre&da=${year}&q=%22${encodeURIComponent(word)}%22`;
           const externalSearchUrl = `https://www.persee.fr/search${queryParams}`;
           const fetchUrl = `/api/persee${queryParams}`;
@@ -123,6 +176,44 @@ const SpecialContextDisplay = ({ record, corpus }) => {
           });
           setData({ type: 'persee', content: results });
 
+        } else if (corpus === CAIRN_CORPUS) {
+          // Cairn sits behind bot protection, which started serving CAPTCHA challenges to
+          // the proxy, so the results are not fetched here. The search is handed over as a
+          // link instead: opened in the browser it also applies the year, which the
+          // server-rendered page ignores.
+          const { revueMap, disciplineIds } = await loadCairnMeta();
+          // The click handler already opened this in a new tab; the panel repeats the link
+          // for the case where a pop-up blocker stopped it. No externalUrl here: the header
+          // it belongs to is hidden for this type, and it would only duplicate the button.
+          const url = cairnSearchUrl({ word, year, revues: record.revues, revueMap, disciplineIds });
+          setData({ type: 'cairn_link', content: url });
+
+        } else if (isPressPanelCorpus(corpus)) {
+          const source = PRESS_PANEL[corpus];
+          const period = pressPeriod(record.date, record.resolution);
+          const googleUrl = googleSiteSearchUrl({ site: source.site, word, ...period });
+          try {
+            const items = await source.search({ word, ...period });
+            setExternalUrl({ url: googleUrl, label: t('Search on Google') });
+            setData({ type: 'press', content: items, source });
+          } catch (err) {
+            // The keys and page layouts used here belong to the newspapers and can change
+            // without notice; a failure should still leave the reader somewhere useful.
+            console.warn(`Press context for ${corpus} failed:`, err);
+            setData({ type: 'press_link', content: googleUrl, name: source.name, site: source.site, failed: true });
+          }
+
+        } else if (isPressLinkOutCorpus(corpus)) {
+          // The click handler already opened this in a new tab; the panel repeats the link
+          // for the case where a pop-up blocker stopped it.
+          const url = pressLinkOutUrl(corpus, word, record.date, record.resolution);
+          setData({ type: 'press_link', content: url, site: PRESS_LINK_OUT[corpus], ownSearch: hasOwnSearch(corpus) });
+
+        } else if (isTvCorpus(corpus)) {
+          // No per-occurrence context for the transcripts; what matters to a reader
+          // looking at a dip is that the recording itself has gaps.
+          setData({ type: 'tv_note', content: null });
+
         } else if (corpus === 'rap') {
           const searchUrl = `https://shiny.ens-paris-saclay.fr/guni/source_rap?mot=${encodeURIComponent(word.replace(/’/g, "'"))}&year=${year}`;
           setExternalUrl({ url: 'https://huggingface.co/datasets/regicid/LRFAF', label: t('Corpus') });
@@ -149,61 +240,85 @@ const SpecialContextDisplay = ({ record, corpus }) => {
     fetchContext();
   }, [record, corpus, t]);
 
-  if (isLoading) return <div>{t('Loading...')}</div>;
-  if (error) return <div style={{ color: 'inherit' }}>{error}</div>;
-  if (!data) return <div>{t('No data')}</div>;
+  // Shown on every path, including the "no context for this corpus" message, which is
+  // where the Majinbook corpora end up.
+  // The label is a separate string from the name so the name can be a link; the French
+  // translation carries its own space before the colon.
+  const credit = CATEGORY_CREDITS[category];
+  const creditLine = credit
+    ? (
+      <p style={{ fontSize: '0.85em', color: '#777', margin: '0 0 0.75rem' }}>
+        {t('Credit')}{' '}
+        {credit.url
+          ? <a href={credit.url} target="_blank" rel="noopener noreferrer">{credit.name}</a>
+          : credit.name}
+      </p>
+    )
+    : null;
+
+  if (isLoading) return <>{creditLine}<div>{t('Loading...')}</div></>;
+  if (error) return <>{creditLine}<div style={{ color: 'inherit' }}>{error}</div></>;
+  if (!data) return <>{creditLine}<div>{t('No data')}</div></>;
+
+  // These corpora show no occurrences at all — a note, or a link out — so heading them
+  // "Context for <word> (<date>)" would announce something that is not there.
+  const hasOccurrences = data.type !== 'tv_note' && data.type !== 'cairn_link' && data.type !== 'press_link';
 
   return (
     <div className="special-context-display">
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3>{t('Context for')} {record.terms[0]} ({record.date.split('T')[0]})</h3>
-        {externalUrl && (
-          <a href={externalUrl.url} target="_blank" rel="noopener noreferrer" className="external-link-button">
-            {externalUrl.label}
-          </a>
-        )}
-      </div>
+      {creditLine}
+      {hasOccurrences && (
+        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('Context for')} {record.terms[0]} ({record.date.split('T')[0]})</h3>
+          {externalUrl && (
+            <a href={externalUrl.url} target="_blank" rel="noopener noreferrer" className="external-link-button">
+              {externalUrl.label}
+            </a>
+          )}
+        </div>
+      )}
 
       {data.type === 'lemonde' && (
         <>
           <p style={{ fontStyle: 'italic', fontSize: '0.9em', marginBottom: '1rem' }}>{t('le_monde_warning')}</p>
           <div className="records-list">
             {data.content.map((item, i) => (
-              <div key={i} className="occurrence-card" style={{
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                padding: '15px',
-                backgroundColor: '#fff',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}>
-                <h4 style={{ marginTop: 0, marginBottom: '10px' }}>
-                  <a href={item.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#2c3e50' }}>
-                    {item.title}
-                  </a>
-                </h4>
-                {item.date && (
-                  <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px', fontStyle: 'italic' }}>
-                    {item.date}
-                  </p>
-                )}
-                {item.description && (
-                  <p style={{ marginBottom: '15px' }}>
-                    {item.description}
-                  </p>
-                )}
-                <Button
-                  variant="contained"
-                  color="success"
-                  href={item.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('Read on Le Monde')}
-                </Button>
-              </div>
+              <ArticleCard key={i} item={item} buttonLabel={t('Read on Le Monde')} />
             ))}
           </div>
         </>
+      )}
+
+      {data.type === 'press' && (
+        <>
+          <p style={{ fontStyle: 'italic', fontSize: '0.9em', marginBottom: '1rem' }}>
+            {t('press_search_warning', { name: data.source.name })}
+            {data.source.looseMatching && <> {t('press_loose_matching_note')}</>}
+            {data.source.upToEnd && <> {t('press_up_to_end_note')}</>}
+          </p>
+          {data.content.length === 0
+            ? <p>{t('press_no_results')}</p>
+            : (
+              <div className="records-list">
+                {data.content.map((item, i) => (
+                  <ArticleCard key={i} item={item} buttonLabel={t('Read on {{name}}', { name: data.source.name })} />
+                ))}
+              </div>
+            )}
+        </>
+      )}
+
+      {data.type === 'press_link' && (
+        <div style={{ fontSize: '0.95em', lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0 }}>
+            {data.failed
+              ? t('press_failed_note', { name: data.name, site: data.site })
+              : t(data.ownSearch ? 'press_own_search_note' : 'press_link_note', { site: data.site })}
+          </p>
+          <a href={data.content} target="_blank" rel="noopener noreferrer" className="external-link-button">
+            {data.ownSearch ? t('search_on_site', { site: data.site }) : t('Search on Google')}
+          </a>
+        </div>
       )}
 
       {data.type === 'persee' && (
@@ -222,6 +337,22 @@ const SpecialContextDisplay = ({ record, corpus }) => {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {data.type === 'tv_note' && (
+        <div style={{ fontSize: '0.95em', lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0 }}>{t('tv_corpus_gaps_note')}</p>
+          <p style={{ marginBottom: 0 }}>{t('tv_corpus_asr_note')}</p>
+        </div>
+      )}
+
+      {data.type === 'cairn_link' && (
+        <div style={{ fontSize: '0.95em', lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0 }}>{t('cairn_context_link_note')}</p>
+          <a href={data.content} target="_blank" rel="noopener noreferrer" className="external-link-button">
+            {t('Search on Cairn')}
+          </a>
         </div>
       )}
 
@@ -314,7 +445,7 @@ const ContextDisplay = ({ records, totalRecords, onPageChange, searchParams, isL
 
   // Check for dummy record indicating special corpus handling
   if (records.length > 0 && records[0].dummy) {
-    return <SpecialContextDisplay record={records[0]} corpus={corpus} />;
+    return <SpecialContextDisplay record={records[0]} corpus={corpus} category={corpusConfigs?.[corpus]?.category} />;
   }
 
   if (isLoading && records.length === 0) {

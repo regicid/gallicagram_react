@@ -25,13 +25,14 @@ const Occurrence = ({ record, corpus, corpusConfigs, resolution }) => {
       });
       terms.forEach(term => params.append('terms', term));
 
-      // Handle resolution specific parameters (month, day)
+      // Handle resolution specific parameters (month, day). A 'YYYY-MM-DD' date parses as
+      // UTC midnight, so it is read back in UTC.
       if (resolution === 'mois' || resolution === 'jour') {
         const dateObj = new Date(record.date);
         if (!isNaN(dateObj.getTime())) {
-          params.append('month', dateObj.getMonth() + 1);
+          params.append('month', dateObj.getUTCMonth() + 1);
           if (resolution === 'jour') {
-            params.append('day', dateObj.getDate());
+            params.append('day', dateObj.getUTCDate());
           }
         }
       }

@@ -3,7 +3,7 @@ Le Monde (rubriques)	1945-2024	1.5 milliards	lemonde_rubriques	4	Mensuelle	Aucun
 Presse de Gallica	1789-1950	57 milliards	presse	3	Mensuelle	"2gram>1;3gram>1"	Mars 2021	source=periodical	document|cooccurrence|joker|nearby	Gallica
 Livres de Gallica	1700-1940	16 milliards	livres	5	Annuelle	2gram>1, etc	Mars 2021	source=book	document|cooccurrence|joker|nearby	Gallica
 Presse + livres de Gallica	1789-1940	73 milliards	presse_livres	3	Annuelle	2gram>1, etc	Mars 2021			Gallica
-Deutsches Zeitungsportal (DDB)	1780-1950	39 milliards	ddb	2	Mensuelle	1gram > 1, 2gram>2	Août 2023			Foreign corpora
+Deutsches Zeitungsportal (DDB)	1780-1950	39 milliards	ddb	2	Mensuelle	1gram > 1, 2gram>2	Août 2023		joker|nearby	Foreign corpora
 American Stories	1798-1963	20 milliards	american_stories	3	Annuelle	1gram>1,2gram>2,3gram>3	Octobre 2023		joker|nearby	Foreign corpora
 Journal de Paris	1777-1827	86 millions	paris	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb327986698	document|cooccurrence|joker|nearby	Gallica
 Moniteur Universel	1789-1869	511 millions	moniteur	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb34452336z	document|cooccurrence|joker|nearby	Gallica
@@ -11,13 +11,13 @@ Journal des Débats	1789-1944	1.2 milliards	journal_des_debats	1gram	Journalièr
 La Presse	1836-1869	253 millions	la_presse	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34448033b	document|cooccurrence	Gallica
 Le Constitutionnel	1821-1913	64 millions	constitutionnel	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb32747578p	document|cooccurrence	Gallica
 Le Figaro	1854-1952	870 millions	figaro	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34355551z	document|cooccurrence|joker|nearby	Gallica
-Le Temps	1861-1942	1 milliard	temps	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34431794k	document|cooccurrence	Gallica
-Le Petit Journal	1863-1942	745 millions	petit_journal	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb32895690j	document|cooccurrence	Gallica
-Le Petit Parisien	1876-1944	631 millions	petit_parisien	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34419111x	document|cooccurrence	Gallica
+Le Temps	1861-1942	1 milliard	temps	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34431794k	document|cooccurrence|joker|nearby	Gallica
+Le Petit Journal	1863-1942	745 millions	petit_journal	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb32895690j	document|cooccurrence|joker|nearby	Gallica
+Le Petit Parisien	1876-1944	631 millions	petit_parisien	2	Journalière	2gram>1	Août 2023	&source=periodical&codes=cb34419111x	document|cooccurrence|joker|nearby	Gallica
 L'Humanité	1904-1952	318 millions	huma	2	Journalière	2gram>1	Août 2023	source=periodical&codes=cb327877302	document|cooccurrence|joker|nearby	Gallica
 Opensubtitles (français)	1935-2020	17 millions	subtitles	3	Annuelle	Aucun	Juillet 2023		joker|nearby	Miscellaneous
-Opensubtitles (anglais)	1930-2020	102 millions	subtitles_en	3	Annuelle	Aucun	Juillet 2023			Foreign corpora
-Rap français (Genius)	1995-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024			Miscellaneous
+Opensubtitles (anglais)	1930-2020	102 millions	subtitles_en	3	Annuelle	Aucun	Juillet 2023		joker|nearby	Foreign corpora
+Rap français (Genius)	1995-2024	20 millions	rap	5	Annuelle	Aucun	Mars 2024		joker|nearby	Miscellaneous
 Persée	~1930-2023	1 milliard	persee	2	Annuelle	Aucun	Décembre 2023		joker|nearby	Academic journals
 Cairn	2001-2025	?	route à part (query_cairn)	3	Annuelle	Aucun	Septembre 2026		joker|nearby	Academic journals
 Persée + Cairn	1930-2025	?	route à part (persee+cairn)	2	Annuelle	Aucun	Septembre 2026			Academic journals
@@ -26,11 +26,11 @@ CNews (transcriptions)	2026-2026	?	tv_cnews	3	Journalière	Aucun	Septembre 2026	
 France Info (transcriptions)	2026-2026	?	tv_franceinfo	3	Journalière	Aucun	Septembre 2026		joker|nearby	TV transcripts
 Ouest-France (Gallica)	1899-2025	?	ouest	2	Annuelle	Aucun	Octobre 2025			Gallica
 Prénoms INSEE	1900-2024	?	prenoms	1	Annuelle	Aucun	2025			Miscellaneous
-Libération	1998-2025	?	libe	3	Journalière	Aucun	Novembre 2025			Modern press
-Majinbook français	1700-2023	?	majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025			Majinbook
+Libération	1998-2025	?	libe	3	Journalière	Aucun	Novembre 2025		joker|nearby	Modern press
+Majinbook français	1700-2023	?	majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025		joker|nearby	Majinbook
 Majinbook espagnol	1700-2023	?	spa_majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025		joker|nearby	Majinbook
-Majinbook anglais	1700-2023	?	eng_majinbook	2	Annuelle	2gram>1	September 2025			Majinbook
-Majinbook allemand	1700-2023	?	deu_majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025			Majinbook
+Majinbook anglais	1700-2023	?	eng_majinbook	2	Annuelle	2gram>1	September 2025		joker|nearby	Majinbook
+Majinbook allemand	1700-2023	?	deu_majinbook	4	Annuelle	2,3,4gram>1	Septembre 2025		joker|nearby	Majinbook
 Presse moderne (toutes)	2008-2026	?	presse_moderne	2	Journalière	Aucun	Septembre 2026			Modern press
 20 Minutes	2006-2026	?	20minutes	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press
 Atlantico	2012-2026	?	atlantico	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press
@@ -53,7 +53,7 @@ Le Marin	2013-2026	?	le_marin	2	Journalière	Aucun	Septembre 2026		joker|nearby	
 Le Monde	1945-2026	?	le_monde	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press
 Le Nouvel Observateur	2010-2026	?	le_nouvel_observateur	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press
 Le Télégramme	2009-2011	?	le_telegramme	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press
-Le Parisien	2001-2024	?	leparisien	2	Journalière	Aucun	Septembre 2026			Modern press
+Le Parisien	2001-2024	?	leparisien	2	Mensuelle	Aucun	Septembre 2026		joker|nearby	Modern press
 Les Échos	1991-2026	?	les_echos	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press
 Marianne	2019-2026	?	marianne	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press
 Mediapart	2008-2026	?	mediapart	2	Journalière	Aucun	Septembre 2026		joker|nearby	Modern press

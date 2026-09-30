@@ -1,6 +1,6 @@
 import { sumSeries } from './series';
 import { usesNgramRoute, ngramDbName, ngramCorpusParams, ngramFieldParams } from './ngramRoute';
-import { CAIRN_CORPUS, PERSEE_CORPUS, buildRevueFilter } from './revueCorpora';
+import { CAIRN_CORPUS, PERSEE_CORPUS, buildRevueFilter, isCombinedCorpus } from './revueCorpora';
 
 describe('ngram route', () => {
   test('maps the app corpus codes to the server database names', () => {
@@ -11,8 +11,19 @@ describe('ngram route', () => {
     expect(ngramDbName(PERSEE_CORPUS)).toBe('persee');
     expect(ngramDbName('livres')).toBe('livres');
     expect(usesNgramRoute('lemonde')).toBe(false);
-    // Its converted database has no counts yet: it stays on /query.
-    expect(usesNgramRoute('journal_des_debats')).toBe(false);
+  });
+
+  // Every corpus of the picker is served by the ngram routes, apart from the ones made
+  // of several parts, which are summed from their parts' series.
+  test('serves every corpus of corpus.tsv through the ngram routes', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const SUMMED = ['presse_livres', 'presse_moderne'];
+    const codes = fs.readFileSync(path.join(__dirname, '../public/corpus.tsv'), 'utf8')
+      .split('\n').slice(1).filter(Boolean).map(line => line.split('\t')[3])
+      .filter(code => !isCombinedCorpus(code) && !SUMMED.includes(code));
+    expect(codes).toContain(CAIRN_CORPUS);
+    expect(codes.filter(code => !usesNgramRoute(code))).toEqual([]);
   });
 
   // The web press databases sit elsewhere on the server, which elias=true selects.
@@ -20,7 +31,8 @@ describe('ngram route', () => {
     expect(ngramCorpusParams('le_figaro')).toBe('corpus=le_figaro&elias=true');
     expect(ngramCorpusParams('elias:leparisien')).toBe('corpus=leparisien&elias=true');
     expect(ngramCorpusParams('tv_bfmtv')).toBe('corpus=bfmtv');
-    expect(usesNgramRoute('leparisien')).toBe(false);
+    // Without the prefix, Le Parisien is the guni corpus.
+    expect(ngramCorpusParams('leparisien')).toBe('corpus=leparisien');
   });
 
   test('builds the field filters, leaving empty selections out', () => {

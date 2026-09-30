@@ -5,7 +5,7 @@ import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './Plot
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
-import { REVUE_CORPORA, TV_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter, LEGACY_CORPUS_CODES } from './revueCorpora';
+import { REVUE_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter, LEGACY_CORPUS_CODES } from './revueCorpora';
 import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
 import { leMondeSource } from './leMonde';
@@ -1292,9 +1292,6 @@ function App() {
       // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
       // pattern is summed into one series on the server.
       url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
-    } else if (TV_CORPORA[corpus]) {
-      // from/to take AAAA, AAAAMM or AAAAMMJJ, so plain years pass through unchanged.
-      url = `${GALLICA_PROXY_API_URL}/query_tv?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${TV_CORPORA[corpus]}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     } else {
       url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
     }

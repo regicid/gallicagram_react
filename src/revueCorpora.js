@@ -26,13 +26,23 @@ export const COMBINED_CORPORA = {
   'route à part (persee+cairn)': ['persee', 'route à part (query_cairn)'],
 };
 
-// Who put a corpus together, keyed by the category in corpus.tsv. Shown above the
-// context panel; the same people are thanked at greater length in About.
-export const CATEGORY_CREDITS = {
-  'Modern press': { name: 'Elias Echikr' },
-  'Majinbook': { name: 'Antoine Mazières', url: 'https://antonomase.fr/' },
+// Who put a corpus together, keyed by the category in corpus.tsv, or by the corpus when
+// its category also holds other people's corpora. Shown above the context panel; the same
+// people are thanked at greater length in About.
+const CATEGORY_CREDITS = {
+  'Modern press': { name: 'Elias Echikr', url: 'https://www.linkedin.com/in/elias-echikr-134a5b259/' },
   'TV transcripts': { name: 'Yann de Boisvilliers', url: 'https://www.linkedin.com/in/yann-de-boisvilliers-875ab8275/' },
 };
+const MAZIERES = { name: 'Antoine Mazières', url: 'https://antonomase.fr/' };
+const CORPUS_CREDITS = {
+  majinbook: MAZIERES,
+  spa_majinbook: MAZIERES,
+  eng_majinbook: MAZIERES,
+  deu_majinbook: MAZIERES,
+};
+
+export const corpusCredit = (corpus, category) =>
+  (has(CORPUS_CREDITS, corpus) ? CORPUS_CREDITS[corpus] : CATEGORY_CREDITS[category]);
 
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 

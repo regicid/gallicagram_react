@@ -5,7 +5,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
-import { CAIRN_CORPUS, PERSEE_CORPUS, isTvCorpus, cairnSearchUrl, CATEGORY_CREDITS } from './revueCorpora';
+import { CAIRN_CORPUS, PERSEE_CORPUS, isTvCorpus, cairnSearchUrl, corpusCredit } from './revueCorpora';
 import { PRESS_PANEL, PRESS_LINK_OUT, isPressPanelCorpus, isPressLinkOutCorpus, hasOwnSearch, pressPeriod, googleSiteSearchUrl, pressLinkOutUrl } from './pressCorpora';
 
 // Cached across renders: both files are static and only needed for Cairn context.
@@ -244,7 +244,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
   // where the Majinbook corpora end up.
   // The label is a separate string from the name so the name can be a link; the French
   // translation carries its own space before the colon.
-  const credit = CATEGORY_CREDITS[category];
+  const credit = corpusCredit(corpus, category);
   const creditLine = credit
     ? (
       <p style={{ fontSize: '0.85em', color: '#777', margin: '0 0 0.75rem' }}>

@@ -13,12 +13,20 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { REVUE_CORPORA, revueCorpusParts, getSelection, isTvCorpus } from './revueCorpora';
 import { usesNgramRoute, SCORE_METHODS } from './ngramRoute';
+import { GOOGLE_NGRAM_CORPORA, GOOGLE_NGRAM_PERIOD } from './googleNgram';
 import { LE_MONDE, LE_MONDE_RUBRIQUES, leMondeSource, mergeLeMonde } from './leMonde';
 
 // Order of the category dropdown. Values match the "Catégorie" column of corpus.tsv
 // and are translation keys, like every other user-facing string.
 const MISC_CATEGORY = 'Miscellaneous';
-const CORPUS_CATEGORIES = ['Gallica', 'Modern press', 'TV transcripts', 'Academic journals', 'Majinbook', 'Foreign corpora', MISC_CATEGORY];
+const BOOKS_CATEGORY = 'Large book corpora';
+const CORPUS_CATEGORIES = ['Gallica', 'Modern press', 'TV transcripts', 'Academic journals', BOOKS_CATEGORY, 'Foreign corpora', MISC_CATEGORY];
+
+const corpusCategories = (column) => {
+  const categories = (column || '').split('|').map(c => c.trim()).filter(c => c);
+  if (categories.length === 0) categories.push(MISC_CATEGORY);
+  return { category: categories[0], categories };
+};
 
 // Corpus picker as a cascading menu: categories on the left, the corpora of the
 // hovered/tapped category in a submenu on the right. With over sixty corpora a flat
@@ -60,7 +68,7 @@ const CorpusMenu = ({ corpora, categories, corpus, currentCategory, onSelect }) 
 
   const byCategory = useMemo(() => {
     const groups = {};
-    corpora.forEach(c => { (groups[c.category] = groups[c.category] || []).push(c); });
+    corpora.forEach(c => c.categories.forEach(cat => { (groups[cat] = groups[cat] || []).push(c); }));
     return groups;
   }, [corpora]);
 
@@ -309,17 +317,25 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
             maxLength: parseInt(columns[4], 10),
             contextFilter: columns[8] || '',
             availableModes: columns[9] ? columns[9].split('|').map(m => m.trim()).filter(m => m) : [],
-            category: (columns[10] || '').trim() || MISC_CATEGORY
+            // A corpus can sit in several categories ("Gallica|Large book corpora"); the
+            // first is its own, the one the menu opens on.
+            ...corpusCategories(columns[10])
           };
         }).filter(c => c.value);
-        setCorpora([...mergeLeMonde(corporaData), { value: 'google', label: t('Ngram Viewer'), resolution: 'Annuelle', category: MISC_CATEGORY }]);
+        const googleCorpora = Object.entries(GOOGLE_NGRAM_CORPORA).map(([value, { name }]) => ({
+          label: `${name} (${GOOGLE_NGRAM_PERIOD.start}-${GOOGLE_NGRAM_PERIOD.end})`,
+          value,
+          resolution: 'Annuelle',
+          ...corpusCategories(BOOKS_CATEGORY)
+        }));
+        setCorpora([...mergeLeMonde(corporaData), ...googleCorpora]);
       });
-  }, [t]);
+  }, []);
 
   // Categories keep the corpus list browsable: there are over sixty corpora, so the
   // first dropdown narrows the second one instead of just labelling a long list.
   const categories = useMemo(() => {
-    const present = new Set(corpora.map(c => c.category));
+    const present = new Set(corpora.flatMap(c => c.categories));
     return CORPUS_CATEGORIES.filter(c => present.has(c));
   }, [corpora]);
 

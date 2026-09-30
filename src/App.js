@@ -11,6 +11,7 @@ import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
 import { leMondeSource } from './leMonde';
 import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX } from './ngramRoute';
+import { GOOGLE_NGRAM_CORPORA, GOOGLE_NGRAM_PERIOD, isGoogleNgram, googleNgramYears, googleNgramUrl } from './googleNgram';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -375,9 +376,12 @@ function App() {
             const code = columns[3].trim();
             const filter = columns[8] ? columns[8].trim() : '';
             const maxLength = columns[4] ? parseInt(columns[4].trim(), 10) : 2;
-            const category = columns[10] ? columns[10].trim() : '';
+            const category = columns[10] ? columns[10].split('|')[0].trim() : ''; // its own, not the extra ones
             configs[code] = { filter, maxLength, category };
           }
+        });
+        Object.entries(GOOGLE_NGRAM_CORPORA).forEach(([code, { name }]) => {
+          periods[code] = { ...GOOGLE_NGRAM_PERIOD, name };
         });
         setCorpusPeriods(periods);
         setCorpusConfigs(configs);
@@ -504,14 +508,7 @@ function App() {
 
   const processNgramData = useCallback((apiResponse, allSameCorpus, plotType, index) => {
     const { data, query } = apiResponse;
-    const { startDate, endDate } = query;
-    const start = parseInt(startDate);
-    const end = parseInt(endDate);
-
-    const years = [];
-    for (let year = start; year <= end; year++) {
-      years.push(new Date(Date.UTC(year, 0)));
-    }
+    const years = googleNgramYears(query.startDate, query.endDate).map(year => new Date(Date.UTC(year, 0)));
 
     const traces = data.map(ngramData => {
       return {
@@ -535,7 +532,7 @@ function App() {
   }, [t, corpusPeriods]);
 
   const processData = useCallback((apiResponse, allSameCorpus, plotType, advancedOptions, index) => {
-    if (apiResponse.query.corpus === 'google') {
+    if (isGoogleNgram(apiResponse.query.corpus)) {
       return processNgramData(apiResponse, allSameCorpus, plotType, index);
     }
     const { data, query } = apiResponse;
@@ -659,7 +656,7 @@ function App() {
 
         const data = apiResponses.map(res => {
           let total;
-          if (res.query.corpus === 'google') {
+          if (isGoogleNgram(res.query.corpus)) {
             total = 0;
           } else {
             total = res.total || 0;
@@ -1326,8 +1323,8 @@ function App() {
       });
   };
 
-  const fetchSingleWordNgramViewer = (word, startDate, endDate) => {
-    const url = `/ngrams/json?content=${word.trim()}&year_start=${startDate}&year_end=${endDate}&corpus=fr&smoothing=0`;
+  const fetchSingleWordNgramViewer = (word, corpus, startDate, endDate) => {
+    const url = googleNgramUrl(corpus, word, startDate, endDate);
     console.log("Querying Ngram URL:", url);
     return fetch(url)
       .then(response => {
@@ -1578,8 +1575,8 @@ function App() {
       const words = word.split('+').map(w => w.trim());
 
       let fetchPromises;
-      if (corpus === 'google') {
-        fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, globalStartDate, globalEndDate));
+      if (isGoogleNgram(corpus)) {
+        fetchPromises = words.map(w => fetchSingleWordNgramViewer(w, corpus, globalStartDate, globalEndDate));
       } else {
         fetchPromises = words.map(w => fetchSingleWordGallicagram(w, corpus, globalStartDate, globalEndDate, resolution, query, rubriques, byRubrique));
       }
@@ -1587,7 +1584,7 @@ function App() {
       Promise.all(fetchPromises)
         .then(results => {
           const queryWithDates = { ...query, startDate: globalStartDate, endDate: globalEndDate };
-          if (corpus === 'google') {
+          if (isGoogleNgram(corpus)) {
             if (results.length === 1) {
               resolve([{ data: results, query: queryWithDates }]);
               return;

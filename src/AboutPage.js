@@ -41,8 +41,12 @@ function AboutPage() {
             <p>{t('about_ack_p4')}</p>
             <p>
                 {t('about_ack_corpora_1')}
+                <a href="https://antonomase.fr/" target="_blank" rel="noreferrer">antonomase.fr</a>
+                {t('about_ack_corpora_1b')}
                 <a href="https://culturalanalytics.org/article/id/1164/" target="_blank" rel="noreferrer">{t('about_ack_corpora_link')}</a>
                 {t('about_ack_corpora_2')}
+                <a href="https://www.linkedin.com/in/elias-echikr-134a5b259/" target="_blank" rel="noreferrer">Elias Echikr</a>
+                {t('about_ack_corpora_2a')}
                 <a href="https://www.linkedin.com/in/yann-de-boisvilliers-875ab8275/" target="_blank" rel="noreferrer">Yann de Boisvilliers</a>
                 {t('about_ack_corpora_2b')}
                 <a href="https://github.com/Yanndb974/laudisi_observatory" target="_blank" rel="noreferrer">{t('about_ack_corpora_link2')}</a>

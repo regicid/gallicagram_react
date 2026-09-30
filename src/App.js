@@ -5,7 +5,8 @@ import PlotComponent, { defaultPalette, colorblindPalette, zscore, fromPlotlyDat
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
-import { REVUE_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter, LEGACY_CORPUS_CODES } from './revueCorpora';
+import { REVUE_CORPORA, CAIRN_CORPUS, isRevueCorpus, isCombinedCorpus, revueCorpusParts, getSelection, cairnSearchUrl, buildRevueFilter } from './revueCorpora';
+import { encodeUrlState, decodeUrlState, QUERY_DEFAULTS, ADVANCED_DEFAULTS } from './urlState';
 import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
 import { leMondeSource } from './leMonde';
@@ -39,24 +40,20 @@ let nextId = 2;
 const initialQuery = {
   word: 'liberté',
   corpus: 'presse',
-  resolution: 'annee',
-  searchMode: 'ngram',
-  word2: '',
-  distance: 10,
-  n_joker: 10,
-  length: 2, // Will be updated based on word length
-  stopwords: 500,
-  score: 'count',
-  min_count: 20,
-  advancedOptions: {
-    rescale: false,
-    showConfidenceInterval: true,
-    showTotalBarplot: false,
-    extendYScale: false,
-    corpusBundle: false,
-    base100: false,
-    base100Year: null,
-  }
+  ...QUERY_DEFAULTS,
+  advancedOptions: { ...ADVANCED_DEFAULTS },
+};
+
+// The tabs a URL describes (see urlState.js): the defaults, then what the URL says, all
+// with the options it gives.
+const queriesFromUrl = (state) => {
+  nextId = Math.max(nextId, state.queries.length + 1);
+  return state.queries.map((query, i) => ({
+    id: i + 1,
+    ...initialQuery,
+    ...query,
+    advancedOptions: { ...initialQuery.advancedOptions, ...state.advancedOptions },
+  }));
 };
 
 function movingAverage(data, windowSize) {
@@ -288,31 +285,8 @@ const NGRAM_LIST_ROUTES = { joker: 'joker_ngram', associated: 'associated_ngram'
 function App() {
   const { t, i18n } = useTranslation();
 
-  const initialUrlState = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    const searchParams = new URLSearchParams(window.location.search);
-    const word = searchParams.get('word');
-    const corpusParam = searchParams.get('corpus');
-    const corpus = LEGACY_CORPUS_CODES[corpusParam] || corpusParam;
-    const start = searchParams.get('start');
-    const end = searchParams.get('end');
-    const mode = searchParams.get('mode');
-    const smoothingParam = searchParams.get('smoothing');
-    const plotTypeParam = searchParams.get('plotType');
-
-    if (word && corpus && start && end && mode) {
-      return {
-        word,
-        corpus,
-        start: parseInt(start, 10),
-        end: parseInt(end, 10),
-        mode,
-        smoothing: smoothingParam ? parseInt(smoothingParam, 10) : 0,
-        plotType: plotTypeParam || 'line'
-      };
-    }
-    return null;
-  }, []);
+  const initialUrlState = useMemo(
+    () => (typeof window === 'undefined' ? null : decodeUrlState(window.location.search)), []);
 
   useEffect(() => {
     // Detect language from browser settings
@@ -325,16 +299,12 @@ function App() {
       i18n.changeLanguage('en');
     }
   }, [i18n]);
-  const [queries, setQueries] = useState(initialUrlState ? [{
-    id: 1,
-    ...initialQuery,
-    word: initialUrlState.word,
-    corpus: initialUrlState.corpus,
-    searchMode: initialUrlState.mode
-  }] : [{ id: 1, ...initialQuery }]);
-  const [activeQueryId, setActiveQueryId] = useState(1);
-  const [startDate, setStartDate] = useState(initialUrlState ? initialUrlState.start : 1789);
-  const [endDate, setEndDate] = useState(initialUrlState ? initialUrlState.end : 1950);
+  const [queries, setQueries] = useState(() => (initialUrlState
+    ? queriesFromUrl(initialUrlState)
+    : [{ id: 1, ...initialQuery }]));
+  const [activeQueryId, setActiveQueryId] = useState(initialUrlState ? initialUrlState.activeIndex + 1 : 1);
+  const [startDate, setStartDate] = useState(initialUrlState?.startDate ?? 1789);
+  const [endDate, setEndDate] = useState(initialUrlState?.endDate ?? 1950);
   const [apiResponses, setApiResponses] = useState([]);
   const [rawPlotData, setRawPlotData] = useState([]);
   const [plotData, setPlotData] = useState([]);
@@ -489,18 +459,48 @@ function App() {
   }, [initialUrlState]); // Add dependency to be safe that it only reads latest definition
 
   const hasAutoPlotted = useRef(false);
+  // Set when the state has just been loaded from the URL (a link opened, or the back and
+  // forward buttons): the next render plots it, once that state is in place.
+  const [plotFromUrl, setPlotFromUrl] = useState(false);
 
   useEffect(() => {
     // Only auto-plot after corpusPeriods loads (to ensure plot names are correct)
     if (initialUrlState && !hasAutoPlotted.current && Object.keys(corpusPeriods).length > 0) {
       hasAutoPlotted.current = true;
-      // Use a timeout to ensure state settles before handlePlot uses it
-      setTimeout(() => {
-        handlePlot();
-      }, 0);
+      // A link without dates gets the period of its first corpus.
+      const period = corpusPeriods[initialUrlState.queries[0].corpus];
+      if (period && initialUrlState.startDate === null) setStartDate(period.start);
+      if (period && initialUrlState.endDate === null) setEndDate(period.end);
+      setPlotFromUrl(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [corpusPeriods]);
+
+  useEffect(() => {
+    if (!plotFromUrl) return;
+    setPlotFromUrl(false);
+    handlePlot({ fromUrl: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plotFromUrl]);
+
+  // Back and forward draw the plot their URL describes.
+  useEffect(() => {
+    const onPopState = () => {
+      const state = decodeUrlState(window.location.search);
+      if (!state) return;
+      const restored = queriesFromUrl(state);
+      setQueries(restored);
+      setActiveQueryId(restored[state.activeIndex].id);
+      if (state.startDate !== null) setStartDate(state.startDate);
+      if (state.endDate !== null) setEndDate(state.endDate);
+      setSmoothing(state.smoothing);
+      autoPlotTypeRef.current = null;
+      setPlotType(state.plotType);
+      setPlotFromUrl(true);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const processNgramData = useCallback((apiResponse, allSameCorpus, plotType, index) => {
     const { data, query } = apiResponse;
@@ -1690,7 +1690,39 @@ function App() {
     });
   };
 
-  const handlePlot = () => {
+  // The tabs and dates of the plot on screen, which its URL describes along with the
+  // display settings of the moment.
+  const plottedRef = useRef(null);
+  const plotSearch = () => {
+    const plotted = plottedRef.current;
+    const activeQuery = queries.find(q => q.id === activeQueryId);
+    return encodeUrlState({
+      queries: plotted.queries,
+      activeIndex: Math.max(0, plotted.queries.findIndex(q => q.id === activeQueryId)),
+      startDate: plotted.startDate,
+      endDate: plotted.endDate,
+      smoothing,
+      // The type the user chose, not one the app switched to for a list mode or few data.
+      plotType: autoPlotTypeRef.current ? autoPlotTypeRef.current.from : plotType,
+      advancedOptions: activeQuery?.advancedOptions,
+    }, revuesData);
+  };
+  const writeUrl = (search, replace) => {
+    if (search === new URLSearchParams(window.location.search).toString()) return;
+    const url = `${window.location.pathname}?${search}`;
+    if (replace) window.history.replaceState({}, '', url);
+    else window.history.pushState({}, '', url);
+  };
+
+  // What changes the look of the plot without fetching again (smoothing, plot type,
+  // options, the tab shown) updates its URL, without a history entry of its own.
+  const activeAdvancedOptions = queries.find(q => q.id === activeQueryId)?.advancedOptions;
+  useEffect(() => {
+    if (plottedRef.current) writeUrl(plotSearch(), true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smoothing, plotType, activeQueryId, activeAdvancedOptions]);
+
+  const handlePlot = ({ fromUrl = false } = {}) => {
     setError(null);
     setApiResponses([]);
     setRawPlotData([]);
@@ -1705,21 +1737,10 @@ function App() {
     setIsLoading(true);
     setFetchContextAfterPlot(true);
 
-    // Update URL with first query parameters
-    if (queries.length > 0) {
-      const firstQuery = queries[0];
-      if (firstQuery && firstQuery.word && firstQuery.corpus) {
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.set('word', firstQuery.word);
-        newUrl.searchParams.set('corpus', firstQuery.corpus);
-        newUrl.searchParams.set('start', startDate);
-        newUrl.searchParams.set('end', endDate);
-        newUrl.searchParams.set('mode', firstQuery.searchMode || 'ngram');
-        newUrl.searchParams.set('smoothing', smoothing);
-        newUrl.searchParams.set('plotType', plotType);
-        window.history.pushState({}, '', newUrl);
-      }
-    }
+    // The URL describes the whole plot, so that its link draws it again. A plot replayed
+    // from the URL (a link just opened, back or forward) keeps its history entry.
+    plottedRef.current = { queries, startDate, endDate };
+    writeUrl(plotSearch(), fromUrl);
 
     // Expand queries with '&' separator into multiple queries
     const expandedQueries = queries.flatMap(q => {
@@ -2387,7 +2408,7 @@ function App() {
                       />
                     </>
                   )}
-                  <Button variant="contained" color="success" onClick={handlePlot} disabled={isLoading}>
+                  <Button variant="contained" color="success" onClick={() => handlePlot()} disabled={isLoading}>
                     {isLoading ? t('Loading...') : t('Plot')}
                   </Button>
                   {dateWarnings.length > 0 && (

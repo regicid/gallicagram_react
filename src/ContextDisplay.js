@@ -69,10 +69,11 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
       let year, month, day;
       const dateObj = new Date(record.date);
 
+      // Points are dated at UTC midnight: local getters would give the day before west of UTC.
       if (!isNaN(dateObj.getTime())) {
-        year = dateObj.getFullYear();
-        month = dateObj.getMonth() + 1;
-        day = dateObj.getDate();
+        year = dateObj.getUTCFullYear();
+        month = dateObj.getUTCMonth() + 1;
+        day = dateObj.getUTCDate();
       } else {
         year = parseInt(record.date);
         month = 1;

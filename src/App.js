@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './App.css';
 import FormComponent, { AdvancedOptionsComponent } from './FormComponent';
-import PlotComponent, { defaultPalette, colorblindPalette, zscore } from './PlotComponent';
+import PlotComponent, { defaultPalette, colorblindPalette, zscore, fromPlotlyDate } from './PlotComponent';
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
@@ -510,7 +510,7 @@ function App() {
 
     const years = [];
     for (let year = start; year <= end; year++) {
-      years.push(new Date(year, 0));
+      years.push(new Date(Date.UTC(year, 0)));
     }
 
     const traces = data.map(ngramData => {
@@ -883,7 +883,7 @@ function App() {
       // Handle non-Gallica corpora by creating a dummy record
       const dummyRecord = {
         date: date.toISOString(),
-        paper_title: `${t('Context for')} ${query.word} (${date.getFullYear()})`,
+        paper_title: `${t('Context for')} ${query.word} (${date.getUTCFullYear()})`,
         url: '#',
         terms: [query.word],
         dummy: true,
@@ -899,19 +899,19 @@ function App() {
 
     const params = new URLSearchParams({
       terms: query.word.split('+')[0].replace(/’/g, "'"),
-      year: date.getFullYear(),
+      year: date.getUTCFullYear(),
       limit: searchParams.limit,
       cursor: searchParams.cursor,
       sort: 'relevance'
     });
 
-    // Add resolution specific parameters (month, day)
+    // Add resolution specific parameters (month, day). Points are dated at UTC midnight.
     const resolution = query.resolution;
     if (resolution === 'mois' || resolution === 'jour') {
       if (!isNaN(date.getTime())) {
-        params.append('month', date.getMonth() + 1); // getMonth is 0-indexed
+        params.append('month', date.getUTCMonth() + 1); // getUTCMonth is 0-indexed
         if (resolution === 'jour') {
-          params.append('day', date.getDate());
+          params.append('day', date.getUTCDate());
         }
       }
     }
@@ -1207,7 +1207,7 @@ function App() {
 
       const query = apiResponses[responseIndex].query;
       setSelectedQuery(query);
-      const date = new Date(point.x);
+      const date = fromPlotlyDate(point.x);
       setSelectedDate(date);
 
       // Cairn cannot be read from inside the app, so a click goes straight to its search.
@@ -1216,7 +1216,7 @@ function App() {
       if (query.corpus === CAIRN_CORPUS) {
         const url = cairnSearchUrl({
           word: (query.word || '').split('+')[0].trim(),
-          year: date.getFullYear(),
+          year: date.getUTCFullYear(),
           revues: getSelection(query, CAIRN_CORPUS).revues,
           revueMap: revuesData[CAIRN_CORPUS],
           disciplineIds: cairnDisciplines,
@@ -1896,7 +1896,7 @@ function App() {
             const baseYear = advancedOptions.base100Year;
             const baseIndex = trace.x ? trace.x.findIndex(d => {
               const date = new Date(d);
-              return date.getFullYear() === baseYear;
+              return date.getUTCFullYear() === baseYear;
             }) : -1;
             if (baseIndex !== -1 && y[baseIndex] !== null && y[baseIndex] !== undefined && y[baseIndex] !== 0) {
               const baseValue = y[baseIndex];
@@ -1994,10 +1994,10 @@ function App() {
         ctx.font = `${20 * scale}px 'EB Garamond', Georgia, serif`;
         const yearSpan = (maxDate - minDate) / (1000 * 60 * 60 * 24 * 365.25);
         const tickInterval = yearSpan > 100 ? 20 : (yearSpan > 50 ? 10 : 5);
-        const startYear = new Date(minDate).getFullYear();
-        const endYear = new Date(maxDate).getFullYear();
+        const startYear = new Date(minDate).getUTCFullYear();
+        const endYear = new Date(maxDate).getUTCFullYear();
         for (let y = Math.ceil(startYear / tickInterval) * tickInterval; y <= endYear; y += tickInterval) {
-          const date = new Date(y, 0, 1);
+          const date = new Date(Date.UTC(y, 0, 1));
           const x = xScale(date);
           ctx.beginPath();
           ctx.moveTo(x, height - margin.bottom);

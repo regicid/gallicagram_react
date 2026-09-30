@@ -198,6 +198,8 @@
   "press_up_to_end_note": "Its results come newest first, so for a long period only its last days appear.",
   "press_no_results": "The newspaper's search engine found nothing for this period. Google may do better: see the link above.",
   "press_link_note": "The search engine of {{site}} cannot be restricted to a date from Gallicagram, so the search opens on Google instead, limited to {{site}} and to the period you clicked. Google's date filter is approximate.",
+  "press_own_search_note": "The search engine of {{site}} only answers your browser, not Gallicagram, so it opens in a new tab, limited to the period you clicked.",
+  "search_on_site": "Search on {{site}}",
   "press_failed_note": "The search on {{name}} could not be loaded. It can be run on Google instead, limited to {{site}} and to the period you clicked.",
   "presse_moderne_help": "This corpus adds up every modern press outlet (except Le Marin, a trade paper). For each date, the occurrences in all outlets are summed, then divided by the total word count of all outlets: each outlet weighs according to how much it publishes, so dailies weigh more than weeklies. Not every outlet covers the whole period, so the make-up of the corpus changes over time.",
   "wildcard_help": "Use * to add up, in one line, every word that starts this way (? stands for a single letter)",

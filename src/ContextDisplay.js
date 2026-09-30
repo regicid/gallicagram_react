@@ -6,7 +6,7 @@ import TextField from '@mui/material/TextField';
 import Papa from 'papaparse';
 import Button from '@mui/material/Button';
 import { CAIRN_CORPUS, PERSEE_CORPUS, isTvCorpus, cairnSearchUrl, CATEGORY_CREDITS } from './revueCorpora';
-import { PRESS_PANEL, PRESS_LINK_OUT, isPressPanelCorpus, isPressLinkOutCorpus, pressPeriod, googleSiteSearchUrl, pressLinkOutUrl } from './pressCorpora';
+import { PRESS_PANEL, PRESS_LINK_OUT, isPressPanelCorpus, isPressLinkOutCorpus, hasOwnSearch, pressPeriod, googleSiteSearchUrl, pressLinkOutUrl } from './pressCorpora';
 
 // Cached across renders: both files are static and only needed for Cairn context.
 let cairnMetaPromise = null;
@@ -206,7 +206,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           // The click handler already opened this in a new tab; the panel repeats the link
           // for the case where a pop-up blocker stopped it.
           const url = pressLinkOutUrl(corpus, word, record.date, record.resolution);
-          setData({ type: 'press_link', content: url, site: PRESS_LINK_OUT[corpus] });
+          setData({ type: 'press_link', content: url, site: PRESS_LINK_OUT[corpus], ownSearch: hasOwnSearch(corpus) });
 
         } else if (isTvCorpus(corpus)) {
           // No per-occurrence context for the transcripts; what matters to a reader
@@ -312,10 +312,10 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           <p style={{ marginTop: 0 }}>
             {data.failed
               ? t('press_failed_note', { name: data.name, site: data.site })
-              : t('press_link_note', { site: data.site })}
+              : t(data.ownSearch ? 'press_own_search_note' : 'press_link_note', { site: data.site })}
           </p>
           <a href={data.content} target="_blank" rel="noopener noreferrer" className="external-link-button">
-            {t('Search on Google')}
+            {data.ownSearch ? t('search_on_site', { site: data.site }) : t('Search on Google')}
           </a>
         </div>
       )}

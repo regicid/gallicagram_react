@@ -139,18 +139,13 @@ const algolia = ({ index, key, dateField, base }) => async ({ word, start, end }
   });
 };
 
-// Valeurs Actuelles runs WordPress with its REST API open, dates included.
-const valeursActuelles = async ({ word, start, end }) => {
-  const params = new URLSearchParams({
-    search: word,
-    after: `${start}T00:00:00`,
-    before: `${end}T23:59:59`,
-    per_page: '20',
-    _fields: 'date,link,title,excerpt',
-  });
-  const response = await fetch(`https://www.valeursactuelles.com/wp-json/wp/v2/posts?${params}`);
-  if (!response.ok) throw new Error(`Valeurs Actuelles: HTTP ${response.status}`);
-  const posts = await response.json();
+// --- Sources going through api/press.js -----------------------------------------------
+
+// Valeurs Actuelles runs WordPress with its REST API open, dates included. Its answers
+// carry two Access-Control-Allow-Origin headers (the caller's origin and *), which
+// browsers reject, hence the proxy.
+const valeursActuelles = async (args) => {
+  const posts = JSON.parse(await viaProxy('valeurs_actuelles', args));
   return posts.map(post => ({
     title: plain(post.title?.rendered),
     href: post.link,
@@ -159,9 +154,8 @@ const valeursActuelles = async ({ word, start, end }) => {
   }));
 };
 
-// --- Sources going through api/press.js -----------------------------------------------
-
-// Le Figaro and Gala share one search engine, and so one page layout.
+// Gala's search engine, which it shares with Le Figaro (whose own now sits behind bot
+// protection).
 const figaroEngine = (source, base) => async (args) => {
   const doc = parseHtml(await viaProxy(source, args));
   return [...doc.querySelectorAll('article.fig-profil')].map(article => {
@@ -251,8 +245,6 @@ export const PRESS_PANEL = {
     search: algolia({ index: 'lt_prod_CONTENT', key: '100c5111cb518ce8cda6b9dc694273ae', dateField: 'timestamp.published', base: 'https://www.latribune.fr/' }) },
   valeurs_actuelles: { name: 'Valeurs Actuelles', site: 'valeursactuelles.com',
     search: valeursActuelles },
-  le_figaro: { name: 'Le Figaro', site: 'lefigaro.fr',
-    search: figaroEngine('le_figaro', 'https://www.lefigaro.fr') },
   gala: { name: 'Gala', site: 'gala.fr',
     search: figaroEngine('gala', 'https://www.gala.fr') },
   // Typographic apostrophe: i18next HTML-escapes a straight one when interpolating.
@@ -289,7 +281,9 @@ export const PRESS_LINK_OUT = {
   paris_match: 'parismatch.com',
   francesoir: 'francesoir.fr',
   bfmtv: 'bfmtv.com',
-  // Behind bot protection.
+  // Behind bot protection. Le Figaro's stops the proxy but not a reader's browser, so a
+  // click opens its own dated search (see OWN_SEARCH).
+  le_figaro: 'lefigaro.fr',
   cnews: 'cnews.fr',
   le_journal_du_dimanche: 'lejdd.fr',
   paris_normandie: 'paris-normandie.fr',
@@ -301,16 +295,29 @@ export const PRESS_LINK_OUT = {
   le_marin: 'lemarin.fr',
 };
 
+// Link-out corpora whose own search takes dates and answers a reader's browser, though not
+// the proxy: the click opens it rather than Google. Dates are DD-MM-YYYY, both included.
+const dmy = (iso) => iso.split('-').reverse().join('-');
+const OWN_SEARCH = {
+  le_figaro: ({ word, start, end }) =>
+    `https://recherche.lefigaro.fr/recherche/${encodeURIComponent(word)}/?datemin=${dmy(start)}&datemax=${dmy(end)}`,
+};
+
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 export const isPressPanelCorpus = (corpus) => has(PRESS_PANEL, corpus);
 export const isPressLinkOutCorpus = (corpus) => has(PRESS_LINK_OUT, corpus);
+export const hasOwnSearch = (corpus) => has(OWN_SEARCH, corpus);
 
 export const pressSite = (corpus) =>
   isPressPanelCorpus(corpus) ? PRESS_PANEL[corpus].site : PRESS_LINK_OUT[corpus];
 
-// The Google search for a click on `corpus` at `dateISO`, or null for other corpora.
+// The search a click on `corpus` at `dateISO` opens (the site's own, or Google's), or null
+// for other corpora.
 export const pressLinkOutUrl = (corpus, word, dateISO, resolution) => {
   const site = pressSite(corpus);
   if (!site) return null;
-  return googleSiteSearchUrl({ site, word, ...pressPeriod(dateISO, resolution) });
+  const period = pressPeriod(dateISO, resolution);
+  return hasOwnSearch(corpus)
+    ? OWN_SEARCH[corpus]({ word, ...period })
+    : googleSiteSearchUrl({ site, word, ...period });
 };

@@ -42,6 +42,14 @@ describe('pressLinkOutUrl', () => {
       .toBe('site:capital.fr "inflation" after:2022-02-28 before:2022-04-01');
   });
 
+  // Its bot protection stops the proxy, not a reader: the click opens the dated search.
+  test("opens Le Figaro's own search, limited to the period", () => {
+    expect(pressLinkOutUrl('le_figaro', 'la guerre', '2017-07-05T00:00:00.000Z', 'jour'))
+      .toBe('https://recherche.lefigaro.fr/recherche/la%20guerre/?datemin=05-07-2017&datemax=05-07-2017');
+    expect(pressLinkOutUrl('le_figaro', 'coucou', '2020-01-01T00:00:00.000Z', 'annee'))
+      .toBe('https://recherche.lefigaro.fr/recherche/coucou/?datemin=01-01-2020&datemax=31-12-2020');
+  });
+
   test('returns null outside the press corpora', () => {
     expect(pressLinkOutUrl('lemonde_rubriques', 'x', '2022-03-01T00:00:00.000Z', 'mois')).toBeNull();
   });

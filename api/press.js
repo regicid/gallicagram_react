@@ -1,11 +1,12 @@
 // Search proxy for the modern press corpora whose search cannot be called from the browser.
 //
-// Two reasons land a site here rather than in a direct fetch from the page: it serves its
-// results as HTML with no CORS header (Le Figaro, Gala, L'Obs, Atlantico, La Dépêche, Midi
-// Libre), or its API only allows its own origin (Les Échos). A Vercel rewrite is not an
-// option either: it forwards X-Forwarded-Host, which some backends trust to decide which
-// site is being served (that is what broke Cairn), and it cannot set the browser-like
-// headers that Les Échos' bot protection insists on.
+// Three reasons land a site here rather than in a direct fetch from the page: it serves its
+// results as HTML with no CORS header (Gala, L'Obs, Atlantico, La Dépêche, Midi Libre),
+// its API only allows its own origin (Les Échos), or its CORS headers are malformed
+// (Valeurs Actuelles sends two Access-Control-Allow-Origin values). A Vercel rewrite is
+// not an option either: it forwards X-Forwarded-Host, which some backends trust to decide
+// which site is being served (that is what broke Cairn), and it cannot set the
+// browser-like headers that Les Échos' bot protection insists on.
 //
 // Every source is a fixed URL template filled with a validated word and date range, so
 // this cannot be used as an open proxy. The response is passed through untouched; the
@@ -41,9 +42,6 @@ const ladepecheDate = (start, end) => {
 };
 
 const SOURCES = {
-  le_figaro: ({ q, start, end }) => ({
-    url: `https://recherche.lefigaro.fr/recherche/${enc(q)}/?datemin=${ddmmyyyy(start, '-')}&datemax=${ddmmyyyy(end, '-')}`,
-  }),
   gala: ({ q, start, end }) => ({
     url: `https://recherche.gala.fr/recherche/${enc(q)}/?publication=gala.fr&datemin=${ddmmyyyy(start, '-')}&datemax=${ddmmyyyy(end, '-')}`,
   }),
@@ -63,6 +61,10 @@ const SOURCES = {
   les_echos: ({ q, start, end }) => ({
     url: `https://api.lesechos.fr/api/v2/search?limit=20&page=1&query=${enc(q)}&startDate=${start}&endDate=${end}`,
     headers: LESECHOS_HEADERS,
+  }),
+  valeurs_actuelles: ({ q, start, end }) => ({
+    url: `https://www.valeursactuelles.com/wp-json/wp/v2/posts?search=${enc(q)}&after=${start}T00:00:00&before=${end}T23:59:59&per_page=20&_fields=date,link,title,excerpt`,
+    headers: { 'User-Agent': UA_CHROME, 'Accept': 'application/json' },
   }),
 };
 

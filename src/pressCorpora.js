@@ -293,7 +293,7 @@ export const PRESS_LINK_OUT = {
   cnews: 'cnews.fr',
   le_journal_du_dimanche: 'lejdd.fr',
   paris_normandie: 'paris-normandie.fr',
-  ouest_france2: 'ouest-france.fr',
+  ouest_france: 'ouest-france.fr',
   le_courrier_de_l_ouest: 'courrierdelouest.fr',
   le_maine_libre: 'lemainelibre.fr',
   presse_ocean: 'presseocean.fr',

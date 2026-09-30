@@ -48,7 +48,7 @@ export const ELIAS_CORPORA = new Set([
   'le_capital', 'le_courrier_de_l_ouest', 'le_figaro', 'le_journal_du_dimanche',
   'le_maine_libre', 'le_marin', 'le_monde', 'le_nouvel_observateur',
   'le_telegramme', 'les_echos', 'marianne', 'mediapart',
-  'midilibre', 'nice_matin', 'ouest_france2', 'paris_match', 'paris_normandie',
+  'midilibre', 'nice_matin', 'ouest_france', 'paris_match', 'paris_normandie',
   'presse_ocean', 'sud_ouest', 'telerama', 'valeurs_actuelles', 'voici',
   'voiles_et_voiliers',
 ]);

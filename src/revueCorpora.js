@@ -93,6 +93,10 @@ export const PERSEE_CORPUS = 'persee';
 export const LEGACY_CORPUS_CODES = {
   'route à part (query_persee)': PERSEE_CORPUS,
   lemonde_rubriques: 'le_monde',
+  // Le Monde's code until December 2025.
+  lemonde: 'le_monde',
+  // The server renamed the database.
+  ouest_france2: 'ouest_france',
 };
 const CAIRN_SEARCH = 'https://shs.cairn.info/recherche';
 // Past this many revue codes the query string gets unwieldy; the discipline ids that

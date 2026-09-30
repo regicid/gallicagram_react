@@ -1084,8 +1084,9 @@ function App() {
     const warnings = [];
 
     if (currentActiveQuery.word) {
-      // Split by space, plus, or ampersand
-      const wordCount = currentActiveQuery.word.trim().split(/[\s+&]+/).length;
+      // '+' and '&' join separate n-grams, so the longest one is what has to fit.
+      const wordCount = Math.max(...currentActiveQuery.word.split(/[+&]/)
+        .map(part => part.trim().split(/\s+/).filter(Boolean).length));
       if (wordCount > maxLength) {
         let messageKey = 'Long query warning';
         if ((currentActiveQuery.corpus === 'lemonde' || currentActiveQuery.corpus === 'lemonde_rubriques') &&
@@ -1698,6 +1699,9 @@ function App() {
     setTotalOccurrences(0);
     setTotalPlotOccurrences(0);
     setSelectedDate(null);
+    // Otherwise the context panel keeps the corpus of the last point clicked, and a new
+    // plot on another corpus shows that corpus's articles.
+    setSelectedQuery(null);
     setIsLoading(true);
     setFetchContextAfterPlot(true);
 

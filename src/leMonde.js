@@ -15,10 +15,10 @@ const LIST_MODES = ['joker', 'nearby'];
 // le_monde has nothing longer than 2-grams.
 const LE_MONDE_MAX_LENGTH = 2;
 
-// Size of the n-grams a query needs: its longest '+' part, and for the list modes one
-// word more (or the requested length, if longer).
+// Size of the n-grams a query needs: its longest '+' or '&' part, and for the list modes
+// one word more (or the requested length, if longer).
 export const ngramSize = ({ word = '', searchMode, length }) => {
-  const words = Math.max(0, ...word.split('+')
+  const words = Math.max(0, ...word.split(/[+&]/)
     .map(part => part.trim().replace(/-/g, ' ').split(/\s+/).filter(Boolean).length));
   return LIST_MODES.includes(searchMode) ? Math.max(words + 1, Number(length) || 0) : words;
 };

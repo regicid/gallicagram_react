@@ -374,6 +374,13 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
     }
   }, [corpus, selectedCorpus, resolution, supportsWeekly, supportsDaily, supportsMonthly, formData.id, onFormChange]);
 
+  // A mode the corpus does not offer falls back to n-grams: moving from a corpus with the
+  // joker to one without would otherwise keep sending a request the server refuses.
+  const modeAvailable = !searchMode || searchMode === 'ngram' || availableModes.includes(searchMode);
+  useEffect(() => {
+    if (selectedCorpus && !modeAvailable) onFormChange({ id: formData.id, searchMode: 'ngram' });
+  }, [selectedCorpus, modeAvailable, formData.id, onFormChange]);
+
   // A corpus picked from the menu, as opposed to one shown by switching tabs. Arriving on
   // a TV corpus selects weekly, only on the pick, so the choice can still be changed
   // afterwards without being forced back; App moves the dates.

@@ -1047,30 +1047,17 @@ function App() {
     validateDatesAgainstCorpus();
   }, [validateDatesAgainstCorpus]);
 
-  // Track previous corpus to detect actual corpus changes (not just tab switches)
-  const prevCorpusRef = React.useRef(null);
-
-  // Auto-adjust dates when corpus changes within a tab (not when switching tabs)
-  useEffect(() => {
-    const activeQuery = queries.find(q => q.id === activeQueryId);
-    if (!activeQuery) return;
-
-    const currentCorpus = activeQuery.corpus;
-    const period = corpusPeriods[currentCorpus];
-
-    // Detect if the corpus actually changed (not just a tab switch)
-    if (period && prevCorpusRef.current !== null && prevCorpusRef.current !== currentCorpus) {
-      // If either start or end date is outside the recommended range, reset to recommended
-      if (startDate < period.start || endDate > period.end) {
-        setStartDate(period.start);
-        setEndDate(period.end);
-      }
+  // Picking a corpus from the menu resets the dates to its period when they fall outside
+  // it. Only a pick does: switching tabs also changes the corpus on display, but the
+  // dates belong to the whole plot and must not move with it.
+  const handleCorpusPick = useCallback((patch) => {
+    handleFormChange(patch);
+    const period = corpusPeriods[patch.corpus];
+    if (period && (startDate < period.start || endDate > period.end)) {
+      setStartDate(period.start);
+      setEndDate(period.end);
     }
-
-    // Tracked even for a corpus with no known period, otherwise going A -> that corpus
-    // -> A would look like "no change" and skip the adjustment on the way back.
-    prevCorpusRef.current = currentCorpus;
-  }, [queries, activeQueryId, corpusPeriods, startDate, endDate]);
+  }, [handleFormChange, corpusPeriods, startDate, endDate]);
 
 
   const [wordCountWarnings, setWordCountWarnings] = useState([]);
@@ -2352,6 +2339,7 @@ function App() {
                       <FormComponent
                         formData={activeQuery}
                         onFormChange={handleFormChange}
+                        onCorpusPick={handleCorpusPick}
                         onPlot={handlePlot}
                         revuesData={revuesData}
                         onRevueSelectionChange={handleRevueSelectionChange}

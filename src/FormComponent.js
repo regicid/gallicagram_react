@@ -286,7 +286,7 @@ const RevuePicker = ({ corpus, revueMap, selection, onSelectionChange, showCorpu
   );
 };
 
-const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSelectionChange }) => {
+const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesData, onRevueSelectionChange }) => {
   const { t } = useTranslation();
   const { word, corpus, resolution, rubriques, byRubrique, searchMode, word2, distance, n_joker, length, stopwords, score, min_count } = formData;
   const [corpora, setCorpora] = useState([]);
@@ -374,16 +374,16 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
     }
   }, [corpus, selectedCorpus, resolution, supportsWeekly, supportsDaily, supportsMonthly, formData.id, onFormChange]);
 
-  // Arriving on a TV corpus selects weekly, but only on the switch, so the choice can
-  // still be changed afterwards without being forced back.
-  const prevCorpusRef = useRef(null);
-  useEffect(() => {
-    if (!selectedCorpus) return;
-    if (prevCorpusRef.current !== null && prevCorpusRef.current !== corpus && isTvCorpus(corpus)) {
-      onFormChange({ id: formData.id, resolution: 'semaine' });
-    }
-    prevCorpusRef.current = corpus;
-  }, [corpus, selectedCorpus, formData.id, onFormChange]);
+  // A corpus picked from the menu, as opposed to one shown by switching tabs. Arriving on
+  // a TV corpus selects weekly, only on the pick, so the choice can still be changed
+  // afterwards without being forced back; App moves the dates.
+  const handleCorpusPick = (value) => {
+    onCorpusPick({
+      id: formData.id,
+      corpus: value,
+      ...(value !== corpus && isTvCorpus(value) ? { resolution: 'semaine' } : {}),
+    });
+  };
 
   // Available search modes with descriptions
   const searchModes = [
@@ -515,7 +515,7 @@ const FormComponent = ({ formData, onFormChange, onPlot, revuesData, onRevueSele
           categories={categories}
           corpus={corpus}
           currentCategory={currentCategory}
-          onSelect={(value) => onFormChange({ ...formData, corpus: value })}
+          onSelect={handleCorpusPick}
         />
       </div>
 

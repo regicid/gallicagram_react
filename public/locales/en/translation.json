@@ -225,8 +225,11 @@
   "whats_new_cairn": "Cairn",
   "whats_new_tv": "TV transcripts",
   "whats_new_press": "36 newspapers",
+  "whats_new_majinbook": "Majinbook",
   "whats_new_syntax": "New syntax: * (wildcards), _ (placeholder)",
   "whats_new_links": "Share a chart with a simple URL",
   "whats_new_speed": "30x faster queries",
-  "whats_new_close": "Let's go"
+  "whats_new_close": "Let's go",
+  "whats_new_thanks": "Thanks to",
+  "whats_new_and": "and"
 }

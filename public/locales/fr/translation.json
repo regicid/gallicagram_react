@@ -225,8 +225,11 @@
   "whats_new_cairn": "Cairn",
   "whats_new_tv": "Transcriptions TV",
   "whats_new_press": "36 journaux",
+  "whats_new_majinbook": "Majinbook",
   "whats_new_syntax": "Nouvelle syntaxe : * (fin de mot libre), _ (mot libre)",
   "whats_new_links": "Partagez un graphique avec une simple URL",
   "whats_new_speed": "Requêtes 30 fois plus rapides",
-  "whats_new_close": "C'est parti"
+  "whats_new_close": "C'est parti",
+  "whats_new_thanks": "Merci à",
+  "whats_new_and": "et"
 }

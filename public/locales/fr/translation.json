@@ -219,5 +219,6 @@
   "min_count_help": "Les mots vus moins souvent sont écartés : les scores d'association sont instables sur les mots rares.",
   "joker_underscore_help": "Placez _ là où vous cherchez un mot : les mots les plus fréquents à cet endroit sont listés. Sans _, il est ajouté après les mots saisis. Sur la presse de Gallica, la recherche ne peut pas commencer par _.",
   "joker_wildcard_help": "Un mot qui commence ainsi : chaque forme est listée séparément",
-  "nearby_syntax_help": "Saisissez un ou deux mots exacts (sans * ni _) : les mots les plus fréquents à proximité sont listés, dans une fenêtre fixée par Longueur. Sur la presse de Gallica, seuls les mots qui suivent sont comptés."
+  "nearby_syntax_help": "Saisissez un ou deux mots exacts (sans * ni _) : les mots les plus fréquents à proximité sont listés, dans une fenêtre fixée par Longueur. Sur la presse de Gallica, seuls les mots qui suivent sont comptés.",
+  "Syntax": "Syntaxe"
 }

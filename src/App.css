@@ -461,3 +461,14 @@ button:hover {
   background-color: #16213e;
   color: #eaeaea;
 }
+
+/* Room for the operator chips sitting inside the word field (FormComponent). */
+.form-group input.has-operator-chips {
+  padding-right: calc(var(--operator-count) * 30px + 8px);
+}
+
+@media (pointer: coarse) {
+  .form-group input.has-operator-chips {
+    padding-right: calc(var(--operator-count) * 38px + 8px);
+  }
+}

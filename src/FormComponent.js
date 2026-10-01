@@ -8,7 +8,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import { useTranslation } from 'react-i18next';
-import { FormControl, InputLabel, Select, MenuItem, Tooltip, IconButton, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment, Menu, MenuList, Popper, Paper, Alert } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, Tooltip, Chip, TextField, Button, Box, OutlinedInput, ListItemText, Divider, InputAdornment, Menu, MenuList, Popper, Paper, Alert } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { REVUE_CORPORA, revueCorpusParts, getSelection, isTvCorpus } from './revueCorpora';
@@ -296,6 +296,7 @@ const RevuePicker = ({ corpus, revueMap, selection, onSelectionChange, showCorpu
 
 const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesData, onRevueSelectionChange }) => {
   const { t } = useTranslation();
+  const wordInputRef = useRef(null);
   const { word, corpus, resolution, rubriques, byRubrique, searchMode, word2, distance, n_joker, length, stopwords, score, min_count } = formData;
   const [corpora, setCorpora] = useState([]);
 
@@ -461,6 +462,42 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
   // The syntax depends on the mode: in the list modes of the ngram routes, & and + do
   // nothing, while _ and * mean something else than in n-gram mode.
   const listModeSyntax = usesNgramRoute(corpus) && (searchMode === 'joker' || searchMode === 'nearby');
+  // Operators shown as chips inside the word field, so the syntax is visible where it is
+  // typed. Same mode logic as the full tooltip below.
+  const operators = searchMode === 'nearby' && listModeSyntax ? []
+    : searchMode === 'joker' && listModeSyntax ? [
+      { op: '_', help: 'joker_underscore_help', example: 'guerre _ allemagne' },
+      { op: '*', help: 'joker_wildcard_help', example: 'addict*' },
+    ] : [
+      { op: '&', help: 'Use & to plot multiple words as separate lines', example: 'liberté&égalité' },
+      { op: '+', help: 'Use + to combine multiple words into one line', example: 'liberté+égalité' },
+      ...(usesNgramRoute(corpus) && (!searchMode || searchMode === 'ngram') ? [
+        { op: '*', help: 'wildcard_help', example: 'addict*' },
+        { op: '_', help: 'any_word_help', example: 'guerre _ allemagne' },
+      ] : []),
+    ];
+
+  // Insert an operator at the cursor. _ stands for a whole word, so it gets spaces
+  // around it unless they are already there.
+  const insertOperator = (op) => {
+    const input = wordInputRef.current;
+    const start = input ? input.selectionStart : word.length;
+    const end = input ? input.selectionEnd : word.length;
+    let text = op;
+    if (op === '_') {
+      if (start > 0 && word[start - 1] !== ' ') text = ' ' + text;
+      if (end < word.length && word[end] !== ' ') text = text + ' ';
+      else if (end === word.length) text = text + ' ';
+    }
+    onFormChange({ ...formData, word: word.slice(0, start) + text + word.slice(end) });
+    const caret = start + text.length;
+    requestAnimationFrame(() => {
+      if (!wordInputRef.current) return;
+      wordInputRef.current.focus();
+      wordInputRef.current.setSelectionRange(caret, caret);
+    });
+  };
+
   const helpTooltipContent = (
     <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
       <strong>{t('Query Syntax:')}</strong>
@@ -523,14 +560,58 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
-        <label style={{ marginRight: '1rem' }}>{t('Word:')}</label>
-        <input type="text" name="word" value={word} onChange={handleChange} required />
-        <Tooltip title={helpTooltipContent} arrow placement="right">
-          <IconButton size="small" style={{ marginLeft: '0.5rem' }}>
-            <HelpOutlineIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+      <div className="form-group" style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+          <label htmlFor="word-input" style={{ margin: 0 }}>{t('Word:')}</label>
+          <Tooltip title={helpTooltipContent} arrow placement="right" enterTouchDelay={0} leaveTouchDelay={8000}>
+            <Chip
+              icon={<HelpOutlineIcon />}
+              label={t('Syntax')}
+              size="small"
+              variant="outlined"
+              color="primary"
+              clickable
+            />
+          </Tooltip>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <input
+            id="word-input"
+            ref={wordInputRef}
+            type="text"
+            name="word"
+            value={word}
+            onChange={handleChange}
+            required
+            className={operators.length ? 'has-operator-chips' : undefined}
+            style={{ '--operator-count': operators.length }}
+          />
+          {operators.length > 0 && (
+            <div style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '4px' }}>
+              {operators.map(({ op, help, example }) => (
+                <Tooltip
+                  key={op}
+                  arrow
+                  placement="top"
+                  title={<span style={{ fontSize: '13px' }}>{t(help)}<br /><em>{t('Example:')} {example}</em></span>}
+                >
+                  <Chip
+                    label={op}
+                    size="small"
+                    onMouseDown={e => e.preventDefault() /* keep the input's cursor */}
+                    onClick={() => insertOperator(op)}
+                    sx={{
+                      minWidth: '26px', height: '22px', fontFamily: 'monospace', fontWeight: 'bold', fontSize: '14px',
+                      '& .MuiChip-label': { px: '6px' },
+                      // Bigger tap targets on touch screens; keep in sync with .has-operator-chips
+                      '@media (pointer: coarse)': { minWidth: '34px', height: '30px', fontSize: '16px' },
+                    }}
+                  />
+                </Tooltip>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <div className="form-group" style={{ marginBottom: '1rem' }}>
         <CorpusMenu

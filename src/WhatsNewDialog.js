@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 
 // Bump this to show the dialog again, once, to every visitor after the next batch of news.
-const RELEASE = '2026-10';
+const RELEASE = '2026-10b';
 const STORAGE_KEY = 'gallicagram_whats_new_seen';
 
 const NEWS = ['whats_new_cairn', 'whats_new_tv', 'whats_new_press', 'whats_new_majinbook', 'whats_new_syntax', 'whats_new_links', 'whats_new_speed'];

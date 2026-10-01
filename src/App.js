@@ -26,6 +26,7 @@ import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
 import AboutPage from "./AboutPage";
 import MCPPage from "./MCPPage";
+import WhatsNewDialog from "./WhatsNewDialog";
 
 const theme = createTheme({
   typography: {
@@ -2276,6 +2277,7 @@ function App() {
 
         <Route path="*" element={
           <>
+            <WhatsNewDialog />
             <div className={`App ${darkMode ? 'dark' : ''}`}>
               <header className="App-header">
                 <div className="header-topline">

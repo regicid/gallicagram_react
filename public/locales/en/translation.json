@@ -220,5 +220,13 @@
   "joker_underscore_help": "Put _ where you are looking for a word: the most frequent words in that place are listed. Without _, one is added after the words typed. On the Gallica press, the search cannot start with _.",
   "joker_wildcard_help": "A word that starts this way: each form is listed separately",
   "nearby_syntax_help": "Type one or two exact words (no * or _): the most frequent words nearby are listed, within a window set by Length. On the Gallica press, only the words that follow are counted.",
-  "Syntax": "Syntax"
+  "Syntax": "Syntax",
+  "whats_new_title": "What's new on Gallicagram",
+  "whats_new_cairn": "Cairn",
+  "whats_new_tv": "TV transcripts",
+  "whats_new_press": "36 newspapers",
+  "whats_new_syntax": "New syntax: * (wildcards), _ (placeholder)",
+  "whats_new_links": "Share a chart with a simple URL",
+  "whats_new_speed": "30x faster queries",
+  "whats_new_close": "Let's go"
 }

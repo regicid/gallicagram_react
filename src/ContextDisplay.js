@@ -7,6 +7,7 @@ import Papa from 'papaparse';
 import Button from '@mui/material/Button';
 import { CAIRN_CORPUS, PERSEE_CORPUS, isTvCorpus, cairnSearchUrl, corpusCredit } from './revueCorpora';
 import { PRESS_PANEL, PRESS_LINK_OUT, isPressPanelCorpus, isPressLinkOutCorpus, hasOwnSearch, pressPeriod, googleSiteSearchUrl, pressLinkOutUrl } from './pressCorpora';
+import { resolveWildcards, rapPattern } from './contextWord';
 
 // Cached across renders: both files are static and only needed for Cairn context.
 let cairnMetaPromise = null;
@@ -107,13 +108,15 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
         const rawWord = record.terms[0];
         const word = rawWord.split('+')[0].trim();
         const { year } = getDates();
+        // The newspapers' and journals' own search engines know nothing of * ? and _.
+        const searchWord = () => resolveWildcards(word, corpus, year);
 
         // le_monde is the Agoragram corpus of the same paper; its context is the same search.
         if (corpus === 'lemonde_rubriques' || corpus === 'le_monde') {
           // The search takes DD/MM/YYYY, both ends included: the clicked point's own period.
           const { start, end } = pressPeriod(record.date, record.resolution);
           const frDate = (iso) => iso.split('-').reverse().join('/');
-          const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&start_at=${frDate(start)}&end_at=${frDate(end)}`;
+          const queryParams = `?search_keywords=${encodeURIComponent(await searchWord())}&page_recherche=1&start_at=${frDate(start)}&end_at=${frDate(end)}`;
           const externalSearchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
           const fetchUrl = `/api/lemonde${queryParams}`;
 
@@ -149,7 +152,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           setData({ type: 'lemonde', content: results });
 
         } else if (corpus === PERSEE_CORPUS) {
-          const queryParams = `?l=fre&da=${year}&q=%22${encodeURIComponent(word)}%22`;
+          const queryParams = `?l=fre&da=${year}&q=%22${encodeURIComponent(await searchWord())}%22`;
           const externalSearchUrl = `https://www.persee.fr/search${queryParams}`;
           const fetchUrl = `/api/persee${queryParams}`;
 
@@ -188,15 +191,16 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           // The click handler already opened this in a new tab; the panel repeats the link
           // for the case where a pop-up blocker stopped it. No externalUrl here: the header
           // it belongs to is hidden for this type, and it would only duplicate the button.
-          const url = cairnSearchUrl({ word, year, revues: record.revues, revueMap, disciplineIds });
+          const url = cairnSearchUrl({ word: await searchWord(), year, revues: record.revues, revueMap, disciplineIds });
           setData({ type: 'cairn_link', content: url });
 
         } else if (isPressPanelCorpus(corpus)) {
           const source = PRESS_PANEL[corpus];
           const period = pressPeriod(record.date, record.resolution);
-          const googleUrl = googleSiteSearchUrl({ site: source.site, word, ...period });
+          const resolved = await searchWord();
+          const googleUrl = googleSiteSearchUrl({ site: source.site, word: resolved, ...period });
           try {
-            const items = await source.search({ word, ...period });
+            const items = await source.search({ word: resolved, ...period });
             setExternalUrl({ url: googleUrl, label: t('Search on Google') });
             setData({ type: 'press', content: items, source });
           } catch (err) {
@@ -209,7 +213,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
         } else if (isPressLinkOutCorpus(corpus)) {
           // The click handler already opened this in a new tab; the panel repeats the link
           // for the case where a pop-up blocker stopped it.
-          const url = pressLinkOutUrl(corpus, word, record.date, record.resolution);
+          const url = pressLinkOutUrl(corpus, await searchWord(), record.date, record.resolution);
           setData({ type: 'press_link', content: url, site: PRESS_LINK_OUT[corpus], ownSearch: hasOwnSearch(corpus) });
 
         } else if (isTvCorpus(corpus)) {
@@ -218,7 +222,7 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
           setData({ type: 'tv_note', content: null });
 
         } else if (corpus === 'rap') {
-          const searchUrl = `https://shiny.ens-paris-saclay.fr/guni/source_rap?mot=${encodeURIComponent(word.replace(/’/g, "'"))}&year=${year}`;
+          const searchUrl = `https://shiny.ens-paris-saclay.fr/guni/source_rap?mot=${encodeURIComponent(rapPattern(word.replace(/’/g, "'")))}&year=${year}`;
           setExternalUrl({ url: 'https://huggingface.co/datasets/regicid/LRFAF', label: t('Corpus') });
 
           const response = await fetch(searchUrl);

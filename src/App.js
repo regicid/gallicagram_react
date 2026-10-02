@@ -10,6 +10,7 @@ import { encodeUrlState, decodeUrlState, QUERY_DEFAULTS, ADVANCED_DEFAULTS } fro
 import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
 import { leMondeSource } from './leMonde';
+import { gallicaTerms, hasWildcard, resolveWildcards } from './contextWord';
 import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX } from './ngramRoute';
 import { GOOGLE_NGRAM_CORPORA, GOOGLE_NGRAM_PERIOD, isGoogleNgram, googleNgramYears, googleNgramUrl } from './googleNgram';
 import { useTranslation } from 'react-i18next';
@@ -896,7 +897,7 @@ function App() {
     }
 
     const params = new URLSearchParams({
-      terms: query.word.split('+')[0].replace(/’/g, "'"),
+      terms: gallicaTerms(query.word.split('+')[0].replace(/’/g, "'")),
       year: date.getUTCFullYear(),
       limit: searchParams.limit,
       cursor: searchParams.cursor,
@@ -1211,20 +1212,33 @@ function App() {
       // Cairn cannot be read from inside the app, so a click goes straight to its search.
       // This has to happen here, synchronously in the click handler: opening it later from
       // the context panel's effect is no longer tied to the gesture and gets blocked.
+      // A word with wildcards is first turned into its most frequent form (see
+      // contextWord.js), which takes a request: the tab is opened now, while the click
+      // still counts, and sent to the search once the form is known.
+      const openSearch = (makeUrl) => {
+        const word = (query.word || '').split('+')[0].trim();
+        if (!hasWildcard(word)) {
+          window.open(makeUrl(word), '_blank', 'noopener,noreferrer');
+          return;
+        }
+        const tab = window.open('', '_blank');
+        if (!tab) return;
+        tab.opener = null;
+        resolveWildcards(word, query.corpus, date.getUTCFullYear())
+          .then(resolved => { tab.location.href = makeUrl(resolved); });
+      };
       if (query.corpus === CAIRN_CORPUS) {
-        const url = cairnSearchUrl({
-          word: (query.word || '').split('+')[0].trim(),
+        openSearch(word => cairnSearchUrl({
+          word,
           year: date.getUTCFullYear(),
           revues: getSelection(query, CAIRN_CORPUS).revues,
           revueMap: revuesData[CAIRN_CORPUS],
           disciplineIds: cairnDisciplines,
-        });
-        window.open(url, '_blank', 'noopener,noreferrer');
+        }));
       }
       // Same for the press corpora whose context is a Google search on the site.
       if (isPressLinkOutCorpus(query.corpus)) {
-        const url = pressLinkOutUrl(query.corpus, (query.word || '').split('+')[0].trim(), date.toISOString(), query.resolution);
-        window.open(url, '_blank', 'noopener,noreferrer');
+        openSearch(word => pressLinkOutUrl(query.corpus, word, date.toISOString(), query.resolution));
       }
 
       const newSearchParams = { limit: 10, cursor: 0 };

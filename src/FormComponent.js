@@ -374,22 +374,27 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
   const supportsMonthly = maxResolution === 'Mensuelle' || maxResolution === 'Journalière';
   const supportsDaily = maxResolution === 'Journalière';
   // Weekly is aggregated from daily data and is only offered where it helps: the TV
-  // transcripts cover a few months, so days are noisy and months give three points.
-  const supportsWeekly = isTvCorpus(corpus);
+  // transcripts cover a few months, so days are noisy and months give three points, and
+  // the modern press covers a few years at most, where decades would be a single point.
+  const isModernPress = currentCategory === 'Modern press';
+  const supportsWeekly = isTvCorpus(corpus) || (isModernPress && supportsDaily);
+  const supportsDecade = !isModernPress;
 
   // Auto-adjust resolution when corpus changes and current resolution is not supported
   useEffect(() => {
     if (!selectedCorpus) return;
 
     // If current resolution is not supported, fall back to a valid one
-    if (resolution === 'semaine' && !supportsWeekly) {
+    if (resolution === 'decennie' && !supportsDecade) {
+      onFormChange({ id: formData.id, resolution: 'annee' });
+    } else if (resolution === 'semaine' && !supportsWeekly) {
       onFormChange({ id: formData.id, resolution: supportsDaily ? 'jour' : supportsMonthly ? 'mois' : 'annee' });
     } else if (resolution === 'jour' && !supportsDaily) {
       onFormChange({ id: formData.id, resolution: supportsMonthly ? 'mois' : 'annee' });
     } else if (resolution === 'mois' && !supportsMonthly) {
       onFormChange({ id: formData.id, resolution: 'annee' });
     }
-  }, [corpus, selectedCorpus, resolution, supportsWeekly, supportsDaily, supportsMonthly, formData.id, onFormChange]);
+  }, [corpus, selectedCorpus, resolution, supportsDecade, supportsWeekly, supportsDaily, supportsMonthly, formData.id, onFormChange]);
 
   // A mode the corpus does not offer falls back to n-grams: moving from a corpus with the
   // joker to one without would otherwise keep sending a request the server refuses.
@@ -834,10 +839,11 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
       <div className="form-group">
         <label>{t('Resolution:')}</label>
         <div className="checkbox-group" style={{ display: 'flex', justifyContent: 'center' }}>
-          <label className="checkbox-label">
-            <input type="radio" name="resolution" value="decennie" checked={resolution === 'decennie'} onChange={handleChange} />
-            {t('Décennie')}
-          </label>
+          {supportsDecade &&
+            <label className="checkbox-label">
+              <input type="radio" name="resolution" value="decennie" checked={resolution === 'decennie'} onChange={handleChange} />
+              {t('Décennie')}
+            </label>}
           <label className="checkbox-label">
             <input type="radio" name="resolution" value="annee" checked={resolution === 'annee'} onChange={handleChange} />
             {t('Année')}

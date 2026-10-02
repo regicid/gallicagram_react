@@ -110,7 +110,10 @@ const SpecialContextDisplay = ({ record, corpus, category }) => {
 
         // le_monde is the Agoragram corpus of the same paper; its context is the same search.
         if (corpus === 'lemonde_rubriques' || corpus === 'le_monde') {
-          const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&start_at=01/01/${record.date.split('-')[0]}&end_at=31/12/${record.date.split('-')[0]}`;
+          // The search takes DD/MM/YYYY, both ends included: the clicked point's own period.
+          const { start, end } = pressPeriod(record.date, record.resolution);
+          const frDate = (iso) => iso.split('-').reverse().join('/');
+          const queryParams = `?search_keywords=${encodeURIComponent(record.terms[0])}&page_recherche=1&start_at=${frDate(start)}&end_at=${frDate(end)}`;
           const externalSearchUrl = `https://www.lemonde.fr/recherche/${queryParams}`;
           const fetchUrl = `/api/lemonde${queryParams}`;
 

@@ -180,21 +180,6 @@ const nouvelObs = async (args) => {
   })).filter(item => item.title && item.href);
 };
 
-// Atlantico's result cards carry the section and the title but no date; the search is
-// already restricted to the period, so that is enough. Results use the large title style;
-// the smaller one belongs to the "most read" sidebar.
-const atlantico = async (args) => {
-  const doc = parseHtml(await viaProxy('atlantico', args));
-  return [...doc.querySelectorAll('a.font-bitter.text-xl[href^="/article/"]')].map(link => {
-    const card = link.closest('.border-b');
-    return {
-      title: text(link),
-      href: absolute(link.getAttribute('href'), 'https://atlantico.fr'),
-      section: text(card?.querySelector('p.uppercase')),
-    };
-  }).filter(item => item.title && item.href);
-};
-
 // La Dépêche and Midi Libre (same group, same layout). Their date filter lists the
 // newest articles up to the end of the period, so for a whole year it shows its end.
 // Midi Libre's cards have no date element, but the date is in every article URL.
@@ -250,8 +235,6 @@ export const PRESS_PANEL = {
   // Typographic apostrophe: i18next HTML-escapes a straight one when interpolating.
   le_nouvel_observateur: { name: 'L’Obs', site: 'nouvelobs.com',
     search: nouvelObs },
-  atlantico: { name: 'Atlantico', site: 'atlantico.fr', looseMatching: true,
-    search: atlantico },
   la_depeche: { name: 'La Dépêche', site: 'ladepeche.fr', looseMatching: true, upToEnd: true,
     search: depecheEngine('la_depeche', 'https://www.ladepeche.fr') },
   midilibre: { name: 'Midi Libre', site: 'midilibre.fr', looseMatching: true, upToEnd: true,

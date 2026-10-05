@@ -43,7 +43,7 @@ export const NGRAM_ROUTE_CORPORA = {
 // The contemporary web press (Elias Echikr's databases, once served by the Agoragram API)
 // goes through the same routes with elias=true; the app corpus code is the database name.
 export const ELIAS_CORPORA = new Set([
-  '20minutes', 'atlantico', 'bfmtv', 'challenges', 'cnews', 'francesoir',
+  '20minutes', 'bfmtv', 'challenges', 'cnews', 'francesoir',
   'gala', 'l_opinion', 'la_depeche', 'laprovence', 'latribune',
   'le_capital', 'le_courrier_de_l_ouest', 'le_figaro', 'le_journal_du_dimanche',
   'le_maine_libre', 'le_marin', 'le_monde', 'le_nouvel_observateur',

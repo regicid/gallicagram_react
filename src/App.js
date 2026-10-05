@@ -214,10 +214,11 @@ const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 // The whole modern press as one corpus: every web outlet (see ELIAS_CORPORA), queried on
 // its own and added together (occurrences and corpus size), so the big outlets weigh the
 // most. Le Parisien and La Croix are the Elias copies, not the guni corpora the app
-// otherwise uses for them. Le Marin is left out: it is a trade paper, not news.
+// otherwise uses for them. Le Marin and Voiles et Voiliers are left out: they are trade
+// papers, not news.
 const PRESSE_MODERNE = 'presse_moderne';
 const PRESSE_MODERNE_PARTS = [
-  ...[...ELIAS_CORPORA].filter(corpus => corpus !== 'le_marin'),
+  ...[...ELIAS_CORPORA].filter(corpus => !['le_marin', 'voiles_et_voiliers'].includes(corpus)),
   'leparisien', 'la_croix',
 ].map(part => `${ELIAS_PREFIX}${part}`);
 // The server is shared; more requests than this at once only queue there.
@@ -1277,10 +1278,21 @@ function App() {
         fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query, rubriques, byRubrique)
       )).then(sumSeries);
     }
+    // An outlet that fails (database down, timeout) is left out of the sum rather than
+    // failing the whole curve; only when every outlet fails is the error reported.
     if (corpus === PRESSE_MODERNE) {
+      const errors = [];
       return mapWithConcurrency(PRESSE_MODERNE_PARTS, PRESSE_MODERNE_CONCURRENCY, part =>
         fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
-      ).then(sumSeries);
+          .catch(error => {
+            console.warn(`presse_moderne: ${part} left out of the sum for "${word}"`, error);
+            errors.push(error);
+            return null;
+          })
+      ).then(seriesList => {
+        if (errors.length === PRESSE_MODERNE_PARTS.length) throw errors[0];
+        return sumSeries(seriesList);
+      });
     }
     if (corpus === PRESSE_LIVRES) {
       return Promise.all(PRESSE_LIVRES_PARTS.map(part =>

@@ -1,7 +1,7 @@
 // Search proxy for the modern press corpora whose search cannot be called from the browser.
 //
 // Three reasons land a site here rather than in a direct fetch from the page: it serves its
-// results as HTML with no CORS header (Gala, L'Obs, Atlantico, La Dépêche, Midi Libre),
+// results as HTML with no CORS header (Gala, L'Obs, La Dépêche, Midi Libre),
 // its API only allows its own origin (Les Échos), or its CORS headers are malformed
 // (Valeurs Actuelles sends two Access-Control-Allow-Origin values). A Vercel rewrite is
 // not an option either: it forwards X-Forwarded-Host, which some backends trust to decide
@@ -48,9 +48,6 @@ const SOURCES = {
   le_nouvel_observateur: ({ q, start, end }) => ({
     // d=3 is "between d1 and d2".
     url: `https://www.nouvelobs.com/recherche?q=${enc(q)}&d=3&d1=${start}&d2=${end}`,
-  }),
-  atlantico: ({ q, start, end }) => ({
-    url: `https://atlantico.fr/search?searchTerm=${enc(q)}&afterDate=${start}&beforeDate=${end}`,
   }),
   la_depeche: ({ q, start, end }) => ({
     url: `https://www.ladepeche.fr/recherche?q=${enc(q)}${ladepecheDate(start, end)}`,

@@ -10,6 +10,7 @@ export const NGRAM_ROUTE_CORPORA = {
   livres: 'livres',
   ddb: 'ddb',
   american_stories: 'american_stories',
+  guardian: 'guardian',
   paris: 'paris',
   moniteur: 'moniteur',
   journal_des_debats: 'journal_des_debats',

@@ -2,8 +2,9 @@
 //
 // Three reasons land a site here rather than in a direct fetch from the page: it serves its
 // results as HTML with no CORS header (Gala, L'Obs, La Dépêche, Midi Libre),
-// its API only allows its own origin (Les Échos), or its CORS headers are malformed
-// (Valeurs Actuelles sends two Access-Control-Allow-Origin values). A Vercel rewrite is
+// its API only allows its own origin (Les Échos), its CORS headers are malformed
+// (Valeurs Actuelles sends two Access-Control-Allow-Origin values), or it needs a key that
+// must not ship in the page (The Guardian). A Vercel rewrite is
 // not an option either: it forwards X-Forwarded-Host, which some backends trust to decide
 // which site is being served (that is what broke Cairn), and it cannot set the
 // browser-like headers that Les Échos' bot protection insists on.
@@ -58,6 +59,13 @@ const SOURCES = {
   les_echos: ({ q, start, end }) => ({
     url: `https://api.lesechos.fr/api/v2/search?limit=20&page=1&query=${enc(q)}&startDate=${start}&endDate=${end}`,
     headers: LESECHOS_HEADERS,
+  }),
+  // The Guardian's Content API answers the browser too, but takes a key (500 calls a day
+  // on a developer one): it stays here, in the GUARDIAN_KEY environment variable, and the
+  // edge cache below spares the quota. The word is quoted to search the exact phrase.
+  guardian: ({ q, start, end }) => ({
+    url: `https://content.guardianapis.com/search?q=${enc(`"${q}"`)}&from-date=${start}&to-date=${end}&order-by=relevance&page-size=20&show-fields=trailText&api-key=${enc(process.env.GUARDIAN_KEY || '')}`,
+    headers: { 'Accept': 'application/json' },
   }),
   valeurs_actuelles: ({ q, start, end }) => ({
     url: `https://www.valeursactuelles.com/wp-json/wp/v2/posts?search=${enc(q)}&after=${start}T00:00:00&before=${end}T23:59:59&per_page=20&_fields=date,link,title,excerpt`,

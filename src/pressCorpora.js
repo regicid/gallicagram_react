@@ -1,4 +1,4 @@
-// Context for the modern press corpora (the Agoragram web-article corpora).
+// Context for the modern press corpora (the Agoragram web-article corpora) and The Guardian.
 //
 // Each newspaper's own search engine is used, restricted to the period that was clicked.
 // Two families:
@@ -215,6 +215,18 @@ const lesEchos = async (args) => {
   }));
 };
 
+// The Guardian's Content API, through the proxy, which holds the key.
+const guardian = async (args) => {
+  const data = JSON.parse(await viaProxy('guardian', args));
+  return (data.response?.results || []).map(item => ({
+    title: item.webTitle || '',
+    href: item.webUrl,
+    description: plain(item.fields?.trailText),
+    date: item.webPublicationDate ? new Date(item.webPublicationDate).toLocaleDateString('en-GB') : '',
+    section: item.sectionName || '',
+  }));
+};
+
 // --- Registry ---------------------------------------------------------------------------
 
 // `site` is used for the Google fallback. `looseMatching` flags the engines that also
@@ -242,6 +254,8 @@ export const PRESS_PANEL = {
   // Newest first, with no way to sort otherwise: a year shows its last days.
   les_echos: { name: 'Les Échos', site: 'lesechos.fr', upToEnd: true,
     search: lesEchos },
+  guardian: { name: 'The Guardian', site: 'theguardian.com',
+    search: guardian },
 };
 
 // Corpus code -> site, for the corpora whose context is a Google search.

@@ -27,6 +27,7 @@ export const NGRAM_ROUTE_CORPORA = {
   rap: 'rap',
   ouest: 'ouest',
   prenoms: 'prenoms',
+  jorf: 'jorf',
   libe: 'libe',
   leparisien: 'leparisien',
   majinbook: 'majinbook',

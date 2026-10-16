@@ -19,6 +19,7 @@ export const NGRAM_ROUTE_CORPORA = {
   temps: 'temps',
   petit_journal: 'petit_journal',
   petit_parisien: 'petit_parisien',
+  journal_officiel: 'journal_officiel',
   huma: 'huma',
   lacroix: 'lacroix',
   subtitles: 'subtitles',

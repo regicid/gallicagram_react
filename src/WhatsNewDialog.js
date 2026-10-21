@@ -6,12 +6,12 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/
 const RELEASE = '2026-10b';
 const STORAGE_KEY = 'gallicagram_whats_new_seen';
 
-const NEWS = ['whats_new_cairn', 'whats_new_tv', 'whats_new_press', 'whats_new_majinbook', 'whats_new_syntax', 'whats_new_links', 'whats_new_speed'];
+const NEWS = ['whats_new_cairn', 'whats_new_tv', 'whats_new_press', /* 'whats_new_majinbook', */ 'whats_new_syntax', 'whats_new_links', 'whats_new_speed'];
 
 // Same people and links as the acknowledgements on the About page.
 const CONTRIBUTORS = [
   { name: 'Elias Echikr', url: 'https://www.linkedin.com/in/elias-echikr-134a5b259/' },
-  { name: 'Antoine Mazières', url: 'https://antonomase.fr/' },
+  // { name: 'Antoine Mazières', url: 'https://antonomase.fr/' },
   { name: 'Yann de Boisvilliers', url: 'https://www.linkedin.com/in/yann-de-boisvilliers-875ab8275/' },
 ];
 

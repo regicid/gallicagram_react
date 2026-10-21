@@ -308,7 +308,8 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
     fetch('/corpus.tsv')
       .then(response => response.text())
       .then(data => {
-        const lines = data.split('\n');
+        // A line starting with "#" is a corpus taken out for now, kept to be put back.
+        const lines = data.split('\n').filter(line => !line.startsWith('#'));
         const corporaData = lines.slice(1).map(line => {
           const columns = line.split('\t');
           return {

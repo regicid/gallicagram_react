@@ -33,12 +33,12 @@ const CATEGORY_CREDITS = {
   'Modern press': { name: 'Elias Echikr', url: 'https://www.linkedin.com/in/elias-echikr-134a5b259/' },
   'TV transcripts': { name: 'Yann de Boisvilliers', url: 'https://www.linkedin.com/in/yann-de-boisvilliers-875ab8275/' },
 };
-const MAJINBOOK = { name: 'MajinBook', url: 'https://github.com/mazieres/MajinBook' };
+// const MAJINBOOK = { name: 'MajinBook', url: 'https://github.com/mazieres/MajinBook' };
 const CORPUS_CREDITS = {
-  majinbook: MAJINBOOK,
-  spa_majinbook: MAJINBOOK,
-  eng_majinbook: MAJINBOOK,
-  deu_majinbook: MAJINBOOK,
+  // majinbook: MAJINBOOK,
+  // spa_majinbook: MAJINBOOK,
+  // eng_majinbook: MAJINBOOK,
+  // deu_majinbook: MAJINBOOK,
 };
 
 export const corpusCredit = (corpus, category) =>

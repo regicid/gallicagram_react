@@ -65,7 +65,7 @@ describe('registry', () => {
 
   test('covers every modern press corpus exactly once', () => {
     const tsv = fs.readFileSync(path.join(__dirname, '..', 'public', 'corpus.tsv'), 'utf8');
-    const codes = tsv.trim().split('\n').slice(1)
+    const codes = tsv.trim().split('\n').slice(1).filter(line => !line.startsWith('#'))
       .map(line => line.split('\t'))
       .filter(cols => (cols[10] || '').trim() === 'Modern press')
       .map(cols => cols[3].trim())
@@ -80,7 +80,7 @@ describe('registry', () => {
 
   test('has no entry for a corpus that does not exist', () => {
     const tsv = fs.readFileSync(path.join(__dirname, '..', 'public', 'corpus.tsv'), 'utf8');
-    const known = new Set(tsv.trim().split('\n').slice(1).map(line => line.split('\t')[3].trim()));
+    const known = new Set(tsv.trim().split('\n').slice(1).filter(line => !line.startsWith('#')).map(line => line.split('\t')[3].trim()));
     [...Object.keys(PRESS_PANEL), ...Object.keys(PRESS_LINK_OUT)].forEach(code => {
       expect({ code, known: known.has(code) }).toEqual({ code, known: true });
     });

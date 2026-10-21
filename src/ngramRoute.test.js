@@ -20,7 +20,7 @@ describe('ngram route', () => {
     const path = require('path');
     const SUMMED = ['presse_livres', 'presse_moderne'];
     const codes = fs.readFileSync(path.join(__dirname, '../public/corpus.tsv'), 'utf8')
-      .split('\n').slice(1).filter(Boolean).map(line => line.split('\t')[3])
+      .split('\n').slice(1).filter(line => line && !line.startsWith('#')).map(line => line.split('\t')[3])
       .filter(code => !isCombinedCorpus(code) && !SUMMED.includes(code));
     expect(codes).toContain(CAIRN_CORPUS);
     expect(codes.filter(code => !usesNgramRoute(code))).toEqual([]);

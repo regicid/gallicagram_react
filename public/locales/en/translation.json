@@ -87,6 +87,7 @@
   "AFC needs three series": "A correspondence analysis needs at least three series with occurrences: compare more words.",
   "Factorial needs dates": "Too few dates where every series has data: widen the period.",
   "Show the trajectory": "Show the trajectory",
+  "Chart error": "This chart could not be drawn. Try another visualization, or plot again.",
   "Hyperbase tribute": "A tribute to",
   "Hyperbase tribute end": ", Étienne Brunet's software, whose factor analyses brought out the chronology of the French vocabulary.",
   "Principal component analysis": "Principal component analysis",

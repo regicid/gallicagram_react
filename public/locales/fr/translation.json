@@ -87,6 +87,7 @@
   "AFC needs three series": "Une AFC demande au moins trois séries avec des occurrences : comparez davantage de mots.",
   "Factorial needs dates": "Trop peu de dates où toutes les séries ont des données : élargissez la période.",
   "Show the trajectory": "Afficher la trajectoire",
+  "Chart error": "Ce graphique n'a pas pu être affiché. Essayez une autre visualisation, ou relancez la recherche.",
   "Hyperbase tribute": "En hommage à",
   "Hyperbase tribute end": ", le logiciel d'Étienne Brunet, dont les analyses factorielles ont fait apparaître la chronologie du vocabulaire français.",
   "Principal component analysis": "Analyse en composantes principales",

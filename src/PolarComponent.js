@@ -29,6 +29,8 @@ const PolarComponent = ({ data, monthly, advancedOptions, darkMode, onPointClick
   }, [data, monthly, removeTrend]);
 
   const table = useMemo(() => {
+    // Without months there is nothing drawn, so nothing to export.
+    if (!monthly) return null;
     const names = (data || []).map(trace => trace.name);
     if (seasonal) {
       const profiles = series.map(seasonalProfile);
@@ -43,7 +45,7 @@ const PolarComponent = ({ data, monthly, advancedOptions, darkMode, onPointClick
       rows.set(key, { ...(rows.get(key) || { date: key }), [names[j]]: s.y[i] });
     }));
     return { fields: ['date', ...names], data: [...rows.keys()].sort().map(key => rows.get(key)) };
-  }, [data, series, seasonal, monthNames]);
+  }, [data, monthly, series, seasonal, monthNames]);
 
   useEffect(() => {
     if (onTable) onTable(table);

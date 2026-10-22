@@ -25,6 +25,7 @@ import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
 import PolarComponent from './PolarComponent';
 import FactorialComponent from './FactorialComponent';
+import ChartErrorBoundary from './ChartErrorBoundary';
 import { FingerprintSpinner } from 'react-epic-spinners';
 import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
@@ -2499,43 +2500,45 @@ function App() {
                           <FingerprintSpinner color="#d32f2f" size={100} />
                         </div>
                       )}
-                      {plotType === 'sums' ? (
-                        <SumsComponent
-                          data={sumsData}
-                          rankedBy={apiResponses.find(res => res.query?.isListMode)?.query.rankedBy}
-                          darkMode={darkMode}
-                          advancedOptions={activeQuery?.advancedOptions}
-                        />
-                      ) : plotType === 'wordcloud' ? (
-                        <WordCloudComponent data={sumsData} darkMode={darkMode} />
-                      ) : plotType === 'polar' ? (
-                        <PolarComponent
-                          data={plotData}
-                          monthly={apiResponses.length > 0 && apiResponses.every(res => SUB_YEAR_RESOLUTIONS.includes(res.query?.resolution) && !isGoogleNgram(res.query.corpus))}
-                          advancedOptions={activeQuery?.advancedOptions}
-                          darkMode={darkMode}
-                          onPointClick={handlePointClick}
-                          onTable={setFigureTable}
-                        />
-                      ) : plotType === 'pca' || plotType === 'ca' ? (
-                        <FactorialComponent
-                          data={plotData}
-                          method={plotType}
-                          advancedOptions={activeQuery?.advancedOptions}
-                          darkMode={darkMode}
-                          onPointClick={handlePointClick}
-                          onTable={setFigureTable}
-                        />
-                      ) : (
-                        <PlotComponent
-                          data={plotData}
-                          onPointClick={handlePointClick}
-                          advancedOptions={activeQuery.advancedOptions}
-                          plotType={plotType}
-                          darkMode={darkMode}
-                          plotRevision={`${fetchId}-${smoothing}-${plotType}-${JSON.stringify(activeQuery?.advancedOptions)}`}
-                        />
-                      )}
+                      <ChartErrorBoundary resetKey={`${plotType}-${fetchId}`}>
+                        {plotType === 'sums' ? (
+                          <SumsComponent
+                            data={sumsData}
+                            rankedBy={apiResponses.find(res => res.query?.isListMode)?.query.rankedBy}
+                            darkMode={darkMode}
+                            advancedOptions={activeQuery?.advancedOptions}
+                          />
+                        ) : plotType === 'wordcloud' ? (
+                          <WordCloudComponent data={sumsData} darkMode={darkMode} />
+                        ) : plotType === 'polar' ? (
+                          <PolarComponent
+                            data={plotData}
+                            monthly={apiResponses.length > 0 && apiResponses.every(res => SUB_YEAR_RESOLUTIONS.includes(res.query?.resolution) && !isGoogleNgram(res.query.corpus))}
+                            advancedOptions={activeQuery?.advancedOptions}
+                            darkMode={darkMode}
+                            onPointClick={handlePointClick}
+                            onTable={setFigureTable}
+                          />
+                        ) : plotType === 'pca' || plotType === 'ca' ? (
+                          <FactorialComponent
+                            data={plotData}
+                            method={plotType}
+                            advancedOptions={activeQuery?.advancedOptions}
+                            darkMode={darkMode}
+                            onPointClick={handlePointClick}
+                            onTable={setFigureTable}
+                          />
+                        ) : (
+                          <PlotComponent
+                            data={plotData}
+                            onPointClick={handlePointClick}
+                            advancedOptions={activeQuery.advancedOptions}
+                            plotType={plotType}
+                            darkMode={darkMode}
+                            plotRevision={`${fetchId}-${smoothing}-${plotType}-${JSON.stringify(activeQuery?.advancedOptions)}`}
+                          />
+                        )}
+                      </ChartErrorBoundary>
                     </div>
                     <div className="plot-controls">
                       <h3>{t('Plot controls')}</h3>

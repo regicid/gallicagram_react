@@ -101,10 +101,10 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
   const textColor = darkMode ? '#bbbbbb' : '#555555';
 
   // PCA variables are correlations (within the unit circle): stretched to the spread of the
-  // dates so the arrows can be read against them, as factoextra's biplot does.
+  // dates so the words can be read against them, as factoextra's biplot does.
   const maxAbs = points => Math.max(...points.flatMap(p => [Math.abs(p[0]), Math.abs(p[1])]), 1e-12);
   const stretch = method === 'pca' ? (0.9 * maxAbs(rows)) / maxAbs(columns) : 1;
-  const tips = columns.map(c => [c[0] * stretch, c[1] * stretch]);
+  const wordPositions = columns.map(c => [c[0] * stretch, c[1] * stretch]);
 
   const traces = [];
   if (trajectory) {
@@ -138,8 +138,8 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
     traces.push({
       type: 'scatter',
       mode: 'text',
-      x: [tips[j][0] * (method === 'pca' ? 1.08 : 1)],
-      y: [tips[j][1] * (method === 'pca' ? 1.08 : 1)],
+      x: [wordPositions[j][0]],
+      y: [wordPositions[j][1]],
       text: [`<b>${name}</b>`],
       textfont: { size: 16, color: colors[j] },
       hovertemplate: `${name}<extra></extra>`,
@@ -147,13 +147,6 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
       showlegend: false,
     });
   });
-  const annotations = method === 'pca'
-    ? tips.map((tip, j) => ({
-      x: tip[0], y: tip[1], ax: 0, ay: 0, xref: 'x', yref: 'y', axref: 'x', ayref: 'y',
-      text: '', showarrow: true, arrowhead: 2, arrowsize: 1, arrowwidth: 2, arrowcolor: colors[j],
-    }))
-    : [];
-
   const handleClick = (event) => {
     const point = event.points?.[0];
     if (!onPointClick || !Array.isArray(point?.customdata)) return;
@@ -189,7 +182,6 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
           hovermode: 'closest',
           xaxis: axis(0),
           yaxis: { ...axis(1), scaleanchor: 'x', scaleratio: 1 },
-          annotations,
           uirevision: `${method}-${revisionOf(data)}`,
         }}
         config={{ displayModeBar: true, scrollZoom: false }}

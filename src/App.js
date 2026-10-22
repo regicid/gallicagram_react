@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './App.css';
 import FormComponent, { AdvancedOptionsComponent } from './FormComponent';
-import PlotComponent, { defaultPalette, colorblindPalette, zscore, fromPlotlyDate } from './PlotComponent';
+import PlotComponent, { defaultPalette, colorblindPalette, zscore, fromPlotlyDate, FIGURE_DIV_ID } from './PlotComponent';
+import Plotly from 'plotly.js/dist/plotly';
 import TabsComponent from './TabsComponent';
 import Papa from 'papaparse';
 import ContextDisplay from './ContextDisplay';
@@ -22,6 +23,8 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import MenuIcon from '@mui/icons-material/Menu';
 import SumsComponent from './SumsComponent';
 import WordCloudComponent from './WordCloudComponent';
+import PolarComponent from './PolarComponent';
+import FactorialComponent from './FactorialComponent';
 import { FingerprintSpinner } from 'react-epic-spinners';
 import { Routes, Route, Link } from "react-router-dom";
 import SwaggerPage from "./SwaggerPage";
@@ -280,6 +283,11 @@ export const rollUpToWeeks = (rows) => {
   return [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
 };
 
+// Visualizations drawn by their own components (PolarComponent, FactorialComponent).
+const FIGURE_PLOT_TYPES = ['polar', 'pca', 'ca'];
+// The polar chart places months on a circle: it needs a resolution of a month or finer.
+const SUB_YEAR_RESOLUTIONS = ['mois', 'semaine', 'jour'];
+
 // Search modes that return a ranked list of words instead of a time series.
 const LIST_MODES = ['joker', 'nearby', 'associated_article'];
 // Their counterparts on the ngram routes (see ngramRoute.js), which also take stopwords
@@ -313,6 +321,8 @@ function App() {
   const [rawPlotData, setRawPlotData] = useState([]);
   const [plotData, setPlotData] = useState([]);
   const [sumsData, setSumsData] = useState([]);
+  // The table behind the polar and factorial figures, which the CSV download exports.
+  const [figureTable, setFigureTable] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [smoothing, setSmoothing] = useState(initialUrlState ? initialUrlState.smoothing : 0);
@@ -612,7 +622,7 @@ function App() {
 
     const yValues = processedData.map(d => {
       if (!d.data) return null;
-      if (plotType === 'line' || plotType === 'area') {
+      if (plotType !== 'bar') {
         return (d.data.n !== undefined && d.data.total) ? d.data.n / d.data.total : null;
       } else { // bar
         return d.data.n !== undefined ? d.data.n : null;
@@ -1205,7 +1215,10 @@ function App() {
         return;
       }
 
-      const query = apiResponses[responseIndex].query;
+      // A figure can ask for another resolution's context (the polar chart's months).
+      const responseQuery = apiResponses[responseIndex].query;
+      const resolution = point.data?.meta?.resolution;
+      const query = resolution ? { ...responseQuery, resolution } : responseQuery;
       setSelectedQuery(query);
       const date = fromPlotlyDate(point.x);
       setSelectedDate(date);
@@ -1811,9 +1824,20 @@ function App() {
       });
   };
 
+  // The list views draw sumsData, the others the time series.
+  const nothingToDownload = plotType === 'sums' || plotType === 'wordcloud'
+    ? sumsData.length === 0
+    : plotData.length === 0;
+
   const handleDownloadPlot = () => {
-    if ((plotType === 'sums' || plotType === 'wordcloud') && sumsData.length === 0) return;
-    if ((plotType !== 'sums' && plotType !== 'wordcloud') && plotData.length === 0) return;
+    if (nothingToDownload) return;
+
+    // The polar and factorial figures are exported as Plotly draws them.
+    if (FIGURE_PLOT_TYPES.includes(plotType)) {
+      const figure = document.getElementById(FIGURE_DIV_ID);
+      if (figure) Plotly.downloadImage(figure, { format: 'png', filename: 'gallicagram_plot', width: 1200, height: 800, scale: 2 });
+      return;
+    }
 
     // Ensure fonts are loaded before drawing
     document.fonts.ready.then(() => {
@@ -2223,6 +2247,11 @@ function App() {
       return;
     }
 
+    if (FIGURE_PLOT_TYPES.includes(plotType) && figureTable) {
+      downloadCSV(Papa.unparse(figureTable));
+      return;
+    }
+
     if (rawPlotData.length === 0) {
       alert("No data to download.");
       return;
@@ -2479,6 +2508,24 @@ function App() {
                         />
                       ) : plotType === 'wordcloud' ? (
                         <WordCloudComponent data={sumsData} darkMode={darkMode} />
+                      ) : plotType === 'polar' ? (
+                        <PolarComponent
+                          data={plotData}
+                          monthly={apiResponses.length > 0 && apiResponses.every(res => SUB_YEAR_RESOLUTIONS.includes(res.query?.resolution) && !isGoogleNgram(res.query.corpus))}
+                          advancedOptions={activeQuery?.advancedOptions}
+                          darkMode={darkMode}
+                          onPointClick={handlePointClick}
+                          onTable={setFigureTable}
+                        />
+                      ) : plotType === 'pca' || plotType === 'ca' ? (
+                        <FactorialComponent
+                          data={plotData}
+                          method={plotType}
+                          advancedOptions={activeQuery?.advancedOptions}
+                          darkMode={darkMode}
+                          onPointClick={handlePointClick}
+                          onTable={setFigureTable}
+                        />
                       ) : (
                         <PlotComponent
                           data={plotData}
@@ -2511,6 +2558,9 @@ function App() {
                             <MenuItem value={"bar"}>{t('Bar Plot (Raw Count)')}</MenuItem>
                             <MenuItem value={"sums"}>{t('Sums')}</MenuItem>
                             <MenuItem value={"wordcloud"}>{t('Word Cloud')}</MenuItem>
+                            <MenuItem value={"polar"}>{t('Polar (Seasonality)')}</MenuItem>
+                            <MenuItem value={"pca"}>{t('PCA')}</MenuItem>
+                            <MenuItem value={"ca"}>{t('Correspondence Analysis')}</MenuItem>
                           </Select>
                         </FormControl>
                       </div>
@@ -2553,10 +2603,10 @@ function App() {
                           </IconButton>
                         </Tooltip>
                       </div>
-                      <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || plotData.length === 0}>
+                      <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || nothingToDownload}>
                         {t('Download Plot')}
                       </Button>
-                      <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || plotData.length === 0}>
+                      <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || nothingToDownload}>
                         {t('Download CSV')}
                       </Button>
                     </div>

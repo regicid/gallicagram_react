@@ -43,7 +43,7 @@ const SumsComponent = ({ data, darkMode, advancedOptions, rankedBy }) => {
       data={plotData}
       layout={{
         autosize: true,
-        title: rankedBy ? t(`score_${rankedBy}`) : t('Total Occurrences per Query'),
+        title: { text: rankedBy ? t(`score_${rankedBy}`) : t('Total Occurrences per Query') },
         ...plotlyTheme,
         margin: {
           l: 150,
@@ -53,12 +53,12 @@ const SumsComponent = ({ data, darkMode, advancedOptions, rankedBy }) => {
           pad: 4
         },
         xaxis: {
-          title: rankedBy ? t(`score_${rankedBy}`) : t('Total Occurrences'),
+          title: { text: rankedBy ? t(`score_${rankedBy}`) : t('Total Occurrences') },
           tickfont: { size: 14 },
           gridcolor: darkMode ? '#0f3460' : undefined
         },
         yaxis: {
-          title: t('Query'),
+          title: { text: t('Query') },
           autorange: 'reversed',
           automargin: true,
           tickfont: { size: yTickFontSize },

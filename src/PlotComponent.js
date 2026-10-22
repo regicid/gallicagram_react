@@ -62,6 +62,23 @@ export const colorblindPalette = [
   '#EE9944', // orange
 ];
 
+// Dark mode styling for Plotly
+export const plotlyThemeFor = (darkMode) => (darkMode ? {
+  paper_bgcolor: '#1a1a2e',
+  plot_bgcolor: '#16213e',
+  font: { color: '#eaeaea', family: 'EB Garamond, Georgia, serif' },
+  xaxis: { gridcolor: '#0f3460', linecolor: '#0f3460' },
+  yaxis: { gridcolor: '#0f3460', linecolor: '#0f3460' }
+} : {
+  paper_bgcolor: 'white',
+  plot_bgcolor: 'white',
+  font: { family: 'EB Garamond, Georgia, serif' }
+});
+
+// The new figures (polar, ACP, AFC) are drawn in this div, so the download button can
+// export them with Plotly's own image export.
+export const FIGURE_DIV_ID = 'gallicagram-figure';
+
 const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, darkMode, plotRevision }) => {
   const { t } = useTranslation();
   const data = React.useMemo(() => (series || []).map(trimEmptyEnds), [series]);
@@ -232,18 +249,7 @@ const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, 
 
   const isMobile = isTouchScreen || window.innerWidth <= 768;
 
-  // Dark mode styling for Plotly
-  const plotlyTheme = darkMode ? {
-    paper_bgcolor: '#1a1a2e',
-    plot_bgcolor: '#16213e',
-    font: { color: '#eaeaea', family: 'EB Garamond, Georgia, serif' },
-    xaxis: { gridcolor: '#0f3460', linecolor: '#0f3460' },
-    yaxis: { gridcolor: '#0f3460', linecolor: '#0f3460' }
-  } : {
-    paper_bgcolor: 'white',
-    plot_bgcolor: 'white',
-    font: { family: 'EB Garamond, Georgia, serif' }
-  };
+  const plotlyTheme = plotlyThemeFor(darkMode);
 
   // Show Total Barplot option
   const showTotalBarplot = advancedOptions?.showTotalBarplot && plotType === 'line';
@@ -278,7 +284,7 @@ const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, 
   // Layout configuration
   const baseLayout = {
     autosize: true,
-    title: t('Frequency over time'),
+    title: { text: t('Frequency over time') },
     ...(isMobile ? {
       margin: { l: 45, r: 0, t: 40, b: 50 } // Reduce margins on mobile to use full width
     } : {}),
@@ -298,14 +304,14 @@ const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, 
     },
     dragmode: isTouchScreen ? false : 'zoom',
     xaxis: {
-      title: showTotalBarplot ? undefined : t('Date'),
+      title: showTotalBarplot ? undefined : { text: t('Date') },
       fixedrange: isTouchScreen,
       tickfont: { size: 14 },
       ...(plotlyTheme.xaxis || {}),
       ...(dataExtent ? { range: dataExtent, autorange: false } : {})
     },
     yaxis: {
-      title: yAxisTitle,
+      title: { text: yAxisTitle },
       rangemode: (plotType === 'area' || advancedOptions?.extendYScale) ? 'tozero' : 'normal',
       fixedrange: isTouchScreen,
       tickfont: { size: 14 },
@@ -323,7 +329,7 @@ const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, 
   // Add second y-axis for total barplot
   if (showTotalBarplot) {
     baseLayout.yaxis2 = {
-      title: t('Total'),
+      title: { text: t('Total') },
       domain: [0, 0.25],
       tickfont: { size: 14 },
       gridcolor: plotlyTheme.yaxis?.gridcolor,

@@ -79,6 +79,27 @@ export const plotlyThemeFor = (darkMode) => (darkMode ? {
 // export them with Plotly's own image export.
 export const FIGURE_DIV_ID = 'gallicagram-figure';
 
+// A number for each data array, to put in a figure's uirevision: Plotly keeps the axis
+// ranges as long as uirevision stays the same, so the figure rescales on new data only.
+const revisions = new WeakMap();
+let lastRevision = 0;
+export const revisionOf = (data) => {
+  if (!data || typeof data !== 'object') return 0;
+  if (!revisions.has(data)) revisions.set(data, ++lastRevision);
+  return revisions.get(data);
+};
+
+// react-plotly attaches its event handlers once its first draw is done. In development,
+// StrictMode mounts the plot twice, and the second draw drops every listener while
+// react-plotly believes its handlers are still attached: the click is lost until the next
+// render. Rendering once more after the plot appears hands it a new handler to attach.
+export const useRenderAfterMount = (mounted) => {
+  const [, setRenders] = React.useState(0);
+  React.useEffect(() => {
+    if (mounted) setRenders(n => n + 1);
+  }, [mounted]);
+};
+
 const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, darkMode, plotRevision }) => {
   const { t } = useTranslation();
   const data = React.useMemo(() => (series || []).map(trimEmptyEnds), [series]);

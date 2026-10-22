@@ -120,7 +120,7 @@ const PolarComponent = ({ data, monthly, advancedOptions, darkMode, onPointClick
         data={traces}
         layout={{
           autosize: true,
-          title: { text: removeTrend ? t('Seasonality (gap to the trend)') : t('Seasonality') },
+          margin: { t: 40 },
           paper_bgcolor: theme.paper_bgcolor,
           font: theme.font,
           showlegend: true,

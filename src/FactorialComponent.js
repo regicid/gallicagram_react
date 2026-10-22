@@ -182,7 +182,7 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
         data={traces}
         layout={{
           autosize: true,
-          title: { text: method === 'pca' ? t('Principal component analysis') : t('Correspondence analysis') },
+          margin: { t: 40 },
           paper_bgcolor: theme.paper_bgcolor,
           plot_bgcolor: theme.plot_bgcolor,
           font: theme.font,

@@ -43,7 +43,6 @@ const SumsComponent = ({ data, darkMode, advancedOptions, rankedBy }) => {
       data={plotData}
       layout={{
         autosize: true,
-        title: { text: rankedBy ? t(`score_${rankedBy}`) : t('Total Occurrences per Query') },
         ...plotlyTheme,
         margin: {
           l: 150,

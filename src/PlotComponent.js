@@ -305,10 +305,10 @@ const PlotComponent = ({ data: series, onPointClick, advancedOptions, plotType, 
   // Layout configuration
   const baseLayout = {
     autosize: true,
-    title: { text: t('Frequency over time') },
-    ...(isMobile ? {
-      margin: { l: 45, r: 0, t: 40, b: 50 } // Reduce margins on mobile to use full width
-    } : {}),
+    // No title above the plot: the top margin only leaves room for the modebar.
+    margin: isMobile
+      ? { l: 45, r: 0, t: 40, b: 50 } // Reduce margins on mobile to use full width
+      : { t: 40 },
     ...plotlyTheme,
     showlegend: true,
     legend: {

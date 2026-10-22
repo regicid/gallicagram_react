@@ -9,6 +9,14 @@ import { toMonthly, detrend, seasonalProfile } from './seasonality';
 // one closed loop, its average over the years; in the spiral view every year goes round
 // once, so the years can be compared. A click on the spiral asks for that month's context;
 // onTable receives the values drawn, for the CSV download.
+
+// The spiral's years go from blue (the first) to red (the last). A line has one colour in
+// Plotly, so each year is its own trace; with several words, the line style tells them apart.
+const OLDEST = [33, 102, 172];
+const LATEST = [178, 24, 43];
+const yearColor = (fraction) => `rgb(${OLDEST.map((v, k) => Math.round(v + (LATEST[k] - v) * fraction)).join(',')})`;
+const DASHES = ['solid', 'dot', 'dash', 'dashdot', 'longdash', 'longdashdot'];
+
 const PolarComponent = ({ data, monthly, advancedOptions, darkMode, onPointClick, onTable }) => {
   const { t, i18n } = useTranslation();
   const [removeTrend, setRemoveTrend] = useState(true);
@@ -52,10 +60,9 @@ const PolarComponent = ({ data, monthly, advancedOptions, darkMode, onPointClick
   }, [table, onTable]);
 
   const traces = useMemo(() => {
-    return series.map((monthlySeries, index) => {
-      const trace = data[index];
-      const color = palette[index % palette.length];
-      if (seasonal) {
+    if (seasonal) {
+      return series.map((monthlySeries, index) => {
+        const color = palette[index % palette.length];
         const profile = seasonalProfile(monthlySeries);
         return {
           type: 'scatterpolar',
@@ -67,25 +74,76 @@ const PolarComponent = ({ data, monthly, advancedOptions, darkMode, onPointClick
           line: { shape: 'spline', color, width: 3 },
           marker: { color, size: 6 },
           connectgaps: true,
-          name: trace.name,
+          name: data[index].name,
         };
-      }
-      const first = monthlySeries.x.length > 0 ? monthlySeries.x[0].getUTCFullYear() : 0;
-      return {
+      });
+    }
+    const years = series.flatMap(monthlySeries => monthlySeries.x.map(d => d.getUTCFullYear()));
+    if (years.length === 0) return [];
+    const firstYear = Math.min(...years);
+    const lastYear = Math.max(...years);
+    const fraction = year => (lastYear > firstYear ? (year - firstYear) / (lastYear - firstYear) : 0);
+    const several = series.length > 1;
+    const traces = series.flatMap((monthlySeries, index) => {
+      const trace = data[index];
+      const dash = several ? DASHES[index % DASHES.length] : 'solid';
+      const byYear = new Map();
+      monthlySeries.x.forEach((d, i) => {
+        const year = d.getUTCFullYear();
+        if (!byYear.has(year)) byYear.set(year, []);
+        byYear.get(year).push(i);
+      });
+      // In the legend, a word stands for all its years: clicking it hides or shows them.
+      const legendEntry = {
         type: 'scatterpolar',
         mode: 'lines',
-        r: monthlySeries.y,
-        theta: monthlySeries.x.map(d => (d.getUTCFullYear() - first) * 360 + d.getUTCMonth() * 30),
-        text: monthlySeries.x.map(d => `${monthNames[d.getUTCMonth()]} ${d.getUTCFullYear()}`),
-        hovertemplate: '%{text}: %{r:.3~g}',
-        line: { shape: 'spline', color, width: 1.5 },
+        r: [null],
+        theta: [null],
+        line: { color: darkMode ? '#bbbbbb' : '#555555', dash, width: 2 },
         name: trace.name,
-        customdata: monthlySeries.x.map(toPlotlyDate),
-        // The context of a point is that of its month, whatever resolution was fetched.
-        meta: { ...trace.meta, resolution: 'mois' },
+        legendgroup: trace.name,
+        hoverinfo: 'skip',
       };
+      return [legendEntry, ...[...byYear.entries()].map(([year, indices]) => {
+        // Each year runs on into the next January, so the spiral stays unbroken.
+        const next = byYear.get(year + 1);
+        const points = next ? [...indices, next[0]] : indices;
+        return {
+          type: 'scatterpolar',
+          mode: 'lines',
+          r: points.map(i => monthlySeries.y[i]),
+          theta: points.map((i, k) => (k === indices.length ? 360 : monthlySeries.x[i].getUTCMonth() * 30)),
+          text: points.map(i => `${monthNames[monthlySeries.x[i].getUTCMonth()]} ${monthlySeries.x[i].getUTCFullYear()}`),
+          hovertemplate: `%{text}: %{r:.3~g}<extra>${trace.name}</extra>`,
+          line: { shape: 'spline', color: yearColor(fraction(year)), width: 1.5, dash },
+          name: trace.name,
+          legendgroup: trace.name,
+          showlegend: false,
+          customdata: points.map(i => toPlotlyDate(monthlySeries.x[i])),
+          // The context of a point is that of its month, whatever resolution was fetched.
+          meta: { ...trace.meta, resolution: 'mois' },
+        };
+      })];
     });
-  }, [data, series, seasonal, palette, monthNames]);
+    // The colour scale of the years, drawn by a trace without points.
+    traces.push({
+      type: 'scatterpolar',
+      mode: 'markers',
+      r: [null, null],
+      theta: [null, null],
+      marker: {
+        color: [firstYear, lastYear],
+        cmin: firstYear,
+        cmax: lastYear,
+        colorscale: [[0, yearColor(0)], [1, yearColor(1)]],
+        showscale: true,
+        colorbar: { title: { text: t('Date') }, tickformat: 'd', thickness: 12 },
+      },
+      showlegend: false,
+      hoverinfo: 'skip',
+    });
+    return traces;
+  }, [data, series, seasonal, palette, monthNames, darkMode, t]);
 
   // The averaged months belong to no year in particular: only the spiral is clickable.
   const handleClick = (event) => {
@@ -124,7 +182,10 @@ const PolarComponent = ({ data, monthly, advancedOptions, darkMode, onPointClick
           paper_bgcolor: theme.paper_bgcolor,
           font: theme.font,
           showlegend: true,
-          legend: { font: { size: 16 } },
+          // In the spiral, the colour scale of the years takes the right-hand side.
+          legend: seasonal
+            ? { font: { size: 16 } }
+            : { font: { size: 16 }, orientation: 'h', x: 0.5, xanchor: 'center', y: -0.05, yanchor: 'top' },
           polar: {
             bgcolor: theme.plot_bgcolor,
             angularaxis: {

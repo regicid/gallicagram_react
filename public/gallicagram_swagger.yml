@@ -451,8 +451,8 @@ components:
         
         | Corpus | Code | Période | N-gram max | Résolutions disponibles |
         | :--- | :--- | :--- | :---: | :--- |
-        | **Le Monde** | `lemonde` | 1944–2023 | 4 | jour, mois, annee |
-        | **Le Monde par rubriques** | `lemonde_rubriques` | 1944–2023 | 4 | jour, mois, annee |
+        | **Le Monde** | `lemonde` | 1944–2023 | 3 | jour, mois, annee |
+        | **Le Monde par rubriques** | `lemonde_rubriques` | 1944–2023 | 5 | jour, mois, annee |
         | **Presse Gallica** | `presse` | 1789–1950 | 3 | mois, annee |
         | **Livres Gallica** | `livres` | 1600–1940 | 5 | annee |
         | **Persée** | *(via /query_persee)* | 1789–2023 | 2 | annee |

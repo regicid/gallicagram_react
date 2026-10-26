@@ -1,8 +1,8 @@
 // Le Monde has two databases: le_monde (the web press set, 1945-2026, daily, up to
-// 2-grams) and lemonde_rubriques (1945-2024, monthly, up to 4-grams, split into
+// 3-grams) and lemonde_rubriques (1945-2024, monthly, up to 5-grams, split into
 // rubriques, and the only one with the article modes). The picker shows them as a single
 // "Le Monde", and each query goes to the one that can answer it: le_monde unless it needs
-// rubriques, an article mode, or n-grams longer than 2.
+// rubriques, an article mode, or n-grams longer than 3.
 export const LE_MONDE = 'le_monde';
 export const LE_MONDE_RUBRIQUES = 'lemonde_rubriques';
 
@@ -12,8 +12,8 @@ export const hasRubriqueFilter = (query) =>
   (Array.isArray(query.rubriques) && query.rubriques.length > 0) || !!query.byRubrique;
 
 const LIST_MODES = ['joker', 'nearby'];
-// le_monde has nothing longer than 2-grams.
-const LE_MONDE_MAX_LENGTH = 2;
+// le_monde has nothing longer than 3-grams.
+const LE_MONDE_MAX_LENGTH = 3;
 
 // Size of the n-grams a query needs: its longest '+' or '&' part, and for the list modes
 // one word more (or the requested length, if longer).

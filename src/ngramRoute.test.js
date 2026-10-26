@@ -1,8 +1,14 @@
 import { sumSeries } from './series';
-import { usesNgramRoute, ngramDbName, ngramCorpusParams, ngramFieldParams } from './ngramRoute';
+import { usesNgramRoute, ngramDbName, ngramCorpusParams, ngramFieldParams, eliasCorporaFromTsv, loadEliasCorpora } from './ngramRoute';
 import { CAIRN_CORPUS, PERSEE_CORPUS, buildRevueFilter, isCombinedCorpus } from './revueCorpora';
 
+const fs = require('fs');
+const path = require('path');
+const CORPUS_TSV = fs.readFileSync(path.join(__dirname, '../public/corpus.tsv'), 'utf8');
+
 describe('ngram route', () => {
+  beforeAll(() => loadEliasCorpora(CORPUS_TSV));
+
   test('maps the app corpus codes to the server database names', () => {
     expect(ngramDbName('presse')).toBe('presse');
     expect(ngramDbName('tv_bfmtv')).toBe('bfmtv');
@@ -16,14 +22,22 @@ describe('ngram route', () => {
   // Every corpus of the picker is served by the ngram routes, apart from the ones made
   // of several parts, which are summed from their parts' series.
   test('serves every corpus of corpus.tsv through the ngram routes', () => {
-    const fs = require('fs');
-    const path = require('path');
     const SUMMED = ['presse_livres', 'presse_moderne'];
-    const codes = fs.readFileSync(path.join(__dirname, '../public/corpus.tsv'), 'utf8')
+    const codes = CORPUS_TSV
       .split('\n').slice(1).filter(line => line && !line.startsWith('#')).map(line => line.split('\t')[3])
       .filter(code => !isCombinedCorpus(code) && !SUMMED.includes(code));
     expect(codes).toContain(CAIRN_CORPUS);
     expect(codes.filter(code => !usesNgramRoute(code))).toEqual([]);
+  });
+
+  // The "Elias" column of corpus.tsv says which corpora are the web press databases.
+  test('reads the Elias corpora from corpus.tsv', () => {
+    const elias = eliasCorporaFromTsv(CORPUS_TSV);
+    expect(elias).toContain('le_figaro');
+    expect(elias).toContain('bfmtv');
+    expect(elias).not.toContain('leparisien');
+    expect(elias).not.toContain('tv_bfmtv');
+    expect(elias).not.toContain('presse_moderne');
   });
 
   // The web press databases sit elsewhere on the server, which elias=true selects.

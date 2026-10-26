@@ -1,8 +1,12 @@
+import fs from 'fs';
+import path from 'path';
 import { hasWildcard, gallicaTerms, rapPattern, resolveWildcards } from './contextWord';
+import { loadEliasCorpora } from './ngramRoute';
 
 const answer = (status, body) => jest.fn().mockResolvedValue({ ok: status === 200, text: () => Promise.resolve(body) });
 
 describe('context word', () => {
+  beforeAll(() => loadEliasCorpora(fs.readFileSync(path.join(__dirname, '../public/corpus.tsv'), 'utf8')));
   afterEach(() => { delete global.fetch; });
 
   test('spots the ngram wildcards, not a _ inside a word', () => {

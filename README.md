@@ -45,6 +45,7 @@ This file acts as a central registry, defining:
 - **Available Modes**: Which search modes (ngram, document, joker, nearby) are valid for each corpus.
 - **API Codes**: Identifiers used to construct API requests.
 - **Metadata**: Date ranges, volume, and specific context filters.
+- **Elias**: `true` for the contemporary web press databases, which the `/guni/` ngram routes (`query_ngram`, `joker_ngram`, `associated_ngram`) serve only with `elias=true` added to the request.
 
 ### API Integration
 The app interacts with multiple backends:

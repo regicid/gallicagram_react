@@ -12,7 +12,7 @@ import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
 import { leMondeSource } from './leMonde';
 import { gallicaTerms, hasWildcard, resolveWildcards } from './contextWord';
-import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX } from './ngramRoute';
+import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX, loadEliasCorpora } from './ngramRoute';
 import { GOOGLE_NGRAM_CORPORA, GOOGLE_NGRAM_PERIOD, isGoogleNgram, googleNgramYears, googleNgramUrl } from './googleNgram';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
@@ -221,7 +221,8 @@ const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 // otherwise uses for them. Le Marin and Voiles et Voiliers are left out: they are trade
 // papers, not news.
 const PRESSE_MODERNE = 'presse_moderne';
-const PRESSE_MODERNE_PARTS = [
+// A function, as ELIAS_CORPORA is only filled once corpus.tsv is loaded.
+const presseModerneParts = () => [
   ...[...ELIAS_CORPORA].filter(corpus => !['le_marin', 'voiles_et_voiliers'].includes(corpus)),
   'leparisien', 'la_croix',
 ].map(part => `${ELIAS_PREFIX}${part}`);
@@ -369,6 +370,8 @@ function App() {
     fetch('/corpus.tsv')
       .then(response => response.text())
       .then(data => {
+        // Before the periods are set: the auto-plot of a shared URL waits for them.
+        loadEliasCorpora(data);
         const lines = data.split('\n');
         const periods = {};
         const configs = {};
@@ -1296,7 +1299,8 @@ function App() {
     // failing the whole curve; only when every outlet fails is the error reported.
     if (corpus === PRESSE_MODERNE) {
       const errors = [];
-      return mapWithConcurrency(PRESSE_MODERNE_PARTS, PRESSE_MODERNE_CONCURRENCY, part =>
+      const parts = presseModerneParts();
+      return mapWithConcurrency(parts, PRESSE_MODERNE_CONCURRENCY, part =>
         fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
           .catch(error => {
             console.warn(`presse_moderne: ${part} left out of the sum for "${word}"`, error);
@@ -1304,7 +1308,7 @@ function App() {
             return null;
           })
       ).then(seriesList => {
-        if (errors.length === PRESSE_MODERNE_PARTS.length) throw errors[0];
+        if (errors.length === parts.length) throw errors[0];
         return sumSeries(seriesList);
       });
     }

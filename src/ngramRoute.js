@@ -45,16 +45,27 @@ export const NGRAM_ROUTE_CORPORA = {
 
 // The contemporary web press (Elias Echikr's databases, once served by the Agoragram API)
 // goes through the same routes with elias=true; the app corpus code is the database name.
-export const ELIAS_CORPORA = new Set([
-  '20minutes', 'bfmtv', 'challenges', 'cnews', 'francesoir',
-  'gala', 'l_opinion', 'la_depeche', 'laprovence', 'latribune',
-  'le_capital', 'le_courrier_de_l_ouest', 'le_figaro', 'le_journal_du_dimanche',
-  'le_maine_libre', 'le_marin', 'le_monde', 'le_nouvel_observateur',
-  'le_telegramme', 'les_echos', 'marianne', 'mediapart',
-  'midilibre', 'nice_matin', 'ouest_france', 'paris_match', 'paris_normandie',
-  'presse_ocean', 'sud_ouest', 'telerama', 'valeurs_actuelles', 'voici',
-  'voiles_et_voiliers',
-]);
+// Which corpora they are is the "Elias" column of corpus.tsv, so that other readers of
+// the file know how to route them too; App fills the set once the file is loaded.
+export const ELIAS_CORPORA = new Set();
+const ELIAS_COLUMN = 'Elias';
+
+// The codes of corpus.tsv whose "Elias" column is true.
+export const eliasCorporaFromTsv = (tsv) => {
+  const [header, ...lines] = tsv.split('\n');
+  const headers = header.split('\t').map(name => name.trim());
+  const code = headers.indexOf('Code API');
+  const elias = headers.indexOf(ELIAS_COLUMN);
+  return lines
+    .map(line => line.split('\t'))
+    .filter(columns => columns[elias]?.trim() === 'true')
+    .map(columns => columns[code].trim());
+};
+
+export const loadEliasCorpora = (tsv) => {
+  ELIAS_CORPORA.clear();
+  eliasCorporaFromTsv(tsv).forEach(corpus => ELIAS_CORPORA.add(corpus));
+};
 // Databases fetched under this prefix always come from the Elias set: its leparisien and
 // la_croix are not the guni corpora the app otherwise uses for those papers.
 export const ELIAS_PREFIX = 'elias:';

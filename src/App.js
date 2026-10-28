@@ -287,6 +287,23 @@ export const rollUpToWeeks = (rows) => {
 
 // Visualizations drawn by their own components (PolarComponent, FactorialComponent).
 const FIGURE_PLOT_TYPES = ['polar', 'pca', 'ca'];
+// The charts drawn on a canvas for their PNG export, in paper or social media form.
+const TIME_SERIES_PLOT_TYPES = ['line', 'area', 'bar'];
+
+// The PNG exports of the line, area and bar charts, in pixels of the image before it is
+// doubled for resolution. A phone shows a shared image about three times smaller than a
+// paper column, hence the larger type and lines of the social media one, and its source
+// line under the legend: a shared image travels without its post.
+const PNG_PRESETS = {
+  paper: {
+    width: 1200, height: 800, lineWidth: 3, yTicks: 6,
+    font: { tick: 28, axisTitle: 34, legend: 30 },
+  },
+  social: {
+    width: 1080, height: 1350, lineWidth: 6, yTicks: 5, sourceLine: true,
+    font: { tick: 40, axisTitle: 46, legend: 46, source: 30 },
+  },
+};
 // The polar chart places months on a circle: it needs a resolution of a month or finer.
 const SUB_YEAR_RESOLUTIONS = ['mois', 'semaine', 'jour'];
 
@@ -363,6 +380,7 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [apiMenuAnchor, setApiMenuAnchor] = useState(null);
+  const [downloadMenuAnchor, setDownloadMenuAnchor] = useState(null);
   const [fetchId, setFetchId] = useState(0); // Track data fetches for graph updates
 
   useEffect(() => {
@@ -1830,8 +1848,9 @@ function App() {
     ? sumsData.length === 0
     : plotData.length === 0;
 
-  const handleDownloadPlot = () => {
+  const handleDownloadPlot = (presetName = 'paper') => {
     if (nothingToDownload) return;
+    const preset = PNG_PRESETS[presetName];
 
     // The polar and factorial figures are exported as Plotly draws them.
     if (FIGURE_PLOT_TYPES.includes(plotType)) {
@@ -1845,8 +1864,8 @@ function App() {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const scale = 2; // Increase resolution
-      const width = 1200 * scale;
-      const height = 800 * scale;
+      const width = preset.width * scale;
+      const height = preset.height * scale;
       let margin = { top: 60 * scale, right: 60 * scale, bottom: 100 * scale, left: 100 * scale };
       canvas.width = width;
       canvas.height = height;
@@ -1858,6 +1877,9 @@ function App() {
       const activeQuery = queries.find(q => q.id === activeQueryId);
       const advancedOptions = activeQuery?.advancedOptions || {};
       const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
+
+      const FONT = preset.font;
+      const font = (size) => `${size * scale}px 'EB Garamond', Georgia, serif`;
 
       // Fonts
       ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
@@ -2017,7 +2039,7 @@ function App() {
         const paddedMax = dataMax + padding;
 
         // Nice Ticks
-        const targetTicks = 6;
+        const targetTicks = preset.yTicks;
         const roughStep = (paddedMax - paddedMin) / (targetTicks - 1);
         const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
         const normalizedStep = roughStep / magnitude;
@@ -2031,15 +2053,39 @@ function App() {
         const maxValue = Math.ceil(paddedMax / tickStep) * tickStep;
 
         // Calculate max tick width to adjust margin dynamically
-        ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
+        ctx.font = font(FONT.tick);
         let maxTickWidth = 0;
         for (let val = minValue; val <= maxValue + tickStep / 10; val += tickStep) {
           const label = parseFloat(val.toPrecision(10)).toString();
           const metrics = ctx.measureText(label);
           if (metrics.width > maxTickWidth) maxTickWidth = metrics.width;
         }
-        // Ensure enough room for Y title (approx 40px * scale) and ticks
-        margin.left = Math.max(margin.left, maxTickWidth + 60 * scale);
+        // Ensure enough room for Y title and ticks: the title is centred this far left of
+        // the tick labels.
+        const yTitleOffset = 24 + FONT.axisTitle / 2;
+        margin.left = Math.max(margin.left, maxTickWidth + (yTitleOffset + FONT.axisTitle / 2 + 16) * scale);
+
+        // The legend, wrapped onto as many lines as the names need. Offsets are before `scale`.
+        ctx.font = font(FONT.legend);
+        const legendRows = [[]];
+        let rowWidth = 0;
+        const swatch = FONT.legend * 1.5;
+        tracesToDraw.forEach((trace, i) => {
+          const itemWidth = (swatch + 8) * scale + ctx.measureText(trace.name).width;
+          if (rowWidth > 0 && rowWidth + itemWidth > width - margin.left - margin.right) {
+            legendRows.push([]);
+            rowWidth = 0;
+          }
+          legendRows[legendRows.length - 1].push({ trace, i, x: rowWidth });
+          rowWidth += itemWidth + 40 * scale;
+        });
+        const legendLine = FONT.legend * 1.4;
+        const legendHeight = legendRows.length * legendLine;
+        // Under the x axis: the ticks, the axis title, the legend, then the source line.
+        const xTitleY = 10 + FONT.tick + 12 + FONT.axisTitle / 2;
+        const belowTitle = xTitleY + FONT.axisTitle / 2 + 20;
+        const sourceY = belowTitle + legendHeight + 12 + FONT.source / 2;
+        margin.bottom = (preset.sourceLine ? sourceY + FONT.source / 2 + 24 : belowTitle + legendHeight + 12) * scale;
 
         // Scales
         const xScale = (date) => {
@@ -2051,6 +2097,7 @@ function App() {
         };
 
         // Axes
+        ctx.lineWidth = 3 * scale;
         ctx.beginPath();
         ctx.moveTo(margin.left, height - margin.bottom);
         ctx.lineTo(width - margin.right, height - margin.bottom);
@@ -2061,11 +2108,13 @@ function App() {
         // X Ticks
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.font = `${20 * scale}px 'EB Garamond', Georgia, serif`;
-        const yearSpan = (maxDate - minDate) / (1000 * 60 * 60 * 24 * 365.25);
-        const tickInterval = yearSpan > 100 ? 20 : (yearSpan > 50 ? 10 : 5);
+        ctx.font = font(FONT.tick);
         const startYear = new Date(minDate).getUTCFullYear();
         const endYear = new Date(maxDate).getUTCFullYear();
+        // The smallest round step whose labels fit, each a label and a half apart.
+        const maxXTicks = Math.max(2, Math.floor((width - margin.left - margin.right) / (ctx.measureText('0000').width * 2.5)));
+        const tickInterval = [1, 2, 5, 10, 20, 25, 50, 100, 200]
+          .find(step => Math.floor(endYear / step) - Math.ceil(startYear / step) + 1 <= maxXTicks) || 500;
         for (let y = Math.ceil(startYear / tickInterval) * tickInterval; y <= endYear; y += tickInterval) {
           const date = new Date(Date.UTC(y, 0, 1));
           const x = xScale(date);
@@ -2093,12 +2142,13 @@ function App() {
 
         // Labels
         ctx.textAlign = 'center';
-        ctx.font = `${24 * scale}px 'EB Garamond', Georgia, serif`;
-        ctx.fillText(t('Date'), margin.left + (width - margin.left - margin.right) / 2, height - margin.bottom + 50 * scale);
+        ctx.textBaseline = 'middle';
+        ctx.font = font(FONT.axisTitle);
+        ctx.fillText(t('Date'), margin.left + (width - margin.left - margin.right) / 2, height - margin.bottom + xTitleY * scale);
 
         ctx.save();
         // Place Y title relative to margin.left to avoid overlap
-        ctx.translate(margin.left - maxTickWidth - 40 * scale, margin.top + (height - margin.top - margin.bottom) / 2);
+        ctx.translate(margin.left - maxTickWidth - yTitleOffset * scale, margin.top + (height - margin.top - margin.bottom) / 2);
         ctx.rotate(-Math.PI / 2);
         let yTitle;
         if (effectiveIsRescaled) {
@@ -2164,7 +2214,7 @@ function App() {
               ctx.fill();
 
               ctx.globalAlpha = 1.0;
-              ctx.lineWidth = 2 * scale;
+              ctx.lineWidth = (preset.lineWidth - 1) * scale;
               ctx.stroke();
             }
 
@@ -2176,13 +2226,13 @@ function App() {
                   const cx = xScale(rawTrace.x[idx]);
                   const cy = yScale(yVal);
                   ctx.beginPath();
-                  ctx.arc(cx, cy, 3 * scale, 0, 2 * Math.PI);
+                  ctx.arc(cx, cy, preset.lineWidth * scale, 0, 2 * Math.PI);
                   ctx.fill();
                 }
               });
             }
 
-            ctx.lineWidth = 3 * scale;
+            ctx.lineWidth = preset.lineWidth * scale;
             ctx.beginPath();
             const points = [];
             trace.y.forEach((yVal, idx) => {
@@ -2214,25 +2264,37 @@ function App() {
         });
 
         // Legend
-        if (tracesToDraw.length >= 1) {
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'middle';
-          ctx.font = `${16 * scale}px 'EB Garamond', Georgia, serif`;
-          let legendX = margin.left;
-          const legendY = height - 30 * scale;
-          tracesToDraw.forEach((trace, i) => {
-            const color = palette[i % palette.length];
-            ctx.fillStyle = color;
-            ctx.fillRect(legendX, legendY - 5 * scale, 20 * scale, 10 * scale);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = font(FONT.legend);
+        legendRows.forEach((row, r) => {
+          const legendY = height - margin.bottom + (belowTitle + (r + 0.5) * legendLine) * scale;
+          row.forEach(({ trace, i, x }) => {
+            const legendX = margin.left + x;
+            ctx.fillStyle = palette[i % palette.length];
+            // A stroke of the curve's own thickness for lines, a block for areas and bars.
+            const swatchHeight = plotType === 'line' ? preset.lineWidth : swatch / 3;
+            ctx.fillRect(legendX, legendY - swatchHeight / 2 * scale, swatch * scale, swatchHeight * scale);
             ctx.fillStyle = 'black';
-            ctx.fillText(trace.name, legendX + 25 * scale, legendY);
-            legendX += ctx.measureText(trace.name).width + 50 * scale;
+            ctx.fillText(trace.name, legendX + (swatch + 8) * scale, legendY);
           });
+        });
+
+        if (preset.sourceLine) {
+          // Made smaller rather than cut off when it does not fit (a long translation).
+          const period = startYear === endYear ? `${startYear}` : `${startYear}–${endYear}`;
+          const source = t('png_source', { period });
+          ctx.font = font(FONT.source);
+          const room = width - margin.left - margin.right;
+          const fullWidth = ctx.measureText(source).width;
+          if (fullWidth > room) ctx.font = font(FONT.source * room / fullWidth);
+          ctx.fillStyle = '#555';
+          ctx.fillText(source, margin.left, height - margin.bottom + sourceY * scale);
         }
       }
 
       const link = document.createElement('a');
-      link.download = 'gallicagram_plot.png';
+      link.download = presetName === 'paper' ? 'gallicagram_plot.png' : `gallicagram_plot_${presetName}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     });
@@ -2606,9 +2668,33 @@ function App() {
                           </IconButton>
                         </Tooltip>
                       </div>
-                      <Button variant="contained" color="success" onClick={handleDownloadPlot} disabled={isLoading || nothingToDownload}>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        disabled={isLoading || nothingToDownload}
+                        onClick={(e) => TIME_SERIES_PLOT_TYPES.includes(plotType)
+                          ? setDownloadMenuAnchor(e.currentTarget)
+                          : handleDownloadPlot()}
+                      >
                         {t('Download Plot')}
                       </Button>
+                      <Menu
+                        anchorEl={downloadMenuAnchor}
+                        open={Boolean(downloadMenuAnchor)}
+                        onClose={() => setDownloadMenuAnchor(null)}
+                      >
+                        {Object.keys(PNG_PRESETS).map(presetName => (
+                          <MenuItem
+                            key={presetName}
+                            onClick={() => {
+                              setDownloadMenuAnchor(null);
+                              handleDownloadPlot(presetName);
+                            }}
+                          >
+                            {t(`png_preset_${presetName}`)}
+                          </MenuItem>
+                        ))}
+                      </Menu>
                       <Button variant="contained" color="success" onClick={handleDownloadCSV} disabled={isLoading || nothingToDownload}>
                         {t('Download CSV')}
                       </Button>

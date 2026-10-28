@@ -43,6 +43,11 @@ describe('decodeUrlState', () => {
   test('leaves the dates to the caller when the link has none', () => {
     expect(decodeUrlState('?word=grève&corpus=libe')).toMatchObject({ startDate: null, endDate: null });
   });
+
+  // Libération's guni copy gave way to the Elias one.
+  test('opens the links made with the old Libération code', () => {
+    expect(decodeUrlState('?word=grève&corpus=libe').queries[0].corpus).toBe('liberation');
+  });
 });
 
 describe('round trip', () => {
@@ -50,7 +55,7 @@ describe('round trip', () => {
     const queries = [
       { word: 'guerre+guerres', corpus: 'le_monde', searchMode: 'ngram', resolution: 'mois', rubriques: ['sport', 'science/technologie'], byRubrique: true },
       { word: 'grève', corpus: 'tv_bfmtv', searchMode: 'ngram', resolution: 'semaine' },
-      { word: 'crise', corpus: 'libe', searchMode: 'joker', n_joker: 30, length: 3, stopwords: 100, score: 'llr', min_count: 5 },
+      { word: 'crise', corpus: 'liberation', searchMode: 'joker', n_joker: 30, length: 3, stopwords: 100, score: 'llr', min_count: 5 },
       { word: 'école', corpus: 'presse', searchMode: 'cooccurrence', word2: 'laïque', distance: 5 },
       {
         word: 'genre', corpus: 'route à part (persee+cairn)', searchMode: 'ngram',

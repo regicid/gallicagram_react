@@ -232,7 +232,7 @@ const guardian = async (args) => {
 // `site` is used for the Google fallback. `looseMatching` flags the engines that also
 // return near matches ("retraites" finds "retrait"), which the panel says.
 export const PRESS_PANEL = {
-  libe: { name: 'Libération', site: 'liberation.fr', looseMatching: true,
+  liberation: { name: 'Libération', site: 'liberation.fr', looseMatching: true,
     search: queryly('794b8320c4a14952', 'https://www.liberation.fr') },
   leparisien: { name: 'Le Parisien', site: 'leparisien.fr', looseMatching: true,
     search: queryly('b41c54fed8224931', 'https://www.leparisien.fr') },
@@ -290,6 +290,9 @@ export const PRESS_LINK_OUT = {
   presse_ocean: 'presseocean.fr',
   voiles_et_voiliers: 'voilesetvoiliers.com',
   le_marin: 'lemarin.fr',
+  // Their own search not looked into yet.
+  atlantico: 'atlantico.fr',
+  blast: 'blast-info.fr',
 };
 
 // Link-out corpora whose own search takes dates and answers a reader's browser, though not

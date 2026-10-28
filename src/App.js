@@ -12,7 +12,7 @@ import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
 import { leMondeSource } from './leMonde';
 import { gallicaTerms, hasWildcard, resolveWildcards } from './contextWord';
-import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX, loadEliasCorpora } from './ngramRoute';
+import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX, addEliasCorpora } from './ngramRoute';
 import { GOOGLE_NGRAM_CORPORA, GOOGLE_NGRAM_PERIOD, isGoogleNgram, googleNgramYears, googleNgramUrl } from './googleNgram';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
@@ -221,7 +221,7 @@ const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 // otherwise uses for them. Le Marin and Voiles et Voiliers are left out: they are trade
 // papers, not news.
 const PRESSE_MODERNE = 'presse_moderne';
-// A function, as ELIAS_CORPORA is only filled once corpus.tsv is loaded.
+// A function, as corpus.tsv can add Elias corpora once it is loaded.
 const presseModerneParts = () => [
   ...[...ELIAS_CORPORA].filter(corpus => !['le_marin', 'voiles_et_voiliers'].includes(corpus)),
   'leparisien', 'la_croix',
@@ -370,8 +370,7 @@ function App() {
     fetch('/corpus.tsv')
       .then(response => response.text())
       .then(data => {
-        // Before the periods are set: the auto-plot of a shared URL waits for them.
-        loadEliasCorpora(data);
+        addEliasCorpora(data);
         const lines = data.split('\n');
         const periods = {};
         const configs = {};
@@ -1317,23 +1316,20 @@ function App() {
         fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
       )).then(sumSeries);
     }
-    let url;
-    if (usesNgramRoute(corpus)) {
-      // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
-      // pattern is summed into one series on the server.
-      url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
-    } else {
-      url = `https://shiny.ens-paris-saclay.fr/guni/query?mot=${word.trim().replace(/-/g, ' ').replace(/’/g, "'")}&corpus=${corpus}&from=${startDate}&to=${endDate}&resolution=${apiResolution}`;
+    // Every corpus now goes through query_ngram. One that does not is a routing mistake
+    // (e.g. the Elias set not filled yet), not a reason to fall back on /query.
+    if (!usesNgramRoute(corpus)) {
+      return Promise.reject(new Error(`${corpus} : no ngram route for this corpus`));
     }
+    // query_ngram also takes '_' for any word and * / ? inside a word (grèv*): each
+    // pattern is summed into one series on the server.
+    const url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
     console.log("Querying Gallicagram URL:", url);
     return fetch(url)
       .then(async response => {
-        if (!response.ok) {
-          // The ngram routes explain their refusals (too many forms for a pattern, '_' or
-          // * at the start on a big corpus).
-          if (usesNgramRoute(corpus)) throw new Error(`${word} : ${await response.text()}`);
-          throw new Error(`Network response was not ok for "${word}"`);
-        }
+        // The ngram routes explain their refusals (too many forms for a pattern, '_' or
+        // * at the start on a big corpus).
+        if (!response.ok) throw new Error(`${word} : ${await response.text()}`);
         const contentType = response.headers.get("content-type");
         if (!contentType || (!contentType.includes("text/csv") && !contentType.includes("text/plain"))) {
           return response.text().then(text => {

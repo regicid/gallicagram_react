@@ -1,5 +1,5 @@
 import { sumSeries } from './series';
-import { usesNgramRoute, ngramDbName, ngramCorpusParams, ngramFieldParams, eliasCorporaFromTsv, loadEliasCorpora } from './ngramRoute';
+import { usesNgramRoute, ngramDbName, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, eliasCorporaFromTsv, addEliasCorpora } from './ngramRoute';
 import { CAIRN_CORPUS, PERSEE_CORPUS, buildRevueFilter, isCombinedCorpus } from './revueCorpora';
 
 const fs = require('fs');
@@ -7,8 +7,6 @@ const path = require('path');
 const CORPUS_TSV = fs.readFileSync(path.join(__dirname, '../public/corpus.tsv'), 'utf8');
 
 describe('ngram route', () => {
-  beforeAll(() => loadEliasCorpora(CORPUS_TSV));
-
   test('maps the app corpus codes to the server database names', () => {
     expect(ngramDbName('presse')).toBe('presse');
     expect(ngramDbName('tv_bfmtv')).toBe('bfmtv');
@@ -30,14 +28,22 @@ describe('ngram route', () => {
     expect(codes.filter(code => !usesNgramRoute(code))).toEqual([]);
   });
 
-  // The "Elias" column of corpus.tsv says which corpora are the web press databases.
-  test('reads the Elias corpora from corpus.tsv', () => {
-    const elias = eliasCorporaFromTsv(CORPUS_TSV);
-    expect(elias).toContain('le_figaro');
-    expect(elias).toContain('bfmtv');
-    expect(elias).not.toContain('leparisien');
-    expect(elias).not.toContain('tv_bfmtv');
-    expect(elias).not.toContain('presse_moderne');
+  // corpus.tsv is the full reference: every corpus written in ELIAS_CORPORA is marked there.
+  test('marks every Elias corpus of the code in corpus.tsv', () => {
+    const fromTsv = eliasCorporaFromTsv(CORPUS_TSV);
+    expect(fromTsv).not.toContain('leparisien');
+    expect(fromTsv).not.toContain('tv_bfmtv');
+    expect([...ELIAS_CORPORA].filter(corpus => !fromTsv.includes(corpus))).toEqual([]);
+  });
+
+  test('adds the Elias corpora of corpus.tsv, taking none out', () => {
+    const tsv = 'Titre\tCode API\tElias\nNouveau\tnouveau_titre\ttrue\nAutre\tautre\t\n';
+    addEliasCorpora(tsv);
+    expect(usesNgramRoute('nouveau_titre')).toBe(true);
+    expect(ngramCorpusParams('nouveau_titre')).toBe('corpus=nouveau_titre&elias=true');
+    expect(usesNgramRoute('autre')).toBe(false);
+    expect(ELIAS_CORPORA.has('le_figaro')).toBe(true);
+    ELIAS_CORPORA.delete('nouveau_titre');
   });
 
   // The web press databases sit elsewhere on the server, which elias=true selects.

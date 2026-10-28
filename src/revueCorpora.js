@@ -107,6 +107,8 @@ export const LEGACY_CORPUS_CODES = {
   lemonde: 'le_monde',
   // The server renamed the database.
   ouest_france2: 'ouest_france',
+  // The guni copy of Libération (1998-2025), replaced by the Elias one in October 2026.
+  libe: 'liberation',
 };
 const CAIRN_SEARCH = 'https://shs.cairn.info/recherche';
 // Past this many revue codes the query string gets unwieldy; the discipline ids that

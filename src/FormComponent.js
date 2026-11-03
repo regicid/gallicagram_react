@@ -12,7 +12,7 @@ import { FormControl, InputLabel, Select, MenuItem, Tooltip, Chip, TextField, Bu
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { REVUE_CORPORA, revueCorpusParts, getSelection, isTvCorpus } from './revueCorpora';
-import { usesNgramRoute, SCORE_METHODS } from './ngramRoute';
+import { usesNgramRoute, SCORE_METHODS, presseModerneOutlets, outletCorpusCode } from './ngramRoute';
 import { GOOGLE_NGRAM_CORPORA, GOOGLE_NGRAM_PERIOD } from './googleNgram';
 import { LE_MONDE, LE_MONDE_RUBRIQUES, leMondeSource, mergeLeMonde } from './leMonde';
 
@@ -291,6 +291,61 @@ const RevuePicker = ({ corpus, revueMap, selection, onSelectionChange, showCorpu
         </Select>
       </FormControl>
     </>
+  );
+};
+
+// The outlets presse_moderne adds up, to restrict it to a few. Unlike the revue pickers,
+// it starts with none ticked, which means all of them: one click then plots a single
+// outlet, and clearing the selection goes back to the whole press.
+const OutletPicker = ({ corpora, outlets, onChange }) => {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState('');
+  const options = useMemo(() => {
+    const names = Object.fromEntries(corpora.map(c => [c.value, c.label]));
+    return presseModerneOutlets()
+      .map(code => ({ code, name: names[outletCorpusCode(code)] || code }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  }, [corpora]);
+  const filtered = options.filter(o => o.name.toLowerCase().includes(search.toLowerCase()));
+  const nameOf = code => options.find(o => o.code === code)?.name || code;
+
+  return (
+    <FormControl fullWidth style={{ marginBottom: '1rem' }}>
+      <InputLabel id="outlets-label" shrink>{t('Outlets')}</InputLabel>
+      <Select
+        labelId="outlets-label"
+        multiple
+        displayEmpty
+        value={outlets}
+        onChange={(e) => onChange(e.target.value)}
+        input={<OutlinedInput label={t('Outlets')} notched />}
+        renderValue={(selected) => (selected.length === 0 ? t('All outlets')
+          : selected.length <= 2 ? selected.map(nameOf).join(', ')
+            : `${selected.length} ${t('selected')}`)}
+        MenuProps={{ variant: 'menu', autoFocus: false, PaperProps: { sx: { maxHeight: 420 } } }}
+      >
+        <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
+          <Button fullWidth size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); onChange([]); }}>{t('All outlets')}</Button>
+        </Box>
+        <Box sx={{ p: 1 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={t('Search outlets...')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+        </Box>
+        <Divider />
+        {filtered.map((o) => (
+          <MenuItem key={o.code} value={o.code}>
+            <Checkbox checked={outlets.indexOf(o.code) > -1} />
+            <ListItemText primary={o.name} />
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 };
 
@@ -630,9 +685,16 @@ const FormComponent = ({ formData, onFormChange, onCorpusPick, onPlot, revuesDat
       </div>
 
       {corpus === 'presse_moderne' && (
-        <Alert severity="info" sx={{ marginBottom: '1rem', textAlign: 'left' }}>
-          {t('presse_moderne_help')}
-        </Alert>
+        <>
+          <Alert severity="info" sx={{ marginBottom: '1rem', textAlign: 'left' }}>
+            {t('presse_moderne_help')}
+          </Alert>
+          <OutletPicker
+            corpora={corpora}
+            outlets={formData.outlets || []}
+            onChange={outlets => onFormChange({ ...formData, outlets })}
+          />
+        </>
       )}
 
       {(searchModes.length > 1) && (

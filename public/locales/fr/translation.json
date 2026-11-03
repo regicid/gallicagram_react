@@ -251,5 +251,14 @@
   "whats_new_speed": "Requêtes 30 fois plus rapides",
   "whats_new_close": "C'est parti",
   "whats_new_thanks": "Merci à",
-  "whats_new_and": "et"
+  "whats_new_and": "et",
+  "Factorial needs corpora": "Comparer des corpus demande au moins trois corpus qui ont tous les mots : interrogez les mêmes mots dans davantage de corpus.",
+  "Dates": "Dates",
+  "Corpora": "Corpus",
+  "Corpora summed over": "Chaque mot cumulé sur {{period}}, les années que couvrent tous les corpus",
+  "Outlets": "Titres",
+  "All outlets": "Tous les titres",
+  "Search outlets...": "Rechercher un titre...",
+  "Varimax rotation": "Rotation varimax",
+  "Rotated dim.": "Dim. après rotation"
 }

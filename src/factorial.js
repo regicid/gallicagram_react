@@ -72,6 +72,8 @@ export const pca = (table) => {
     rows: z.map(row => vectors.slice(0, dims).map(u => u.reduce((s, x, j) => s + x * row[j], 0))),
     columns: Array.from({ length: p }, (_, j) => vectors.slice(0, dims).map((u, k) => u[j] * Math.sqrt(values[k]))),
     explained: percentages(values).slice(0, dims),
+    // What each column weighs in an axis's variance (see varimax).
+    columnWeights: Array(p).fill(1),
   };
 };
 
@@ -96,6 +98,56 @@ export const ca = (table) => {
     rows: s.map((row, i) => axes.map(u => u.reduce((acc, x, j) => acc + x * row[j], 0) / Math.sqrt(r[i]))),
     columns: Array.from({ length: p }, (_, j) => axes.map((u, k) => (u[j] * Math.sqrt(values[k])) / Math.sqrt(c[j]))),
     explained: percentages(values.slice(0, dims)),
+    // The column masses: an axis's inertia is the masses' weighted sum of squares.
+    columnWeights: c,
+  };
+};
+
+// Varimax rotation (Kaiser's, with his normalisation, like R's varimax) of the first two
+// axes of a pca or ca result. The plane is turned so that each column loads as much as
+// possible on one axis and as little as possible on the other, which makes the axes
+// easier to name after words. The rows turn by the same angle, so the biplot keeps its
+// geometry; only the frame moves. The two axes share the variance they had between them,
+// in new proportions, the larger first. Further axes are left as they were.
+export const varimax = ({ rows, columns, explained, columnWeights }) => {
+  const p = columns.length;
+  // In two dimensions the optimal angle has a closed form (Kaiser 1958).
+  let a = 0, b = 0, c = 0, d = 0;
+  columns.forEach(([x0, y0]) => {
+    const h = Math.hypot(x0, y0) || 1;
+    const x = x0 / h, y = y0 / h;
+    const u = x * x - y * y, v = 2 * x * y;
+    a += u; b += v; c += u * u - v * v; d += 2 * u * v;
+  });
+  const phi = Math.atan2(d - (2 * a * b) / p, c - (a * a - b * b) / p) / 4;
+  const cos = Math.cos(phi), sin = Math.sin(phi);
+  const turn = ([x, y, ...rest]) => [x * cos + y * sin, -x * sin + y * cos, ...rest];
+  let rotatedColumns = columns.map(turn);
+  let rotatedRows = rows.map(turn);
+  const inertia = k => rotatedColumns.reduce((s, col, j) => s + columnWeights[j] * col[k] ** 2, 0);
+  let [i0, i1] = [inertia(0), inertia(1)];
+  // The larger axis first, each oriented with its largest loading positive, as the
+  // unrotated axes are.
+  if (i1 > i0) {
+    const swap = ([x, y, ...rest]) => [y, x, ...rest];
+    rotatedColumns = rotatedColumns.map(swap);
+    rotatedRows = rotatedRows.map(swap);
+    [i0, i1] = [i1, i0];
+  }
+  [0, 1].forEach(k => {
+    const big = rotatedColumns.reduce((m, col) => (Math.abs(col[k]) > Math.abs(m) ? col[k] : m), 0);
+    if (big >= 0) return;
+    const flip = point => point.map((x, i) => (i === k ? -x : x));
+    rotatedColumns = rotatedColumns.map(flip);
+    rotatedRows = rotatedRows.map(flip);
+  });
+  const shared = explained[0] + explained[1];
+  const total = i0 + i1 || 1;
+  return {
+    rows: rotatedRows,
+    columns: rotatedColumns,
+    explained: [(shared * i0) / total, (shared * i1) / total, ...explained.slice(2)],
+    columnWeights,
   };
 };
 
@@ -121,6 +173,43 @@ export const buildTable = (traces, useCounts) => {
   return {
     dates: dates.map(t => new Date(t)),
     table: dates.map(t => columns.map(col => col.get(t))),
+  };
+};
+
+// The corpora × words table, for comparing corpora rather than dates: each trace is one
+// word in one corpus (its meta carries both). Every cell sums the word's occurrences over
+// the years all the traces cover, so that no corpus weighs more for having a longer run.
+// The AFC reads these summed counts, the PCA the word's frequency over that span (summed
+// occurrences over summed totals). A corpus missing one of the words is left out: it has
+// no complete profile.
+export const buildCorpusTable = (traces, useCounts) => {
+  const yearsOf = trace => (trace.x || [])
+    .filter((_, i) => trace.n?.[i] !== null && trace.n?.[i] !== undefined)
+    .map(d => new Date(d).getUTCFullYear());
+  const spans = traces.map(yearsOf).filter(years => years.length > 0);
+  const from = Math.max(...spans.map(years => Math.min(...years)));
+  const to = Math.min(...spans.map(years => Math.max(...years)));
+  const words = [...new Set(traces.map(trace => trace.meta?.word))];
+  const corpora = [...new Set(traces.map(trace => trace.meta?.corpus))];
+  const cell = new Map();
+  traces.forEach(trace => {
+    let n = 0, total = 0, seen = false;
+    (trace.x || []).forEach((d, i) => {
+      const year = new Date(d).getUTCFullYear();
+      if (year < from || year > to || trace.n?.[i] === null || trace.n?.[i] === undefined) return;
+      n += trace.n[i];
+      total += trace.total?.[i] || 0;
+      seen = true;
+    });
+    if (seen) cell.set(`${trace.meta?.corpus}\u0000${trace.meta?.word}`, useCounts ? n : (total > 0 ? n / total : 0));
+  });
+  const kept = corpora.filter(corpus => words.every(word => cell.has(`${corpus}\u0000${word}`)));
+  return {
+    corpora: kept,
+    words,
+    from,
+    to,
+    table: kept.map(corpus => words.map(word => cell.get(`${corpus}\u0000${word}`))),
   };
 };
 

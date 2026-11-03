@@ -87,6 +87,7 @@ export const encodeUrlState = (
     });
     if (query.rubriques?.length) params.set(key('rubriques'), query.rubriques.join(','));
     if (query.byRubrique) params.set(key('byRubrique'), '1');
+    if (query.outlets?.length) params.set(key('outlets'), query.outlets.join(','));
     revueCorpusParts(query.corpus).forEach(part => {
       const selection = query.revueSelection?.[part];
       if (!selection || isWholeCorpus(selection, revuesData[part])) return;
@@ -135,6 +136,7 @@ export const decodeUrlState = (search) => {
     });
     if (params.has(key('rubriques'))) query.rubriques = splitList(params.get(key('rubriques')));
     if (params.get(key('byRubrique')) === '1') query.byRubrique = true;
+    if (params.has(key('outlets'))) query.outlets = splitList(params.get(key('outlets')));
     revueCorpusParts(corpus).forEach(part => {
       const prefix = key(REVUE_KEYS[part]);
       const disciplines = params.getAll(`${prefix}.discipline`);

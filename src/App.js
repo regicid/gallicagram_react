@@ -12,7 +12,8 @@ import { isPressLinkOutCorpus, pressLinkOutUrl } from './pressCorpora';
 import { sumSeries } from './series';
 import { leMondeSource } from './leMonde';
 import { gallicaTerms, hasWildcard, resolveWildcards } from './contextWord';
-import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_CORPORA, ELIAS_PREFIX, addEliasCorpora } from './ngramRoute';
+import { cachedFetch } from './fetchCache';
+import { usesNgramRoute, ngramCorpusParams, ngramFieldParams, ELIAS_PREFIX, addEliasCorpora, presseModerneOutlets, outletCorpusCode } from './ngramRoute';
 import { GOOGLE_NGRAM_CORPORA, GOOGLE_NGRAM_PERIOD, isGoogleNgram, googleNgramYears, googleNgramUrl } from './googleNgram';
 import { useTranslation } from 'react-i18next';
 import Button from '@mui/material/Button';
@@ -215,17 +216,13 @@ function movingSum(data, windowSize) {
 
 const GALLICA_PROXY_API_URL = 'https://shiny.ens-paris-saclay.fr/guni';
 
-// The whole modern press as one corpus: every web outlet (see ELIAS_CORPORA), queried on
-// its own and added together (occurrences and corpus size), so the big outlets weigh the
-// most. Le Parisien and La Croix are the Elias copies, not the guni corpora the app
-// otherwise uses for them. Le Marin and Voiles et Voiliers are left out: they are trade
-// papers, not news.
+// The whole modern press as one corpus: every web outlet (see presseModerneOutlets), or
+// the ones the query picked, queried on its own and added together (occurrences and corpus
+// size), so the big outlets weigh the most. They are fetched under ELIAS_PREFIX: Le
+// Parisien and La Croix are the Elias copies, not the guni corpora the app otherwise uses.
 const PRESSE_MODERNE = 'presse_moderne';
-// A function, as corpus.tsv can add Elias corpora once it is loaded.
-const presseModerneParts = () => [
-  ...[...ELIAS_CORPORA].filter(corpus => !['le_marin', 'voiles_et_voiliers'].includes(corpus)),
-  'leparisien', 'la_croix',
-].map(part => `${ELIAS_PREFIX}${part}`);
+const presseModerneParts = (query) =>
+  presseModerneOutlets(query?.outlets).map(part => `${ELIAS_PREFIX}${part}`);
 // The server is shared; more requests than this at once only queue there.
 const PRESSE_MODERNE_CONCURRENCY = 5;
 
@@ -287,6 +284,7 @@ export const rollUpToWeeks = (rows) => {
 
 // Visualizations drawn by their own components (PolarComponent, FactorialComponent).
 const FIGURE_PLOT_TYPES = ['polar', 'pca', 'ca'];
+const FACTORIAL_PLOT_TYPES = ['pca', 'ca'];
 // The charts drawn on a canvas for their PNG export, in paper or social media form.
 const TIME_SERIES_PLOT_TYPES = ['line', 'area', 'bar'];
 
@@ -540,6 +538,15 @@ function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  // The corpus as curves name it. presse_moderne restricted to a few outlets is named
+  // after them, so that two tabs on different outlets are told apart (and compared as two
+  // corpora by the factorial analyses).
+  const corpusName = useCallback((query) => {
+    const nameOf = corpus => corpusPeriods[outletCorpusCode(corpus)]?.name || corpus;
+    if (query.corpus === PRESSE_MODERNE && query.outlets?.length) return query.outlets.map(nameOf).join(' + ');
+    return nameOf(query.corpus);
+  }, [corpusPeriods]);
+
   const processNgramData = useCallback((apiResponse, allSameCorpus, plotType, index) => {
     const { data, query } = apiResponse;
     const years = googleNgramYears(query.startDate, query.endDate).map(year => new Date(Date.UTC(year, 0)));
@@ -556,14 +563,14 @@ function App() {
         line: plotType === 'line' || plotType === 'area' ? { shape: 'spline' } : undefined,
         name: allSameCorpus
           ? (ngramData.ngram || `${t('Query')} ${query.id}`)
-          : `${ngramData.ngram || `${t('Query')} ${query.id}`} (${corpusPeriods[query.corpus]?.name || query.corpus})`,
+          : `${ngramData.ngram || `${t('Query')} ${query.id}`} (${corpusName(query)})`,
         connectgaps: false,
-        meta: { responseIndex: index }
+        meta: { responseIndex: index, word: ngramData.ngram, corpus: corpusName(query) }
       };
     });
 
     return traces;
-  }, [t, corpusPeriods]);
+  }, [t, corpusName]);
 
   const processData = useCallback((apiResponse, allSameCorpus, plotType, advancedOptions, index) => {
     if (isGoogleNgram(apiResponse.query.corpus)) {
@@ -668,11 +675,11 @@ function App() {
       line: plotType === 'line' || plotType === 'area' ? { shape: 'spline' } : undefined,
       name: allSameCorpus
         ? (displayWord || `${t('Query')} ${query.id}`)
-        : `${displayWord || `${t('Query')} ${query.id}`} (${corpusPeriods[query.corpus]?.name || query.corpus})`,
+        : `${displayWord || `${t('Query')} ${query.id}`} (${corpusName(query)})`,
       connectgaps: false,
-      meta: { responseIndex: index }
+      meta: { responseIndex: index, word: displayWord || `${t('Query')} ${query.id}`, corpus: corpusName(query) }
     };
-  }, [processNgramData, t, corpusPeriods]);
+  }, [processNgramData, t, corpusName]);
 
   useEffect(() => {
     if (apiResponses.length === 0) return;
@@ -685,8 +692,8 @@ function App() {
         // Use the data directly
         setSumsData(listModeResponse.data);
       } else {
-        const firstCorpus = queries[0]?.corpus;
-        const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
+        const firstCorpus = corpusName(queries[0] || {});
+        const allSameCorpus = queries.every(q => corpusName(q) === firstCorpus);
 
         const data = apiResponses.map(res => {
           let total;
@@ -701,7 +708,7 @@ function App() {
             : res.query.word;
           const name = allSameCorpus
             ? (displayWord || `${t('Query')} ${res.query.id}`)
-            : `${displayWord || `${t('Query')} ${res.query.id}`} (${corpusPeriods[res.query.corpus]?.name || res.query.corpus})`;
+            : `${displayWord || `${t('Query')} ${res.query.id}`} (${corpusName(res.query)})`;
 
           return {
             word: displayWord || `${t('Query')} ${res.query.id}`,
@@ -714,12 +721,22 @@ function App() {
         setSumsData(data);
       }
     } else {
-      const firstCorpus = queries[0]?.corpus;
-      const allSameCorpus = queries.every(q => q.corpus === firstCorpus);
+      const firstCorpus = corpusName(queries[0] || {});
+      const allSameCorpus = queries.every(q => corpusName(q) === firstCorpus);
       const activeQuery = queries.find(q => q.id === activeQueryId);
       const advancedOptions = activeQuery?.advancedOptions || {};
 
-      let traces = apiResponses.flatMap((res, index) => processData(res, allSameCorpus, plotType, advancedOptions, index));
+      let traces = apiResponses.flatMap((res, index) => {
+        const processed = processData(res, allSameCorpus, plotType, advancedOptions, index);
+        // The factorial analyses can compare corpora: a presse_moderne curve brings along
+        // one trace per outlet, which they use in place of the sum.
+        if (FACTORIAL_PLOT_TYPES.includes(plotType) && res.byOutlet && !Array.isArray(processed)) {
+          processed.parts = Object.entries(res.byOutlet).map(([outlet, rows]) => processData(
+            { data: rows, query: { ...res.query, corpus: outlet, outlets: undefined } },
+            false, plotType, advancedOptions, index));
+        }
+        return processed;
+      });
 
       // Handle difference calculation for lineplot mode
       if (plotType === 'line' && advancedOptions.difference && traces.length >= 2) {
@@ -851,7 +868,7 @@ function App() {
 
       setRawPlotData(traces);
     }
-  }, [apiResponses, plotType, queries, activeQueryId, processData, t, corpusPeriods]);
+  }, [apiResponses, plotType, queries, activeQueryId, processData, t, corpusName]);
 
   // Effect to switch to 'sums' view for list modes, and back when leaving them
   useEffect(() => {
@@ -1316,7 +1333,7 @@ function App() {
     // failing the whole curve; only when every outlet fails is the error reported.
     if (corpus === PRESSE_MODERNE) {
       const errors = [];
-      const parts = presseModerneParts();
+      const parts = presseModerneParts(query);
       return mapWithConcurrency(parts, PRESSE_MODERNE_CONCURRENCY, part =>
         fetchSingleWordGallicagram(word, part, startDate, endDate, resolution, query)
           .catch(error => {
@@ -1326,7 +1343,13 @@ function App() {
           })
       ).then(seriesList => {
         if (errors.length === parts.length) throw errors[0];
-        return sumSeries(seriesList);
+        // Each outlet's own series rides along with the sum, for the factorial analyses
+        // to compare the outlets with one another.
+        const sum = sumSeries(seriesList);
+        sum.byOutlet = Object.fromEntries(parts
+          .map((part, i) => [part.replace(ELIAS_PREFIX, ''), seriesList[i]])
+          .filter(([, series]) => series));
+        return sum;
       });
     }
     if (corpus === PRESSE_LIVRES) {
@@ -1343,7 +1366,7 @@ function App() {
     // pattern is summed into one series on the server.
     const url = `${GALLICA_PROXY_API_URL}/query_ngram?mot=${encodeURIComponent(word.trim().replace(/-/g, ' ').replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${startDate}&to=${endDate}&resolution=${apiResolution}${ngramFilter(query, corpus, true)}`;
     console.log("Querying Gallicagram URL:", url);
-    return fetch(url)
+    return cachedFetch(url)
       .then(async response => {
         // The ngram routes explain their refusals (too many forms for a pattern, '_' or
         // * at the start on a big corpus).
@@ -1385,7 +1408,7 @@ function App() {
   const fetchSingleWordNgramViewer = (word, corpus, startDate, endDate) => {
     const url = googleNgramUrl(corpus, word, startDate, endDate);
     console.log("Querying Ngram URL:", url);
-    return fetch(url)
+    return cachedFetch(url)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Network response was not ok for "${word}"`);
@@ -1414,7 +1437,7 @@ function App() {
       }
 
       try {
-        const response = await fetch(url);
+        const response = await cachedFetch(url);
         if (!response.ok) throw new Error("Network response was not ok");
         const text = await response.text();
         const parsed = await new Promise((resolveParse) => {
@@ -1454,7 +1477,7 @@ function App() {
     const fetchCount = async (cqlQuery) => {
       const url = `/api/sru?operation=searchRetrieve&exactSearch=True&version=1.2&startRecord=0&maximumRecords=0&collapsing=false&query=${encodeURIComponent(cqlQuery)}`;
       try {
-        const res = await fetch(url);
+        const res = await cachedFetch(url);
         const text = await res.text();
         // Parse XML to find <srw:numberOfRecords>
         const match = text.match(/<srw:numberOfRecords>(\d+)<\/srw:numberOfRecords>/);
@@ -1556,7 +1579,7 @@ function App() {
       url = `${GALLICA_PROXY_API_URL}/${ngramRoute}?mot=${encodeURIComponent(word.trim().replace(/’/g, "'"))}&${ngramCorpusParams(corpus)}&from=${globalStartDate}&to=${globalEndDate}&n_joker=${n_joker || 10}${lengthParam}&stopwords=${orDefault(stopwords, 500)}${scoreParam}${ngramFilter(query, corpus)}`;
     }
 
-    return fetch(url)
+    return cachedFetch(url)
       .then(res => res.text().then(text => {
         // The server explains its refusals in plain text; parsed as CSV they would plot
         // as nonsense words.
@@ -1738,7 +1761,12 @@ function App() {
               });
               const dataValues = Object.values(combinedData);
               const total = dataValues.reduce((acc, row) => acc + (row.n || 0), 0);
-              resolve([{ data: dataValues, query: queryWithDates, total }]);
+              // presse_moderne: the outlets' series, each summed over the word's variants.
+              const outlets = [...new Set(results.flatMap(r => Object.keys(r.byOutlet || {})))];
+              const byOutlet = outlets.length > 0
+                ? Object.fromEntries(outlets.map(o => [o, sumSeries(results.map(r => r.byOutlet?.[o]).filter(Boolean))]))
+                : undefined;
+              resolve([{ data: dataValues, query: queryWithDates, total, byOutlet }]);
             }
           }
         })

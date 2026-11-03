@@ -1,4 +1,4 @@
-import { symmetricEigen, pca, ca, buildTable, bezierCurve } from './factorial';
+import { symmetricEigen, pca, ca, buildTable, buildCorpusTable, varimax, bezierCurve } from './factorial';
 
 const close = (a, b, eps = 1e-9) => expect(Math.abs(a - b)).toBeLessThan(eps);
 
@@ -107,5 +107,67 @@ describe('bezierCurve', () => {
   test('stays finite with hundreds of control points', () => {
     const points = Array.from({ length: 1200 }, (_, i) => [Math.cos(i), Math.sin(i)]);
     bezierCurve(points).flat().forEach(x => expect(Number.isFinite(x)).toBe(true));
+  });
+});
+
+describe('buildCorpusTable', () => {
+  const trace = (word, corpus, years, n, total) => ({
+    x: years.map(y => new Date(Date.UTC(y, 0))),
+    n,
+    total,
+    meta: { word, corpus },
+  });
+
+  test('sums each word over the years every corpus covers', () => {
+    const traces = [
+      trace('a', 'A', [1900, 1901, 1902], [1, 2, 100], [10, 10, 10]),
+      trace('b', 'A', [1900, 1901, 1902], [3, 4, 100], [10, 10, 10]),
+      trace('a', 'B', [1899, 1900, 1901], [100, 5, 6], [20, 20, 20]),
+      trace('b', 'B', [1899, 1900, 1901], [100, 7, 8], [20, 20, 20]),
+    ];
+    const counts = buildCorpusTable(traces, true);
+    expect([counts.from, counts.to]).toEqual([1900, 1901]);
+    expect(counts.corpora).toEqual(['A', 'B']);
+    expect(counts.words).toEqual(['a', 'b']);
+    expect(counts.table).toEqual([[3, 7], [11, 15]]);
+    const freqs = buildCorpusTable(traces, false);
+    close(freqs.table[0][0], 3 / 20);
+    close(freqs.table[1][1], 15 / 40);
+  });
+
+  test('leaves out a corpus missing one of the words', () => {
+    const traces = [
+      trace('a', 'A', [1900], [1], [10]),
+      trace('b', 'A', [1900], [2], [10]),
+      trace('a', 'B', [1900], [3], [10]),
+    ];
+    expect(buildCorpusTable(traces, true).corpora).toEqual(['A']);
+  });
+});
+
+describe('varimax', () => {
+  // Kaiser's criterion on the normalised loadings: the variance of their squares.
+  const criterion = (columns) => [0, 1].reduce((sum, k) => {
+    const sq = columns.map(([x, y]) => [x, y][k] ** 2 / (x * x + y * y));
+    const mean = sq.reduce((a, b) => a + b, 0) / sq.length;
+    return sum + sq.reduce((a, b) => a + (b - mean) ** 2, 0);
+  }, 0);
+  const turn = (phi) => ([x, y]) => [x * Math.cos(phi) + y * Math.sin(phi), -x * Math.sin(phi) + y * Math.cos(phi)];
+  const table = [[10, 2, 5, 1], [8, 3, 6, 2], [2, 9, 1, 7], [1, 10, 2, 8], [5, 5, 9, 4], [3, 4, 2, 9]];
+
+  test.each([['pca', pca], ['ca', ca]])('%s: no other angle scores higher, and nothing but the frame moves', (_, analyse) => {
+    const result = analyse(table);
+    const rotated = varimax(result);
+    const best = criterion(rotated.columns);
+    for (let i = 0; i < 360; i++) {
+      expect(criterion(result.columns.map(turn((i * Math.PI) / 180)))).toBeLessThanOrEqual(best + 1e-9);
+    }
+    // A rotation: distances between rows and words are kept.
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    result.rows.forEach((r, i) => result.columns.forEach((c, j) =>
+      close(dist(r, c), dist(rotated.rows[i], rotated.columns[j]))));
+    close(rotated.explained[0] + rotated.explained[1], result.explained[0] + result.explained[1]);
+    expect(rotated.explained[0]).toBeGreaterThanOrEqual(rotated.explained[1]);
+    expect(rotated.explained.slice(2)).toEqual(result.explained.slice(2));
   });
 });

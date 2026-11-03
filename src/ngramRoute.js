@@ -73,6 +73,21 @@ export const eliasCorporaFromTsv = (tsv) => {
 export const addEliasCorpora = (tsv) =>
   eliasCorporaFromTsv(tsv).forEach(corpus => ELIAS_CORPORA.add(corpus));
 
+// The outlets the presse_moderne corpus adds together: every Elias corpus but Le Marin and
+// Voiles et Voiliers (trade papers, not news), plus the Elias copies of Le Parisien and
+// La Croix. A function, as corpus.tsv can add Elias corpora once it is loaded. `selected`
+// narrows it to the outlets the user picked; none picked means all of them.
+export const presseModerneOutlets = (selected) => {
+  const all = [
+    ...[...ELIAS_CORPORA].filter(corpus => !['le_marin', 'voiles_et_voiliers'].includes(corpus)),
+    'leparisien', 'la_croix',
+  ];
+  return selected?.length ? all.filter(corpus => selected.includes(corpus)) : all;
+};
+
+// corpus.tsv lists the Elias La Croix under its guni code: the one to read its name from.
+export const outletCorpusCode = (outlet) => (outlet === 'la_croix' ? 'lacroix' : outlet);
+
 // Databases fetched under this prefix always come from the Elias set: its leparisien and
 // la_croix are not the guni corpora the app otherwise uses for those papers.
 export const ELIAS_PREFIX = 'elias:';

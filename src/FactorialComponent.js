@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Plot from 'react-plotly.js';
 import { useTranslation } from 'react-i18next';
-import { FormControlLabel, Switch, Box, Link, Typography } from '@mui/material';
+import { FormControlLabel, Switch, Box, Link, Typography, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { defaultPalette, colorblindPalette, plotlyThemeFor, toPlotlyDate, revisionOf, useRenderAfterMount, FIGURE_DIV_ID } from './PlotComponent';
-import { pca, ca, buildTable, bezierCurve } from './factorial';
+import { pca, ca, varimax, buildTable, buildCorpusTable, bezierCurve } from './factorial';
 
 // Above this many dates, their years would cover the plane: they become dots.
 const MAX_LABELLED_DATES = 400;
@@ -34,14 +34,49 @@ const dateLabel = (dates) => {
 // Shiny app's "Épurer" option did, after Hyperbase.
 // A click on a date asks for its context, for the word that date leans towards (the series
 // it projects furthest onto); onTable receives the coordinates, for the CSV download.
+// When the series span several corpora, the rows can be the corpora instead of the dates:
+// each word summed over the years they share, to see which corpus leans towards which word.
 const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointClick, onTable }) => {
   const { t } = useTranslation();
   const [trajectory, setTrajectory] = useState(false);
+  const [rowsBy, setRowsBy] = useState('dates');
+  const [rotate, setRotate] = useState(false);
   const palette = advancedOptions?.colorblindPalette ? colorblindPalette : defaultPalette;
 
-  const analysis = useMemo(() => {
+  // A summed corpus (presse_moderne) brings its outlets' series as `parts`: to compare
+  // corpora, each outlet counts as one.
+  const corpusTraces = useMemo(
+    () => (data || []).flatMap(trace => (trace.parts?.length ? trace.parts : [trace])),
+    [data]);
+  const multiCorpus = useMemo(
+    () => new Set(corpusTraces.map(trace => trace.meta?.corpus).filter(Boolean)).size > 1,
+    [corpusTraces]);
+  const byCorpus = multiCorpus && rowsBy === 'corpora';
+
+  const unrotated = useMemo(() => {
     const traces = (data || []).filter(trace => Array.isArray(trace.x) && trace.x.length > 0);
     if (traces.length === 0) return { error: t('No data to display') };
+    if (byCorpus) {
+      const { corpora, words, from, to, table } = buildCorpusTable(
+        corpusTraces.filter(trace => Array.isArray(trace.x) && trace.x.length > 0), method === 'ca');
+      let names = words;
+      let colors = words.map((_, i) => palette[i % palette.length]);
+      let rowsTable = table;
+      let rowLabels = corpora;
+      if (method === 'ca') {
+        const keepRows = rowsTable.map(row => row.reduce((a, b) => a + b, 0) > 0);
+        rowLabels = rowLabels.filter((_, i) => keepRows[i]);
+        rowsTable = rowsTable.filter((_, i) => keepRows[i]);
+        const keepCols = names.map((_, j) => rowsTable.some(row => row[j] > 0));
+        rowsTable = rowsTable.map(row => row.filter((_, j) => keepCols[j]));
+        names = names.filter((_, j) => keepCols[j]);
+        colors = colors.filter((_, j) => keepCols[j]);
+      }
+      if (names.length < (method === 'ca' ? 3 : 2)) return { error: t(method === 'ca' ? 'AFC needs three series' : 'ACP needs two series') };
+      if (rowLabels.length < 3) return { error: t('Factorial needs corpora') };
+      const result = method === 'ca' ? ca(rowsTable) : pca(rowsTable);
+      return { rowLabels, period: `${from}–${to}`, names, colors, ...result };
+    }
     let { dates, table } = buildTable(traces, method === 'ca');
     let names = traces.map(trace => trace.name);
     let colors = traces.map((_, i) => palette[i % palette.length]);
@@ -66,7 +101,13 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
       return scores.indexOf(Math.max(...scores));
     });
     return { dates, names, colors, metas, leaning, ...result };
-  }, [data, method, palette, t]);
+  }, [data, corpusTraces, method, palette, t, byCorpus]);
+
+  // Varimax only turns the frame: which word a date leans towards stays the same.
+  const analysis = useMemo(
+    () => (rotate && !unrotated.error ? { ...unrotated, ...varimax(unrotated) } : unrotated),
+    [unrotated, rotate]);
+  const axisName = rotate ? 'Rotated dim.' : 'Dim.';
 
   useEffect(() => {
     if (!onTable) return;
@@ -74,29 +115,44 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
       onTable(null);
       return;
     }
-    const { dates, names, rows, columns, explained } = analysis;
-    const dims = explained.map((_, k) => `Dim ${k + 1} (${explained[k].toFixed(2)} %)`);
+    const { dates, rowLabels, names, rows, columns, explained } = analysis;
+    const dims = explained.map((_, k) => `${rotate && k < 2 ? 'RC' : 'Dim'} ${k + 1} (${explained[k].toFixed(2)} %)`);
     const line = (kind, label, coords) => Object.fromEntries([['type', kind], ['label', label], ...dims.map((dim, k) => [dim, coords[k]])]);
-    const label = dateLabel(dates);
+    const label = rowLabels ? (i => rowLabels[i]) : (i => dateLabel(dates)(dates[i]));
     onTable({
       fields: ['type', 'label', ...dims],
       data: [
-        ...rows.map((coords, i) => line('date', label(dates[i]), coords)),
+        ...rows.map((coords, i) => line(rowLabels ? 'corpus' : 'date', label(i), coords)),
         ...columns.map((coords, j) => line('word', names[j], coords)),
       ],
     });
-  }, [analysis, onTable]);
+  }, [analysis, rotate, onTable]);
 
   useRenderAfterMount(!analysis.error);
 
+  const rowsToggle = multiCorpus && (
+    <ToggleButtonGroup
+      size="small"
+      exclusive
+      value={rowsBy}
+      onChange={(_, value) => value && setRowsBy(value)}
+      sx={{ marginRight: 2 }}
+    >
+      <ToggleButton value="dates">{t('Dates')}</ToggleButton>
+      <ToggleButton value="corpora">{t('Corpora')}</ToggleButton>
+    </ToggleButtonGroup>
+  );
+
   if (analysis.error) {
-    return <div className="plot-component" style={{ padding: '2rem' }}>{analysis.error}</div>;
+    return (
+      <div>
+        {rowsToggle && <Box sx={{ paddingLeft: 2 }}>{rowsToggle}</Box>}
+        <div className="plot-component" style={{ padding: '2rem' }}>{analysis.error}</div>
+      </div>
+    );
   }
 
-  const { dates, names, colors, metas, leaning, rows, columns, explained } = analysis;
-  const label = dateLabel(dates);
-  const labels = dates.map(label);
-  const showYears = dates.length <= MAX_LABELLED_DATES;
+  const { dates, rowLabels, names, colors, metas, leaning, rows, columns, explained } = analysis;
   const theme = plotlyThemeFor(darkMode);
   const textColor = darkMode ? '#bbbbbb' : '#555555';
 
@@ -107,7 +163,21 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
   const wordPositions = columns.map(c => [c[0] * stretch, c[1] * stretch]);
 
   const traces = [];
-  if (trajectory) {
+  if (byCorpus) {
+    traces.push({
+      type: 'scatter',
+      mode: 'markers+text',
+      x: rows.map(r => r[0]),
+      y: rows.map(r => r[1]),
+      text: rowLabels,
+      textposition: 'top center',
+      textfont: { size: 13, color: textColor },
+      marker: { size: 7, color: textColor },
+      hovertemplate: '%{text}<extra></extra>',
+      showlegend: false,
+    });
+  }
+  if (!byCorpus && trajectory) {
     const curve = bezierCurve(rows.map(r => [r[0], r[1]]));
     traces.push({
       type: 'scatter',
@@ -119,21 +189,26 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
       showlegend: false,
     });
   }
-  const first = dates[0].getTime();
-  const span = dates[dates.length - 1].getTime() - first || 1;
-  const dateColors = dates.map(d => dateColor((d.getTime() - first) / span, darkMode));
-  traces.push({
-    type: 'scatter',
-    mode: showYears ? 'text' : 'markers',
-    x: rows.map(r => r[0]),
-    y: rows.map(r => r[1]),
-    text: dates.map(d => String(d.getUTCFullYear())),
-    customdata: dates.map((d, i) => [toPlotlyDate(d), names[leaning[i]], labels[i]]),
-    textfont: { size: 12, color: dateColors },
-    marker: { size: 7, color: dateColors },
-    hovertemplate: '%{customdata[2]} → %{customdata[1]}<extra></extra>',
-    showlegend: false,
-  });
+  if (!byCorpus) {
+    const label = dateLabel(dates);
+    const labels = dates.map(label);
+    const showYears = dates.length <= MAX_LABELLED_DATES;
+    const first = dates[0].getTime();
+    const span = dates[dates.length - 1].getTime() - first || 1;
+    const dateColors = dates.map(d => dateColor((d.getTime() - first) / span, darkMode));
+    traces.push({
+      type: 'scatter',
+      mode: showYears ? 'text' : 'markers',
+      x: rows.map(r => r[0]),
+      y: rows.map(r => r[1]),
+      text: dates.map(d => String(d.getUTCFullYear())),
+      customdata: dates.map((d, i) => [toPlotlyDate(d), names[leaning[i]], labels[i]]),
+      textfont: { size: 12, color: dateColors },
+      marker: { size: 7, color: dateColors },
+      hovertemplate: '%{customdata[2]} → %{customdata[1]}<extra></extra>',
+      showlegend: false,
+    });
+  }
   names.forEach((name, j) => {
     traces.push({
       type: 'scatter',
@@ -149,13 +224,13 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
   });
   const handleClick = (event) => {
     const point = event.points?.[0];
-    if (!onPointClick || !Array.isArray(point?.customdata)) return;
+    if (byCorpus || !onPointClick || !Array.isArray(point?.customdata)) return;
     const word = leaning[point.pointIndex];
     onPointClick({ points: [{ ...point, x: point.customdata[0], data: { ...point.data, meta: metas[word] } }] });
   };
 
   const axis = k => ({
-    title: { text: `${t('Dim.')} ${k + 1} (${explained[k].toFixed(1)} %)` },
+    title: { text: `${t(axisName)} ${k + 1} (${explained[k].toFixed(1)} %)` },
     zeroline: true,
     zerolinecolor: textColor,
     tickfont: { size: 12 },
@@ -164,10 +239,22 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
 
   return (
     <div>
-      <Box sx={{ paddingLeft: 2 }}>
+      <Box sx={{ paddingLeft: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+        {rowsToggle}
+        {byCorpus ? (
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+            {t('Corpora summed over', { period: analysis.period })}
+          </Typography>
+        ) : (
+          <FormControlLabel
+            control={<Switch checked={trajectory} onChange={e => setTrajectory(e.target.checked)} />}
+            label={t('Show the trajectory')}
+          />
+        )}
         <FormControlLabel
-          control={<Switch checked={trajectory} onChange={e => setTrajectory(e.target.checked)} />}
-          label={t('Show the trajectory')}
+          sx={{ marginLeft: 1 }}
+          control={<Switch checked={rotate} onChange={e => setRotate(e.target.checked)} />}
+          label={t('Varimax rotation')}
         />
       </Box>
       <Plot
@@ -182,7 +269,7 @@ const FactorialComponent = ({ data, method, advancedOptions, darkMode, onPointCl
           hovermode: 'closest',
           xaxis: axis(0),
           yaxis: { ...axis(1), scaleanchor: 'x', scaleratio: 1 },
-          uirevision: `${method}-${revisionOf(data)}`,
+          uirevision: `${method}-${rowsBy}-${rotate}-${revisionOf(data)}`,
         }}
         config={{ displayModeBar: true, scrollZoom: false }}
         useResizeHandler={true}

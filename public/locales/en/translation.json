@@ -251,5 +251,14 @@
   "whats_new_speed": "30x faster queries",
   "whats_new_close": "Let's go",
   "whats_new_thanks": "Thanks to",
-  "whats_new_and": "and"
+  "whats_new_and": "and",
+  "Factorial needs corpora": "Comparing corpora needs at least three corpora that have every word: query the same words in more corpora.",
+  "Dates": "Dates",
+  "Corpora": "Corpora",
+  "Corpora summed over": "Each word summed over {{period}}, the years all the corpora cover",
+  "Outlets": "Outlets",
+  "All outlets": "All outlets",
+  "Search outlets...": "Search outlets...",
+  "Varimax rotation": "Varimax rotation",
+  "Rotated dim.": "Rotated dim."
 }
